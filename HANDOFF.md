@@ -1,4 +1,12 @@
-# HANDOFF — Dragon's Hoard slot machine (Android)
+# HANDOFF — Casino repo (two apps)
+
+| App | Module | Status |
+|-----|--------|--------|
+| Dragon's Hoard | `:app` | DONE (v1.0.0, `release/DragonsHoard.apk`) |
+| Neon Reaper | `:reaper` | IN PROGRESS — see "NEON REAPER" section at the bottom |
+
+---
+# Dragon's Hoard (app 1)
 
 > **Cold-resume protocol for any new Claude session:** read this file top to bottom,
 > then `git log --oneline -15`, then continue at the first unchecked item in
@@ -65,3 +73,35 @@ cp app/build/outputs/apk/release/app-release.apk release/DragonsHoard.apk
 ## Status log
 - Session 1: scaffold created. Engine done: exact RTP 79.999%, sim 80.4%, hit 33%, SD 4.6, FS every ~126 spins.
 - Session 1 (cont.): full game built; 13 unit tests pass; release APK 114 KB in `release/`; README with screenshots.
+
+
+---
+# NEON REAPER (app 2) — module `:reaper`, package `com.tjshea.neonreaper`
+
+## User requirements (session 2)
+1. RTP 87 % (house edge ~13 %) at EVERY stake. 2. Winning spin ~1 in 4.
+3. Single STAKE button (no lines UI). 4. Stake 1–40 credits. **1 credit = 1 token** (user's choice).
+5. Same password/wallet/architecture as app 1. 6. Same currency + round-down-to-mack rule.
+7. Dark theme: black, neon green, red; hooded red-eyed figures, grim reapers. 8. Subtle scary background music.
+9. Big/huge wins proportional to stake, **hard cap 25 books (2000 tokens) per spin and per bonus** (user's choice),
+   still 87 % at every stake.
+10. Lots of animation; characters appear/enlarge on big wins, with SFX.
+11. Collect 5 relics (random chance per spin) → separate BONUS screen (Hold & Spin style), big payouts, transition in/out,
+    show total, add to balance, return to base game.
+
+## Math design
+- 5x3, 20 fixed paylines, pays are integer multiples of the stake (so stakes that are multiples of 10 never lose to rounding).
+- Rounding to mack and the 2000-token cap make RTP stake-dependent, so a visible **"Reaper's Touch" random wild-reel feature**
+  has a per-stake trigger rate f(stake) computed so RTP(stake) = 87 % exactly (table in ReaperConfig, verified by test).
+- Bonus: each spin has chance p to award the next missing relic; 5 relics → Soul Vault bonus (Hold & Spin, 5x4 grid,
+  3 respins reset on every landing orb, value orbs × bonus bet, MINI/MINOR/MAJOR jackpot orbs, Reaper collector orb,
+  GRAND for a full grid). Bonus bet = average stake while collecting (prevents min-stake-then-max-stake exploit).
+- Small stakes (<10 tokens): wins below 10 tokens round to 0 (user accepted), so hit rate is lower there.
+
+## Work queue (app 2)
+- [ ] Python tuner (tools/reaper_tune.py) → reel counts, feature, bonus params
+- [ ] Engine + exact per-stake RTP test
+- [ ] Wallet/Security copy (+ relics, average stake, bonus state persisted)
+- [ ] Art (procedural reaper/hooded/skull/raven/lantern + royals), base SlotView, music + SFX
+- [ ] Bonus screen + transitions
+- [ ] Release APK `release/NeonReaper.apk`, CI, README
