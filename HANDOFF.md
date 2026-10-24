@@ -45,7 +45,7 @@ cp app/build/outputs/apk/release/app-release.apk release/DragonsHoard.apk
 - [x] Project scaffold, keystore, handoff doc
 - [x] Tune reel strips to 80 % RTP (python tuner in scratchpad; result goes in `engine/GameConfig.kt`)
 - [x] Engine (spin, line eval, scatter, free spins) + exact RTP unit test
-- [ ] Wallet + password security
+- [x] Wallet + password security (data/Wallet.kt, data/Security.kt)
 - [ ] SlotView rendering & animations, sounds
 - [ ] Dialogs: setup password, deposit, withdraw, paytable/help, stats
 - [ ] Build release APK → `release/`, GitHub Actions workflow
