@@ -399,7 +399,7 @@ object Art {
         }
     }
 
-    fun orbBitmap(size: Int, color: Int): Bitmap = bitmap(size) { c, s -> orb(c, s / 2, s / 2, s * 0.32f, color) }
+    fun orbBitmap(size: Int, color: Int): Bitmap = bitmap(size) { c, s -> orb(c, s / 2, s / 2, s * 0.38f, color) }
 
     fun darken(c: Int) = Color.rgb(Color.red(c) / 5, Color.green(c) / 5, Color.blue(c) / 5)
 

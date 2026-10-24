@@ -3,7 +3,7 @@
 | App | Module | Status |
 |-----|--------|--------|
 | Dragon's Hoard | `:app` | DONE (v1.0.0, `release/DragonsHoard.apk`) |
-| Neon Reaper | `:reaper` | IN PROGRESS — see "NEON REAPER" section at the bottom |
+| Neon Reaper | `:reaper` | DONE v1.0.0 (`release/NeonReaper.apk`) — see "NEON REAPER" section at the bottom |
 
 ---
 # Dragon's Hoard (app 1)
@@ -102,6 +102,14 @@ cp app/build/outputs/apk/release/app-release.apk release/DragonsHoard.apk
 - [x] Python tuner (tools/reaper_tune.py, tools/reaper_bonus.py) → reel counts, feature, bonus params
 - [x] Engine + per-stake calibration (CalibrationTest prints FEATURE_RATE; all stakes 87.0 %), FullGameTest sim 86–88 %
 - [x] Wallet/Security (+ relics, average stake, crash-safe Soul Vault replay via stored seed)
-- [ ] (audio done: audio/Audio.kt) Art (procedural reaper/hooded/skull/raven/lantern + royals), base SlotView, music + SFX
-- [ ] Bonus screen + transitions
-- [ ] Release APK `release/NeonReaper.apk`, CI, README
+- [x] Art (ui/Art.kt), base game (ui/ReaperView.kt), music + SFX (audio/Audio.kt)
+- [x] Bonus screen (ui/VaultView.kt) + trigger/return transitions (MainActivity overlays VaultView)
+- [x] Release APK `release/NeonReaper.apk`, CI builds both apps, README
+- [x] Tests: CalibrationTest, FullGameTest, WalletTest, ActivityTest (launch + dialogs), ScreensTest/ArtSheetTest (renders to reaper/build/screens)
+- [ ] Possible next steps if asked: real-device tuning of animation speed/volume on the MT8168, more bonus variety (e.g. extra rows), haptics tuning
+
+## Key files (app 2)
+- engine/ReaperConfig.kt — pays, reels, stakes, FEATURE_RATE table (re-run CalibrationTest after ANY math change and paste its printed table)
+- engine/ReaperEngine.kt, engine/SoulVault.kt (bonus is generated from a seed: credited at trigger, replayed by UI; replays after restart)
+- data/Wallet.kt — relics, average-stake bonus bet, vaultUnseen gate (spins blocked until the bonus has been shown)
+- Session 2: Neon Reaper built end to end; per-stake RTP 87.0 %; 148 KB APK.

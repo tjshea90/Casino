@@ -1,14 +1,48 @@
-# Dragon's Hoard — Android slot machine
+# Casino — Android slot machines
+
+| Game | APK | Theme |
+|------|-----|-------|
+| **Neon Reaper** | [`release/NeonReaper.apk`](release/NeonReaper.apk) (~150 KB) | Dark horror: reapers, hooded watchers, neon green & blood red. 87 % RTP, Soul Vault bonus |
+| **Dragon's Hoard** | [`release/DragonsHoard.apk`](release/DragonsHoard.apk) (~115 KB) | Red & gold Asian fortune. 80 % RTP, free spins |
+
+Both run on Android 10 (Go) and up (MT8168 / armv7 tested target), share the same currency and password security, and are separate apps (they can be installed side by side).
+
+---
+
+# Neon Reaper
+
+![Neon Reaper](docs/reaper_idle.jpg)
+
+- **Stake:** one STAKE button, 1–40 tokens (1, 2, 3, 4, 5, 8, 10, 15, 20, 25, 30, 40).
+- **20 lines**, pays are multiples of the stake. Every payout rounds **down to a whole mack**; max win **25 books (2,000 tokens)** per spin and per bonus.
+- **RTP 87 % at every stake** (house edge 13 %). About **1 in 4 spins wins** at stakes of 10+ tokens. At stakes under 10, wins under 10 tokens round to 0, so wins are rarer there.
+- **Reaper's Touch:** the Grim Reaper swoops in and slashes 1–3 middle reels fully wild.
+- **Relics → Soul Vault bonus:** any spin can reveal one of 5 relics (kept between sessions). Collect all 5 (≈ every 220 spins) to open the **Soul Vault**, a separate hold-and-spin screen:
+  5 starting orbs, 3 respins that reset whenever an orb lands; orbs worth 1×–25× the bonus bet; MINI 15×, MINOR 40×, MAJOR 150× jackpot orbs;
+  the Reaper orb harvests every soul on the board; fill all 20 niches for the GRAND (1000×). Averages ~50× the bonus bet. The bonus bet is your **average stake while collecting**, so switching to a big stake at the last relic doesn't game it.
+- Big/Huge/Massive/Deadly win celebrations with the reaper rising, characters looming out of the reels on 5-of-a-kind, lightning, bats, fog, soul particles, synthesized horror music (separate bonus track) and sound effects.
+
+| Reaper's Touch | Big win | Soul Vault |
+|---|---|---|
+| ![](docs/reaper_touch.jpg) | ![](docs/reaper_bigwin.jpg) | ![](docs/reaper_vault.jpg) |
+
+**Math verification** (`reaper/src/test/.../CalibrationTest.kt`, `FullGameTest.kt`): per-stake RTP is measured with rounding and the cap
+(4 M base spins, 800 k feature spins, 400 k bonuses); the Reaper's Touch rate is tuned per stake so each stake computes to 87.0 %.
+A 2-million-spin full-game simulation per stake confirms 86.3–87.9 %.
+
+---
+
+# Dragon's Hoard
 
 A fully offline, casino-style 5-reel video slot for Android 10 (Go edition) and up,
 optimised for the MediaTek MT8168 (armv7). **APK: [`release/DragonsHoard.apk`](release/DragonsHoard.apk)** (~115 KB).
 
 ![Cabinet](docs/idle_1280x800.jpg)
 
-## Install
-1. Copy `release/DragonsHoard.apk` to the tablet (or download it from GitHub on the device).
+## Install (either game)
+1. Copy the APK to the tablet (or download it from GitHub on the device).
 2. Open it and allow "Install unknown apps" for your file manager/browser when asked.
-3. Launch **Dragon's Hoard**, set your machine password, then tap **DEPOSIT**.
+3. Launch the game, set your machine password, then tap **DEPOSIT**.
 
 ## Currency
 | Unit | Tokens |

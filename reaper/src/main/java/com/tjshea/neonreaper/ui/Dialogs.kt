@@ -320,7 +320,8 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
         for (s in 0 until ReaperConfig.SYMBOL_COUNT) {
             val p = ReaperConfig.PAYS[s]
             val name = ReaperConfig.SYMBOL_NAMES[s].uppercase() + if (s == ReaperConfig.WILD) " — substitutes for every symbol" else ""
-            val desc = "$name\n5×: ${p[2] * stake}    4×: ${p[1] * stake}    3×: ${p[0] * stake} tokens   (${p[2]}× / ${p[1]}× / ${p[0]}× stake)"
+            fun v(m: Int): String { val x = m.toLong() * stake; return if (x > ReaperConfig.MAX_WIN_TOKENS) "${ReaperConfig.MAX_WIN_TOKENS} (max)" else "$x" }
+            val desc = "$name\n5×: ${v(p[2])}    4×: ${v(p[1])}    3×: ${v(p[0])} tokens   (${p[2]}× / ${p[1]}× / ${p[0]}× stake)"
             val nl = desc.indexOf('\n')
             val styled = android.text.SpannableString(desc).apply {
                 setSpan(android.text.style.ForegroundColorSpan(gold), 0, nl, 0)

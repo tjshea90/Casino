@@ -816,6 +816,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         val y = sy + (target.centerY() - sy) * ease - sin(ease * PI).toFloat() * 80 * u
         val scale = (2.6f * appear) * (1 - ease) + 1f * ease
         val s = target.width() * scale
+        if (s < 2f) return
         pFill.shader = RadialGradient(x, y, s, intArrayOf(0xAA76FF03.toInt(), 0x00000000), null, Shader.TileMode.CLAMP)
         c.drawCircle(x, y, s, pFill); pFill.shader = null
         tmp.set(x - s / 2, y - s / 2, x + s / 2, y + s / 2)
@@ -962,7 +963,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         val cy = rightChar.centerY() + (reelRect.top - rightChar.height() * 0.1f - rightChar.centerY()) * e
         val w = rightChar.width() * scale; val h = rightChar.height() * scale
         // shadow aura
-        pFill.shader = RadialGradient(cx, cy, w, intArrayOf(0xAA000000.toInt(), 0x00000000), null, Shader.TileMode.CLAMP)
+        pFill.shader = RadialGradient(cx, cy, w.coerceAtLeast(1f), intArrayOf(0xAA000000.toInt(), 0x00000000), null, Shader.TileMode.CLAMP)
         c.drawCircle(cx, cy, w, pFill); pFill.shader = null
         c.save()
         val swing = if (t in (slashAt - 0.12)..(slashAt + 0.15)) ((t - slashAt + 0.12) / 0.27 * 50 - 25).toFloat() else -10f * e

@@ -79,6 +79,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
     private val plaques = Array(4) { RectF() }
     private val totalRect = RectF()
     private val respinRect = RectF()
+    private val betRect = RectF()
     private var bg: Bitmap? = null
     private var orbBmp: Array<Bitmap>? = null
     private val fx = Random()
@@ -144,14 +145,16 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         u = min(W / 1280f, H / 800f)
         val top = H * 0.2f; val bottom = H * 0.84f
         cellH = (bottom - top) / VAULT_ROWS
-        cellW = min(cellH * 1.25f, W * 0.62f / VAULT_COLS)
+        cellW = min(cellH * 1.25f, W * 0.56f / VAULT_COLS)
         val gw = cellW * VAULT_COLS
         gridRect.set((W - gw) / 2, top, (W + gw) / 2, top + cellH * VAULT_ROWS)
         val pw = min(W * 0.17f, 230 * u); val pgap = 14 * u
         val px0 = W / 2 - (pw * 4 + pgap * 3) / 2
         for (i in 0 until 4) plaques[i].set(px0 + i * (pw + pgap), H * 0.035f, px0 + i * (pw + pgap) + pw, H * 0.155f)
-        totalRect.set(W / 2 - 260 * u, H * 0.865f, W / 2 + 260 * u, H * 0.975f)
-        respinRect.set(gridRect.left - 200 * u, gridRect.centerY() - 120 * u, gridRect.left - 24 * u, gridRect.centerY() + 120 * u)
+        val x0 = W / 2 - 446 * u
+        respinRect.set(x0, H * 0.865f, x0 + 300 * u, H * 0.975f)
+        totalRect.set(respinRect.right + 16 * u, H * 0.865f, respinRect.right + 416 * u, H * 0.975f)
+        betRect.set(totalRect.right + 16 * u, H * 0.865f, totalRect.right + 176 * u, H * 0.975f)
         bg?.recycle()
         bg = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888).also { paintCrypt(Canvas(it), W, H) }
         orbBmp?.forEach { it.recycle() }
@@ -180,7 +183,8 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         }
         // arches
         p.color = 0xFF020302.toInt()
-        for (ax in floatArrayOf(w * 0.1f, w * 0.9f)) {
+        val margin = gridRect.left
+        for (ax in floatArrayOf(margin * 0.5f, w - margin * 0.5f)) {
             val a = Path().apply {
                 moveTo(ax - 110 * u, h); lineTo(ax - 110 * u, h * 0.45f)
                 cubicTo(ax - 110 * u, h * 0.2f, ax + 110 * u, h * 0.2f, ax + 110 * u, h * 0.45f)
@@ -189,8 +193,8 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             c.drawPath(a, p)
         }
         // hooded silhouettes in the arches
-        Art.hooded(c, w * 0.1f - 80 * u, h * 0.42f, 160 * u, 210 * u, Neon.RED_DIM)
-        Art.hooded(c, w * 0.9f - 80 * u, h * 0.42f, 160 * u, 210 * u, Neon.RED_DIM)
+        Art.hooded(c, margin * 0.5f - 80 * u, h * 0.5f, 160 * u, 210 * u, Neon.RED_DIM)
+        Art.hooded(c, w - margin * 0.5f - 80 * u, h * 0.5f, 160 * u, 210 * u, Neon.RED_DIM)
         // vignette
         p.shader = RadialGradient(w / 2, h / 2, max(w, h) * 0.65f, intArrayOf(0x00000000, 0xEE000000.toInt()), floatArrayOf(0.45f, 1f), Shader.TileMode.CLAMP)
         c.drawRect(0f, 0f, w, h, p); p.shader = null
@@ -305,8 +309,9 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
     private var introStart = 0.0
 
     private fun drawTorches(c: Canvas, t: Double) {
-        for ((i, x) in floatArrayOf(width * 0.22f, width * 0.78f).withIndex()) {
-            val y = height * 0.33f
+        val m = gridRect.left
+        for ((i, x) in floatArrayOf(m * 0.5f - 95 * u, m * 0.5f + 95 * u, width - m * 0.5f - 95 * u, width - m * 0.5f + 95 * u).withIndex()) {
+            val y = height * 0.36f
             pFill.color = 0xFF1A1A1A.toInt()
             c.drawRect(x - 6 * u, y, x + 6 * u, y + 60 * u, pFill)
             pFill.shader = RadialGradient(x, y, 160 * u, intArrayOf(0x4476FF03, 0x00000000), null, Shader.TileMode.CLAMP)
@@ -335,20 +340,32 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
 
     private fun drawRespins(c: Canvas, t: Double) {
         val r = respinRect
-        pText.typeface = cond; pText.textSize = 26 * u; pText.color = 0xFF9CCC65.toInt()
-        c.drawText("RESPINS", r.centerX(), r.top + 20 * u, pText)
+        pFill.color = 0xF0000000.toInt(); c.drawRoundRect(r, 16 * u, 16 * u, pFill)
+        path.reset(); path.addRoundRect(r, 16 * u, 16 * u, Path.Direction.CW)
+        Art.neonStroke(c, path, Neon.RED, 2f * u)
+        pText.typeface = cond; pText.textSize = r.height() * 0.24f; pText.color = 0xFFFF8A80.toInt()
+        pText.textAlign = Paint.Align.LEFT
+        c.drawText("RESPINS", r.left + 14 * u, r.centerY() + r.height() * 0.08f, pText)
+        pText.textAlign = Paint.Align.CENTER
         val flash = vt - resetFlash < 0.8
+        val sz = r.height() * 0.72f
         for (i in 0 until ReaperConfig.VAULT_RESPINS) {
-            val cy = r.top + 60 * u + i * 62 * u
+            val cx = r.right - sz * 0.7f - (ReaperConfig.VAULT_RESPINS - 1 - i) * sz * 1.05f
             val on = i < respins
-            val s = if (flash && on) (1 + 0.25 * (1 - (vt - resetFlash) / 0.8)).toFloat() else 1f
-            c.save(); c.scale(s, s, r.centerX(), cy)
-            Art.skull(c, r.centerX(), cy, 52 * u, if (on) Neon.RED else 0xFF3A2A2A.toInt())
+            val s = if (flash && on) (1 + 0.3 * (1 - (vt - resetFlash) / 0.8)).toFloat() else 1f
+            c.save(); c.scale(s, s, cx, r.centerY())
+            Art.skull(c, cx, r.centerY(), sz, if (on) Neon.RED else 0xFF3A2A2A.toInt())
             c.restore()
         }
-        pText.typeface = cond; pText.textSize = 20 * u; pText.color = 0xFF8A9A80.toInt()
-        c.drawText("BONUS BET ${result.bet}", r.centerX(), r.bottom + 30 * u, pText)
-        if (speed > 1.0 && summaryAt < 0) { pText.color = Neon.ORANGE; c.drawText("FAST ▸▸", r.centerX(), r.bottom + 56 * u, pText) }
+        // bonus bet box mirrors it on the right
+        tmp.set(betRect)
+        pFill.color = 0xF0000000.toInt(); c.drawRoundRect(tmp, 16 * u, 16 * u, pFill)
+        path.reset(); path.addRoundRect(tmp, 16 * u, 16 * u, Path.Direction.CW)
+        Art.neonStroke(c, path, Neon.PURPLE, 2f * u)
+        pText.typeface = cond; pText.textSize = r.height() * 0.22f; pText.color = 0xFFE1A6FF.toInt()
+        c.drawText("BONUS BET", tmp.centerX(), tmp.top + r.height() * 0.36f, pText)
+        pText.typeface = serif; pText.textSize = r.height() * 0.36f; pText.color = Color.WHITE
+        c.drawText(if (speed > 1.0 && summaryAt < 0) "${result.bet} ▸▸" else "${result.bet}", tmp.centerX(), tmp.bottom - r.height() * 0.16f, pText)
     }
 
     private fun cellRect(i: Int, out: RectF) {
@@ -364,12 +381,18 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             if (o == null) {
                 // spinning niche: flickering ghost orbs
                 if (revealAt[i] > 0 && vt < revealAt[i]) {
-                    val k = ((vt * 14 + i * 3).toInt()) % 3
-                    pBmp.alpha = 70
-                    val s = min(cellW, cellH) * 0.8f
-                    c.drawBitmap(ob[if (k == 0) 0 else if (k == 1) 4 else 2], null,
-                        RectF(tmp.centerX() - s / 2, tmp.centerY() - s / 2 + ((vt * 9 % 1.0) * 20 * u).toFloat(), tmp.centerX() + s / 2, tmp.centerY() + s / 2), pBmp)
+                    c.save(); c.clipRect(tmp.left + 6 * u, tmp.top + 6 * u, tmp.right - 6 * u, tmp.bottom - 6 * u)
+                    val ph = ((vt * 5 + i * 0.37) % 1.0).toFloat()
+                    val s = min(cellW, cellH) * 0.7f
+                    pBmp.alpha = 45
+                    for (k in -1..1) {
+                        val cy = tmp.top + (ph + k) * cellH + cellH / 2
+                        c.drawBitmap(ob[0], null, RectF(tmp.centerX() - s / 2, cy - s * 0.7f, tmp.centerX() + s / 2, cy + s * 0.7f), pBmp)
+                    }
                     pBmp.alpha = 255
+                    pFill.shader = LinearGradient(0f, tmp.top, 0f, tmp.bottom, intArrayOf(0x00000000, 0x3376FF03, 0x00000000), null, Shader.TileMode.CLAMP)
+                    c.drawRect(tmp, pFill); pFill.shader = null
+                    c.restore()
                 }
                 continue
             }
@@ -425,7 +448,8 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         c.drawText("SOULS HARVESTED", r.centerX(), r.top + r.height() * 0.3f, pText)
         pText.typeface = serif; pText.textSize = r.height() * 0.48f; pText.color = Color.WHITE
         pText.setShadowLayer(12 * u, 0f, 0f, Neon.GREEN)
-        c.drawText("${Money.fmt(tokens(totalMult))} TOKENS", r.centerX(), r.bottom - r.height() * 0.14f, pText)
+        val live = cellValue.sum() + if (grandAt >= 0) ReaperConfig.GRAND else 0
+        c.drawText("${Money.fmt(tokens(live))} TOKENS", r.centerX(), r.bottom - r.height() * 0.14f, pText)
         pText.clearShadowLayer()
     }
 
