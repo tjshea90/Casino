@@ -10,28 +10,36 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.Random
 import kotlin.math.PI
+import kotlin.math.abs
+import kotlin.math.cos
 import kotlin.math.exp
+import kotlin.math.pow
 import kotlin.math.sin
+import kotlin.math.tanh
 
 /**
- * All audio is synthesized on first launch into WAV files in the cache dir:
- * short effects go through SoundPool, the two ambient music loops through
- * MediaPlayer. Nothing ships in the APK.
+ * All audio is synthesized on first launch into WAV files in the cache dir
+ * (short effects → SoundPool, the two music loops → MediaPlayer). Nothing ships
+ * in the APK. Music is composed in code: pads, sub bass, music-box melody,
+ * ghost choir and taiko drums, all through a Freeverb-style reverb.
  */
 class Audio(context: Context) {
-    enum class Sfx { CLICK, SPIN, STOP, WIN, WIN_MED, BIG_WIN, THUNDER, RELIC, VAULT, ORB, HEARTBEAT, JACKPOT, GROWL, SLASH, TICK, ERROR, BELL }
+    enum class Sfx {
+        CLICK, SPIN, STOP, WIN, WIN_MED, BIG_WIN, THUNDER, RELIC, VAULT, ORB, HEARTBEAT, JACKPOT, GROWL, SLASH, TICK,
+        ERROR, BELL, LAUGH, CACKLE, GIGGLE, CAW, CHATTER, WHOOSH, COINS
+    }
     enum class Track { BASE, VAULT }
 
     var sfxOn = true
     var musicOn = true
-        set(v) { field = v; if (v) resumeMusic() else player?.pause() }
+        set(v) { field = v; if (v) resumeMusic() else pauseMusic() }
 
-    private val pool = SoundPool.Builder().setMaxStreams(10).setAudioAttributes(
+    private val pool = SoundPool.Builder().setMaxStreams(12).setAudioAttributes(
         AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_GAME)
             .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build()
     ).build()
     private val ids = IntArray(Sfx.values().size)
-    private val dir = File(context.cacheDir, "audio_v1").apply { mkdirs() }
+    private val dir = File(context.cacheDir, "audio_v2").apply { mkdirs() }
     private var player: MediaPlayer? = null
     private var track: Track? = null
     @Volatile private var musicReady = false
@@ -39,10 +47,11 @@ class Audio(context: Context) {
     private val sr = 22050
 
     init {
+        File(context.cacheDir, "audio_v1").deleteRecursively()
         Thread {
             for (s in Sfx.values()) {
                 val f = File(dir, "${s.name}.wav")
-                if (!f.exists() || f.length() < 100) writeWav(f, synth(s))
+                if (!f.exists() || f.length() < 100) writeWav(f, master(synth(s), 0.92f))
                 ids[s.ordinal] = pool.load(f.path, 1)
             }
             for (t in Track.values()) {
@@ -71,7 +80,7 @@ class Audio(context: Context) {
                     .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build())
                 setDataSource(File(dir, "music_${t.name}.wav").path)
                 isLooping = true
-                setVolume(0.5f, 0.5f)
+                setVolume(0.45f, 0.45f)
                 prepare()
             }
         } catch (e: Exception) { null }
@@ -81,11 +90,11 @@ class Audio(context: Context) {
 
     private fun resumeMusic() { if (musicOn) try { player?.start() } catch (_: Exception) {} }
     fun pauseMusic() { try { player?.pause() } catch (_: Exception) {} }
-
     fun release() { pool.release(); player?.release(); player = null }
 
-    // ================================================================== synthesis helpers
+    // ================================================================== DSP building blocks
     private fun n(sec: Double) = (sec * sr).toInt()
+    private fun midi(m: Double) = 440.0 * 2.0.pow((m - 69) / 12)
 
     private fun tone(sec: Double, f: Double, decay: Double = 4.0, vol: Double = 0.5, attack: Double = 0.004): FloatArray {
         val out = FloatArray(n(sec))
@@ -96,9 +105,9 @@ class Audio(context: Context) {
         return out
     }
 
-    /** Bell / music-box timbre: inharmonic partials. */
     private fun bell(sec: Double, f: Double, vol: Double, decay: Double = 3.0): FloatArray =
-        mix(tone(sec, f, decay, vol), tone(sec, f * 2.76, decay * 1.8, vol * 0.4), tone(sec, f * 5.4, decay * 3, vol * 0.18))
+        mix(tone(sec, f, decay, vol), tone(sec, f * 2.0, decay * 1.6, vol * 0.25), tone(sec, f * 2.76, decay * 2.2, vol * 0.3),
+            tone(sec, f * 5.4, decay * 3.5, vol * 0.12))
 
     private fun noise(sec: Double, vol: Double, decay: Double, lowpass: Double = 1.0, seed: Long = 7): FloatArray {
         val r = Random(seed); val out = FloatArray(n(sec)); var y = 0.0
@@ -135,68 +144,156 @@ class Audio(context: Context) {
         return out
     }
 
-    private fun echo(a: FloatArray, delaySec: Double, fbD: Double, tail: Double = 1.0): FloatArray {
-        val fb = fbD.toFloat()
-        val d = n(delaySec); val out = a.copyOf(a.size + n(tail))
-        for (i in d until out.size) out[i] += out[i - d] * fb
+    private fun pad(a: FloatArray, sec: Double) = a.copyOf(a.size + n(sec))
+
+    /** RBJ band-pass (constant peak gain) used for vocal formants. */
+    private class BandPass(sr: Int, f: Double, q: Double) {
+        private val b0: Double; private val b2: Double; private val a1: Double; private val a2: Double
+        private var x1 = 0.0; private var x2 = 0.0; private var y1 = 0.0; private var y2 = 0.0
+        init {
+            val w = 2 * PI * f / sr; val alpha = sin(w) / (2 * q); val a0 = 1 + alpha
+            b0 = alpha / a0; b2 = -alpha / a0; a1 = -2 * cos(w) / a0; a2 = (1 - alpha) / a0
+        }
+        fun process(x: Double): Double {
+            val y = b0 * x + b2 * x2 - a1 * y1 - a2 * y2
+            x2 = x1; x1 = x; y2 = y1; y1 = y
+            return y
+        }
+    }
+
+    /** Freeverb-style reverb: 4 damped combs in parallel, 2 all-passes in series. */
+    private fun reverb(input: FloatArray, wet: Float, room: Double = 0.84, damp: Double = 0.25, tail: Double = 2.5): FloatArray {
+        val a = input.copyOf(input.size + n(tail))
+        val combLen = intArrayOf(1116, 1188, 1277, 1356).map { (it * sr / 44100.0).toInt() }
+        val apLen = intArrayOf(556, 441).map { (it * sr / 44100.0).toInt() }
+        val combs = combLen.map { FloatArray(it) }; val idx = IntArray(4); val store = DoubleArray(4)
+        val aps = apLen.map { FloatArray(it) }; val apIdx = IntArray(2)
+        val out = FloatArray(a.size)
+        for (i in a.indices) {
+            val x = a[i] * 0.25
+            var sum = 0.0
+            for (k in 0 until 4) {
+                val buf = combs[k]; val y = buf[idx[k]].toDouble()
+                store[k] = y * (1 - damp) + store[k] * damp
+                buf[idx[k]] = (x + store[k] * room).toFloat()
+                idx[k] = (idx[k] + 1) % buf.size
+                sum += y
+            }
+            for (k in 0 until 2) {
+                val buf = aps[k]; val b = buf[apIdx[k]].toDouble()
+                buf[apIdx[k]] = (sum + b * 0.5).toFloat()
+                sum = b - sum
+                apIdx[k] = (apIdx[k] + 1) % buf.size
+            }
+            out[i] = a[i] + (sum * wet).toFloat()
+        }
         return out
     }
 
-    private fun heartbeat(vol: Double): FloatArray {
-        val beat = mix(tone(0.16, 55.0, 22.0, vol), noise(0.05, vol * 0.3, 50.0, 0.05))
-        val out = FloatArray(n(0.5))
-        at(out, beat, 0); at(out, beat, n(0.22), 0.75f)
+    /** Soft-clip and normalize to [peak]. */
+    private fun master(a: FloatArray, peak: Float): FloatArray {
+        var m = 0f
+        for (i in a.indices) { a[i] = tanh(a[i].toDouble() * 1.2).toFloat(); m = maxOf(m, abs(a[i])) }
+        if (m > 0f) for (i in a.indices) a[i] *= peak / m
+        return a
+    }
+
+    /**
+     * Formant voice: a buzzy glottal source through three vowel formants, with
+     * pitch glide, vibrato, jitter (roughness) and breath noise.
+     */
+    private fun voice(sec: Double, f0a: Double, f0b: Double, formants: DoubleArray, vol: Double,
+                      breath: Double = 0.15, vibrato: Double = 0.0, jitter: Double = 0.0, seed: Long = 1): FloatArray {
+        val out = FloatArray(n(sec)); val r = Random(seed)
+        val bps = (0 until 3).map { BandPass(sr, formants[it], 6.0 + it * 3) }
+        val gains = doubleArrayOf(1.0, 0.6, 0.25)
+        var ph = 0.0
+        for (i in out.indices) {
+            val p = i.toDouble() / out.size; val t = i.toDouble() / sr
+            val f0 = (f0a + (f0b - f0a) * p) * (1 + vibrato * sin(2 * PI * 6.0 * t)) * (1 + jitter * (r.nextDouble() - 0.5))
+            ph = (ph + f0 / sr) % 1.0
+            val src = (1 - 2 * ph) * 0.7 + (r.nextDouble() * 2 - 1) * breath
+            var y = 0.0
+            for (k in 0 until 3) y += bps[k].process(src) * gains[k]
+            val env = (t / 0.02).coerceAtMost(1.0) * ((sec - t) / 0.05).coerceIn(0.0, 1.0)
+            out[i] = (y * vol * env * 3).toFloat()
+        }
         return out
+    }
+
+    private val vowelA = doubleArrayOf(730.0, 1090.0, 2440.0)
+    private val vowelE = doubleArrayOf(530.0, 1840.0, 2480.0)
+    private val vowelI = doubleArrayOf(300.0, 2300.0, 3000.0)
+    private val vowelO = doubleArrayOf(400.0, 800.0, 2600.0)
+    private val vowelU = doubleArrayOf(320.0, 870.0, 2250.0)
+
+    /** "Ha-ha-ha" syllables: breathy h then voiced vowel, each lower than the last. */
+    private fun laughSyllables(count: Int, f0: Double, drop: Double, vowel: DoubleArray, syl: Double, gap: Double,
+                               vol: Double, vib: Double, jitter: Double): FloatArray {
+        val parts = ArrayList<FloatArray>()
+        for (k in 0 until count) {
+            val f = f0 * (1 - drop * k / count)
+            parts += noise(0.04, vol * 0.25, 20.0, 0.5, 30L + k)
+            parts += voice(syl, f * 1.08, f * 0.92, vowel, vol, 0.12, vib, jitter, k.toLong())
+            parts += FloatArray(n(gap))
+        }
+        return concat(*parts.toTypedArray())
     }
 
     // ================================================================== effects
     private fun synth(s: Sfx): FloatArray = when (s) {
         Sfx.CLICK -> mix(tone(0.05, 900.0, 80.0, 0.3), noise(0.02, 0.2, 200.0))
-        Sfx.SPIN -> mix(sweep(0.35, 120.0, 420.0, 0.22), noise(0.35, 0.12, 6.0, 0.08))
-        Sfx.STOP -> mix(tone(0.18, 70.0, 25.0, 0.8), noise(0.08, 0.35, 45.0, 0.2))
+        Sfx.SPIN -> mix(sweep(0.4, 110.0, 380.0, 0.22), noise(0.4, 0.14, 5.0, 0.08))
+        Sfx.STOP -> mix(tone(0.2, 62.0, 22.0, 0.9), tone(0.12, 124.0, 30.0, 0.3), noise(0.06, 0.35, 45.0, 0.25))
         Sfx.TICK -> tone(0.04, 1900.0, 90.0, 0.25)
-        Sfx.WIN -> echo(concat(bell(0.18, 659.25, 0.25), bell(0.5, 880.0, 0.28)), 0.22, 0.3, 0.6)
-        Sfx.WIN_MED -> echo(concat(bell(0.14, 440.0, 0.25), bell(0.14, 523.25, 0.25), bell(0.14, 659.25, 0.25), bell(0.7, 830.6, 0.3)), 0.25, 0.35, 0.8)
-        Sfx.BIG_WIN -> mix(thunder(2.2, 0.55), choir(2.4, doubleArrayOf(220.0, 261.63, 329.63, 415.3), 0.12))
-        Sfx.THUNDER -> thunder(2.6, 0.6)
-        Sfx.RELIC -> mix(sweep(0.6, 300.0, 1400.0, 0.2), echo(bell(0.6, 1318.5, 0.3, 5.0), 0.18, 0.4, 0.8))
-        Sfx.VAULT -> mix(bell(3.0, 98.0, 0.6, 1.0), bell(3.0, 146.8, 0.3, 1.2), choir(3.0, doubleArrayOf(146.8, 174.6, 220.0, 277.2), 0.1), thunder(3.0, 0.4))
-        Sfx.ORB -> echo(mix(bell(0.6, 1046.5, 0.35, 6.0), tone(0.15, 130.0, 20.0, 0.4)), 0.15, 0.35, 0.6)
+        Sfx.COINS -> reverb(concat(*Array(6) { k -> mix(tone(0.07, 2300.0 + k * 140, 40.0, 0.25), tone(0.07, 3400.0 + k * 90, 55.0, 0.12)) }), 0.3f, tail = 0.6)
+        Sfx.WIN -> reverb(concat(bell(0.16, midi(76.0), 0.28), bell(0.16, midi(79.0), 0.28), bell(0.7, midi(84.0), 0.32, 2.5)), 0.45f, tail = 1.2)
+        Sfx.WIN_MED -> reverb(concat(bell(0.12, midi(69.0), 0.25), bell(0.12, midi(72.0), 0.25), bell(0.12, midi(76.0), 0.25),
+            bell(0.12, midi(81.0), 0.25), mix(bell(1.0, midi(84.0), 0.3, 2.0), bell(1.0, midi(88.0), 0.22, 2.0))), 0.5f, tail = 1.5)
+        Sfx.BIG_WIN -> reverb(mix(thunder(2.4, 0.5), choir(2.8, doubleArrayOf(57.0, 60.0, 64.0, 69.0), 0.1),
+            pad(laughSyllables(5, 95.0, 0.3, vowelA, 0.17, 0.05, 0.5, 0.0, 0.08), 1.5)), 0.4f, tail = 1.5)
+        Sfx.THUNDER -> thunder(2.8, 0.6)
+        Sfx.RELIC -> reverb(mix(sweep(0.6, 300.0, 1400.0, 0.2), bell(0.8, midi(88.0), 0.3, 4.0), choir(0.9, doubleArrayOf(76.0, 81.0), 0.06)), 0.55f, tail = 1.2)
+        Sfx.VAULT -> reverb(mix(bell(3.0, midi(43.0), 0.6, 1.0), bell(3.0, midi(50.0), 0.3, 1.2), choir(3.2, doubleArrayOf(50.0, 53.0, 57.0, 62.0), 0.1), thunder(3.0, 0.4)), 0.4f)
+        Sfx.ORB -> reverb(mix(bell(0.6, midi(84.0), 0.35, 6.0), tone(0.15, 130.0, 20.0, 0.4)), 0.4f, tail = 0.8)
         Sfx.HEARTBEAT -> heartbeat(0.9)
-        Sfx.JACKPOT -> echo(concat(bell(0.12, 523.25, 0.3), bell(0.12, 659.25, 0.3), bell(0.12, 783.99, 0.3), bell(0.12, 1046.5, 0.3),
-            mix(bell(1.2, 1046.5, 0.3, 2.0), bell(1.2, 1318.5, 0.25, 2.0), bell(1.2, 1568.0, 0.2, 2.0))), 0.2, 0.35, 1.0)
+        Sfx.JACKPOT -> reverb(concat(bell(0.1, midi(72.0), 0.3), bell(0.1, midi(76.0), 0.3), bell(0.1, midi(79.0), 0.3), bell(0.1, midi(84.0), 0.3),
+            mix(bell(1.3, midi(84.0), 0.3, 2.0), bell(1.3, midi(88.0), 0.25, 2.0), bell(1.3, midi(91.0), 0.2, 2.0))), 0.45f, tail = 1.2)
         Sfx.GROWL -> growl(1.3)
         Sfx.SLASH -> mix(noise(0.35, 0.5, 9.0, 0.6, 3), sweep(0.3, 2400.0, 500.0, 0.12))
+        Sfx.WHOOSH -> noise(0.6, 0.45, 3.0, 0.12, 9).also { for (i in it.indices) it[i] *= sin(PI * i / it.size).toFloat() }
         Sfx.ERROR -> concat(tone(0.14, 110.0, 6.0, 0.4), tone(0.2, 82.0, 6.0, 0.4))
-        Sfx.BELL -> echo(bell(2.5, 196.0, 0.5, 1.2), 0.4, 0.3, 1.5)
+        Sfx.BELL -> reverb(bell(2.5, midi(43.0), 0.5, 1.2), 0.5f)
+        // deep, slow, evil "HA HA HA HA HA" (Grim Reaper)
+        Sfx.LAUGH -> reverb(mix(laughSyllables(6, 105.0, 0.35, vowelA, 0.2, 0.06, 0.55, 0.0, 0.06),
+            laughSyllables(6, 52.0, 0.35, vowelO, 0.2, 0.06, 0.3, 0.0, 0.05)), 0.45f, tail = 1.5)
+        // high, quick, witchy cackle (Jack-o'-lantern)
+        Sfx.CACKLE -> reverb(laughSyllables(9, 420.0, -0.25, vowelE, 0.085, 0.03, 0.35, 0.03, 0.05), 0.35f, tail = 1.0)
+        // breathy, airy "hee-hee-hee" with echo (ghost)
+        Sfx.GIGGLE -> reverb(laughSyllables(5, 620.0, 0.2, vowelI, 0.1, 0.06, 0.25, 0.04, 0.02), 0.65f, room = 0.9, tail = 1.8)
+        // two rough caws (raven)
+        Sfx.CAW -> reverb(concat(voice(0.28, 520.0, 430.0, doubleArrayOf(820.0, 1450.0, 2700.0), 0.45, 0.35, 0.0, 0.35, 4),
+            FloatArray(n(0.12)), voice(0.32, 500.0, 400.0, doubleArrayOf(820.0, 1450.0, 2700.0), 0.45, 0.35, 0.0, 0.4, 5)), 0.3f, tail = 0.8)
+        // bony teeth chatter (skull)
+        Sfx.CHATTER -> reverb(concat(*Array(9) { k -> concat(mix(noise(0.012, 0.6, 120.0, 0.9, 40L + k), tone(0.03, 1700.0 + (k % 3) * 120, 90.0, 0.3)), FloatArray(n(0.035))) }), 0.25f, tail = 0.4)
     }
 
     private fun thunder(sec: Double, vol: Double): FloatArray {
-        val crack = noise(0.25, vol, 12.0, 0.7, 11)
-        val rumble = noise(sec, vol * 1.4, 1.6, 0.025, 12)
-        val out = mix(crack, rumble)
-        // irregular rolling
+        val out = mix(noise(0.25, vol, 12.0, 0.7, 11), noise(sec, vol * 1.4, 1.6, 0.025, 12))
         for (i in out.indices) out[i] *= (0.7 + 0.3 * sin(2 * PI * 3.1 * i / sr) * sin(2 * PI * 0.7 * i / sr)).toFloat()
         return out
     }
 
-    /** Ghostly "ooh" choir: detuned sines with vibrato and slow swell. */
+    /** Ghost choir: formant voices on "ooh" with slow swell. */
     private fun choir(sec: Double, notes: DoubleArray, vol: Double): FloatArray {
-        val out = FloatArray(n(sec))
-        for ((k, f) in notes.withIndex()) {
-            var ph1 = 0.0; var ph2 = 0.0
-            for (i in out.indices) {
-                val t = i.toDouble() / sr
-                val vib = 1 + 0.006 * sin(2 * PI * (5.0 + k * 0.3) * t)
-                ph1 += 2 * PI * f * vib / sr; ph2 += 2 * PI * f * 1.004 * vib / sr
-                val env = (t / 0.4).coerceAtMost(1.0) * ((sec - t) / 0.6).coerceIn(0.0, 1.0)
-                out[i] += ((sin(ph1) + sin(ph2) + 0.3 * sin(2 * ph1)) * vol * env).toFloat()
-            }
+        val parts = notes.mapIndexed { k, m ->
+            val v = voice(sec, midi(m), midi(m) * 1.003, vowelU, vol, 0.08, 0.008, 0.002, 100L + k)
+            for (i in v.indices) { val t = i.toDouble() / sr; v[i] *= ((t / (sec * 0.35)).coerceAtMost(1.0) * ((sec - t) / (sec * 0.3)).coerceIn(0.0, 1.0)).toFloat() }
+            v
         }
-        return out
+        return mix(*parts.toTypedArray())
     }
 
-    /** Low monstrous growl: AM noise through a resonant-ish filter plus a sub tone. */
     private fun growl(sec: Double): FloatArray {
         val r = Random(5); val out = FloatArray(n(sec)); var y = 0.0; var y2 = 0.0
         for (i in out.indices) {
@@ -209,68 +306,120 @@ class Audio(context: Context) {
         return out
     }
 
+    private fun heartbeat(vol: Double): FloatArray {
+        val beat = mix(tone(0.16, 55.0, 22.0, vol), noise(0.05, vol * 0.3, 50.0, 0.05))
+        val out = FloatArray(n(0.5))
+        at(out, beat, 0); at(out, beat, n(0.22), 0.75f)
+        return out
+    }
+
     // ================================================================== music
-    /** 32 s seamless loop: drone, wind, sparse music-box in A harmonic minor, distant bell. */
+    /** Detuned-saw pad chord through a slowly opening low-pass, with swell envelope. */
+    private fun padChord(sec: Double, notes: IntArray, vol: Double, cutLo: Double, cutHi: Double, seed: Long): FloatArray {
+        val out = FloatArray(n(sec)); val r = Random(seed)
+        val phases = DoubleArray(notes.size * 3) { r.nextDouble() }
+        var lp1 = 0.0; var lp2 = 0.0
+        for (i in out.indices) {
+            val t = i.toDouble() / sr; val p = t / sec
+            var s = 0.0
+            for ((k, m) in notes.withIndex()) for (d in 0 until 3) {
+                val f = midi(m.toDouble()) * (1 + (d - 1) * 0.004)
+                val idx = k * 3 + d
+                phases[idx] = (phases[idx] + f / sr) % 1.0
+                s += 1 - 2 * phases[idx]
+            }
+            val cut = cutLo + (cutHi - cutLo) * sin(PI * p)
+            val a = (2 * PI * cut / sr).coerceAtMost(0.9)
+            lp1 += a * (s - lp1); lp2 += a * (lp1 - lp2)
+            val env = (t / (sec * 0.25)).coerceAtMost(1.0) * ((sec - t) / (sec * 0.2)).coerceIn(0.0, 1.0)
+            out[i] = (lp2 * vol * env).toFloat()
+        }
+        return out
+    }
+
+    private fun taiko(vol: Double): FloatArray {
+        val out = FloatArray(n(0.9)); var ph = 0.0
+        for (i in out.indices) {
+            val t = i.toDouble() / sr
+            ph += 2 * PI * (42 + 50 * exp(-t * 18)) / sr
+            out[i] = (sin(ph) * vol * exp(-t * 4.5)).toFloat()
+        }
+        return mix(out, noise(0.12, vol * 0.35, 30.0, 0.15, 77))
+    }
+
+    private fun subBass(sec: Double, m: Int, vol: Double): FloatArray {
+        val f = midi(m.toDouble()); val out = FloatArray(n(sec))
+        for (i in out.indices) {
+            val t = i.toDouble() / sr
+            val env = (t / 0.05).coerceAtMost(1.0) * exp(-t * 0.6) * ((sec - t) / 0.3).coerceIn(0.0, 1.0)
+            out[i] = (tanh(1.6 * sin(2 * PI * f * t)) * vol * env).toFloat()
+        }
+        return out
+    }
+
+    /** 32 s loop (60 BPM, 8 bars): Am F Dm E | Am C Dm E7 with music-box melody, ghost choir and taiko. */
     private fun baseMusic(): FloatArray {
-        val len = 32.0; val total = n(len)
-        val out = FloatArray(total + n(2.0))
-        // drone (periods divide the loop length)
-        for (i in out.indices) {
-            val t = i.toDouble() / sr
-            val swell = 0.75 + 0.25 * sin(2 * PI * t / 16.0)
-            out[i] += (0.10 * sin(2 * PI * 55.0 * t) + 0.07 * sin(2 * PI * 55.25 * t) + 0.04 * sin(2 * PI * 82.5 * t) +
-                0.025 * sin(2 * PI * 110.5 * t)).toFloat() * swell.toFloat()
+        val bar = 4.0; val bars = 8; val total = n(bar * bars)
+        val dry = FloatArray(total + n(3.0)); val wetSend = FloatArray(dry.size)
+        val chords = arrayOf(intArrayOf(57, 60, 64), intArrayOf(53, 57, 60), intArrayOf(50, 53, 57), intArrayOf(52, 56, 59),
+            intArrayOf(57, 60, 64), intArrayOf(55, 60, 64), intArrayOf(50, 53, 57), intArrayOf(52, 56, 62))
+        val roots = intArrayOf(33, 29, 26, 28, 33, 36, 26, 28)
+        for (b in 0 until bars) {
+            val o = n(b * bar)
+            at(dry, padChord(bar + 1.2, chords[b], 0.05, 280.0, 1100.0, b.toLong()), o - n(0.3).coerceAtMost(o))
+            at(dry, subBass(bar, roots[b] + 12, 0.22), o)
+            at(wetSend, taiko(0.55), o)
+            if (b % 4 == 3) { at(wetSend, taiko(0.35), o + n(2.5)); at(wetSend, taiko(0.4), o + n(3.0)) }
+            if (b >= 4) at(wetSend, choir(bar + 0.5, chords[b].map { it.toDouble() }.toDoubleArray(), 0.05), o)
         }
+        // music-box melody: (bar, beat, midi)
+        val mel = arrayOf(
+            doubleArrayOf(0.0, 0.0, 76.0), doubleArrayOf(0.0, 1.0, 81.0), doubleArrayOf(0.0, 2.0, 84.0), doubleArrayOf(0.0, 2.5, 83.0), doubleArrayOf(0.0, 3.0, 81.0),
+            doubleArrayOf(1.0, 0.0, 84.0), doubleArrayOf(1.0, 1.0, 81.0), doubleArrayOf(1.0, 2.0, 77.0),
+            doubleArrayOf(2.0, 0.0, 74.0), doubleArrayOf(2.0, 1.0, 77.0), doubleArrayOf(2.0, 1.5, 81.0), doubleArrayOf(2.0, 2.5, 80.0), doubleArrayOf(2.0, 3.0, 81.0),
+            doubleArrayOf(3.0, 0.0, 83.0), doubleArrayOf(3.0, 1.0, 80.0), doubleArrayOf(3.0, 2.0, 76.0),
+            doubleArrayOf(4.0, 0.0, 81.0), doubleArrayOf(4.0, 1.0, 84.0), doubleArrayOf(4.0, 2.0, 88.0), doubleArrayOf(4.0, 2.5, 86.0), doubleArrayOf(4.0, 3.0, 84.0),
+            doubleArrayOf(5.0, 0.0, 79.0), doubleArrayOf(5.0, 1.0, 76.0), doubleArrayOf(5.0, 2.0, 84.0),
+            doubleArrayOf(6.0, 0.0, 77.0), doubleArrayOf(6.0, 0.5, 81.0), doubleArrayOf(6.0, 1.0, 86.0), doubleArrayOf(6.0, 2.0, 84.0), doubleArrayOf(6.0, 3.0, 83.0),
+            doubleArrayOf(7.0, 0.0, 80.0), doubleArrayOf(7.0, 1.0, 83.0), doubleArrayOf(7.0, 2.0, 86.0), doubleArrayOf(7.0, 3.5, 88.0))
+        for (e in mel) at(wetSend, bell(2.0, midi(e[2]), 0.075, 2.2), n(e[0] * bar + e[1]))
         // wind
-        val wind = noise(len + 2, 0.22, 0.0, 0.012, 21)
-        for (i in wind.indices) {
-            val t = i.toDouble() / sr
-            wind[i] *= (0.35 + 0.65 * sin(PI * t / 8.0).let { it * it }).toFloat()
-        }
-        at(out, wind, 0)
-        // music box phrase (A harmonic minor), sparse
-        val notes = doubleArrayOf(880.0, 1046.5, 987.8, 830.6, 659.3, 698.5, 830.6, 880.0, 1318.5, 1174.7, 1046.5, 987.8)
-        val times = doubleArrayOf(1.0, 2.2, 3.4, 4.6, 8.5, 9.7, 10.9, 12.1, 17.0, 18.2, 19.4, 20.6)
-        val box = FloatArray(out.size)
-        for (k in notes.indices) at(box, bell(2.2, notes[k], 0.07, 2.4), n(times[k]))
-        at(box, bell(2.5, 659.3, 0.05, 1.8), n(25.0)); at(box, bell(3.0, 622.3, 0.05, 1.5), n(27.0))
-        at(out, echo(box, 0.42, 0.38, 0.0), 0)
-        // distant funeral bell every 16 s
-        at(out, bell(5.0, 73.4, 0.18, 0.7), n(6.0)); at(out, bell(5.0, 69.3, 0.16, 0.7), n(22.0))
-        return seamless(out, total)
+        val wind = noise(bar * bars + 3, 0.12, 0.0, 0.01, 21)
+        for (i in wind.indices) wind[i] *= (0.4 + 0.6 * sin(PI * i / n(16.0)).let { it * it }).toFloat()
+        at(dry, wind, 0)
+        val wet = reverb(wetSend, 0.9f, room = 0.88, damp = 0.3, tail = 0.0)
+        val mixed = mix(dry, wet, reverb(dry, 0.25f, tail = 0.0))
+        return seamless(mixed, total)
     }
 
-    /** 16 s loop for the Soul Vault: heartbeat pulse, tense rising choir, ticking. */
+    /** 19.2 s loop (100 BPM): pulsing A ostinato, tense strings, taiko + heartbeat, rising choir. */
     private fun vaultMusic(): FloatArray {
-        val len = 16.0; val total = n(len)
-        val out = FloatArray(total + n(2.0))
-        val beat = heartbeat(0.55)
-        var t = 0.0
-        while (t < len) { at(out, beat, n(t)); t += 0.75 }
-        val tick = tone(0.03, 2600.0, 120.0, 0.08)
-        t = 0.375
-        while (t < len) { at(out, tick, n(t)); t += 0.75 }
-        at(out, choir(8.0, doubleArrayOf(220.0, 233.1, 311.1), 0.05), 0)
-        at(out, choir(8.0, doubleArrayOf(233.1, 246.9, 329.6), 0.05), n(8.0))
-        for (i in out.indices) {
-            val tt = i.toDouble() / sr
-            out[i] += (0.09 * sin(2 * PI * 41.2 * tt) * (0.6 + 0.4 * sin(2 * PI * tt / 4.0))).toFloat()
+        val beat = 0.6; val bars = 8; val total = n(beat * 4 * bars)
+        val dry = FloatArray(total + n(3.0)); val send = FloatArray(dry.size)
+        val roots = intArrayOf(45, 45, 41, 41, 43, 43, 40, 40)
+        val chords = arrayOf(intArrayOf(57, 60, 64), intArrayOf(57, 60, 64), intArrayOf(53, 57, 60), intArrayOf(53, 57, 60),
+            intArrayOf(55, 59, 62), intArrayOf(55, 59, 62), intArrayOf(52, 56, 59), intArrayOf(52, 56, 62))
+        for (b in 0 until bars) {
+            val o = n(b * 4 * beat)
+            for (k in 0 until 8) {   // eighth-note ostinato
+                val m = roots[b] + if (k % 4 == 3) 7 else 0
+                at(dry, padChord(beat / 2, intArrayOf(m - 12, m), if (k % 2 == 0) 0.07 else 0.045, 300.0, 900.0, (b * 8 + k).toLong()), o + n(k * beat / 2))
+            }
+            at(dry, padChord(4 * beat + 0.3, chords[b].map { it + 12 }.toIntArray(), 0.03, 600.0, 2200.0, 50L + b), o)
+            at(send, taiko(0.5), o); at(send, taiko(0.35), o + n(2 * beat))
+            at(dry, heartbeat(0.35), o + n(beat))
+            if (b >= 4) at(send, choir(4 * beat + 0.3, chords[b].map { it + 12.0 }.toDoubleArray(), 0.04), o)
         }
-        return seamless(out, total)
+        val wet = reverb(send, 0.8f, tail = 0.0)
+        return seamless(mix(dry, wet, reverb(dry, 0.2f, tail = 0.0)), total)
     }
 
-    /** Folds the overhang past [total] back onto the start with a crossfade so the loop is click-free. */
+    /** Folds the tail past [total] onto the start (crossfaded) so the loop is seamless, then masters. */
     private fun seamless(buf: FloatArray, total: Int): FloatArray {
         val out = buf.copyOf(total)
-        val fade = minOf(buf.size - total, n(1.5))
-        for (i in 0 until fade) {
-            val a = i.toFloat() / fade
-            out[i] = out[i] * a + buf[total + i] * (1 - a)
-        }
-        var peak = 0f
-        for (v in out) peak = maxOf(peak, kotlin.math.abs(v))
-        if (peak > 0.95f) for (i in out.indices) out[i] *= 0.95f / peak
-        return out
+        val fade = minOf(buf.size - total, n(2.0))
+        for (i in 0 until fade) out[i] += buf[total + i] * (1 - i.toFloat() / fade)
+        return master(out, 0.9f)
     }
 
     private fun writeWav(f: File, data: FloatArray) {
@@ -283,5 +432,13 @@ class Audio(context: Context) {
         val tmp = File(f.path + ".tmp")
         FileOutputStream(tmp).use { it.write(h.array()); it.write(pcm.array()) }
         tmp.renameTo(f)
+    }
+
+    /** Test hook: synthesizes everything into [out] (used to inspect audio off-device). */
+    internal fun renderAllTo(out: File) {
+        out.mkdirs()
+        for (s in Sfx.values()) writeWav(File(out, "${s.name}.wav"), master(synth(s), 0.92f))
+        writeWav(File(out, "music_BASE.wav"), baseMusic())
+        writeWav(File(out, "music_VAULT.wav"), vaultMusic())
     }
 }

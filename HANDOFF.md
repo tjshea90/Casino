@@ -128,6 +128,6 @@ Design: line pays are integer multiples of the stake (so no fractional tokens at
 Work queue v1.1:
 - [x] release.yml workflow (fires when release/*.apk changes; workflow_dispatch only works from default branch)
 - [x] math: new pays/reels (hit ≈ 28.6 %), relic chance, vault retune, calibration, cash-out rounding, tests
-- [ ] audio: reverb + composed music + laugh/caw SFX
+- [x] audio: reverb + composed music + laugh/cackle/giggle/caw/chatter SFX (AudioRenderTest renders WAVs to reaper/build/audio)
 - [ ] 3D art: drum reels, animated characters (layered bitmaps), win banner, idle character events
 - [ ] screenshots, release build, verify release link
