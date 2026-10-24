@@ -101,7 +101,7 @@ cp app/build/outputs/apk/release/app-release.apk release/DragonsHoard.apk
 ## Work queue (app 2)
 - [x] Python tuner (tools/reaper_tune.py, tools/reaper_bonus.py) → reel counts, feature, bonus params
 - [x] Engine + per-stake calibration (CalibrationTest prints FEATURE_RATE; all stakes 87.0 %), FullGameTest sim 86–88 %
-- [ ] Wallet/Security copy (+ relics, average stake, bonus state persisted)
-- [ ] Art (procedural reaper/hooded/skull/raven/lantern + royals), base SlotView, music + SFX
+- [x] Wallet/Security (+ relics, average stake, crash-safe Soul Vault replay via stored seed)
+- [ ] (audio done: audio/Audio.kt) Art (procedural reaper/hooded/skull/raven/lantern + royals), base SlotView, music + SFX
 - [ ] Bonus screen + transitions
 - [ ] Release APK `release/NeonReaper.apk`, CI, README
