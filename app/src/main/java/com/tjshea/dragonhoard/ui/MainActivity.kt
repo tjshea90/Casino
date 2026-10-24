@@ -67,6 +67,11 @@ class MainActivity : Activity(), SlotView.Host {
         if (wallet.status == Wallet.LoadStatus.TAMPERED) dialogs.tampered() else dialogs.setupPassword()
     }
 
+    override fun onPause() {
+        super.onPause()
+        slot.onHostPause()
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         slot.release()

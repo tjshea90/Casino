@@ -132,6 +132,9 @@ class SlotView(context: Context, private val host: Host) : View(context) {
         textAlign = Paint.Align.CENTER; typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD)
     }
     private var titleShader: LinearGradient? = null
+    private var shadeTop: Shader? = null
+    private var shadeBottom: Shader? = null
+    private val buttonShaders = HashMap<Long, Shader>()
     private val shaderMatrix = Matrix()
     private val path = Path()
     private val tmpRect = RectF()
@@ -173,7 +176,7 @@ class SlotView(context: Context, private val host: Host) : View(context) {
         u = min(w / 1280f, h / 800f)
         if (!landscape) u = min(w / 800f, h / 1280f)
         val marqueeH = if (landscape) h * 0.13f else h * 0.09f
-        val panelH = if (landscape) h * 0.25f else h * 0.24f
+        val panelH = if (landscape) h * 0.25f else h * 0.30f
         val margin = 10 * u
         marqueeRect.set(margin, margin * 0.6f, w - margin, marqueeH)
         panelRect.set(margin, h - panelH, w - margin, h - margin * 0.6f)
@@ -210,22 +213,36 @@ class SlotView(context: Context, private val host: Host) : View(context) {
         buttons.clear()
         val p = panelRect
         val ph = p.height()
-        val spinR = ph * 0.40f
-        val spinCx = p.right - spinR - 16 * u
-        val spinCy = p.centerY()
+        // landscape: meters + AUTO + SPIN in one row; portrait: meters on top, AUTO + SPIN below
+        val meterArea = RectF(p.left + 12 * u, p.top + ph * 0.1f, p.right - 12 * u, p.bottom - ph * 0.1f)
+        val spinR: Float
+        val spinCx: Float
+        val spinCy: Float
+        if (landscape) {
+            spinR = ph * 0.40f
+            spinCx = p.right - spinR - 16 * u
+            spinCy = p.centerY()
+        } else {
+            meterArea.bottom = p.top + ph * 0.52f
+            spinR = ph * 0.22f
+            spinCx = p.centerX() + spinR * 0.9f
+            spinCy = p.bottom - spinR - 14 * u
+        }
         buttons += Btn("spin", "SPIN", RectF(spinCx - spinR, spinCy - spinR, spinCx + spinR, spinCy + spinR), round = true)
-        val autoW = ph * 0.52f
-        val autoRect = RectF(spinCx - spinR - autoW - 14 * u, spinCy - ph * 0.17f, spinCx - spinR - 14 * u, spinCy + ph * 0.17f)
+        val autoW = if (landscape) ph * 0.52f else spinR * 1.6f
+        val autoH = if (landscape) ph * 0.34f else spinR * 0.8f
+        val autoRect = RectF(spinCx - spinR - autoW - 14 * u, spinCy - autoH / 2, spinCx - spinR - 14 * u, spinCy + autoH / 2)
         buttons += Btn("auto", "AUTO", autoRect)
+        if (landscape) meterArea.right = autoRect.left - 12 * u
 
-        // meters across the remaining width
-        val meterLeft = p.left + 12 * u
-        val meterRight = autoRect.left - 12 * u
+        // meters across the meter area
+        val meterLeft = meterArea.left
+        val meterRight = meterArea.right
         val mw = meterRight - meterLeft
         val gap = 10 * u
-        val colW = (mw - gap * 4) / 5f
-        val mTop = p.top + ph * 0.12f; val mBot = p.bottom - ph * 0.12f
-        creditRect.set(meterLeft, mTop, meterLeft + colW * 1.35f, mBot)
+        val colW = (mw - gap * 4) / 4.95f
+        val mTop = meterArea.top; val mBot = meterArea.bottom
+        creditRect.set(meterLeft, mTop, meterLeft + colW * 1.3f, mBot)
         linesRect.set(creditRect.right + gap, mTop, creditRect.right + gap + colW * 0.9f, mBot)
         lineBetRect.set(linesRect.right + gap, mTop, linesRect.right + gap + colW * 0.9f, mBot)
         betRect.set(lineBetRect.right + gap, mTop, lineBetRect.right + gap + colW * 0.85f, mBot)
@@ -267,6 +284,9 @@ class SlotView(context: Context, private val host: Host) : View(context) {
         bgBase?.recycle(); bgFree?.recycle()
         bgBase = paintBackground(w.toInt(), h.toInt(), false)
         bgFree = paintBackground(w.toInt(), h.toInt(), true)
+        shadeTop = LinearGradient(0f, reelRect.top, 0f, reelRect.top + cell * 0.45f, 0xAA000000.toInt(), 0, Shader.TileMode.CLAMP)
+        shadeBottom = LinearGradient(0f, reelRect.bottom - cell * 0.45f, 0f, reelRect.bottom, 0, 0xAA000000.toInt(), Shader.TileMode.CLAMP)
+        buttonShaders.clear()
         titleShader = LinearGradient(0f, 0f, marqueeRect.width() * 0.35f, 0f,
             intArrayOf(0xFFB8860B.toInt(), 0xFFFFF8E1.toInt(), 0xFFFFC107.toInt(), 0xFFB8860B.toInt()),
             floatArrayOf(0f, 0.45f, 0.55f, 1f), Shader.TileMode.MIRROR)
@@ -376,8 +396,13 @@ class SlotView(context: Context, private val host: Host) : View(context) {
             return
         }
         settleRollup()
-        val free = wallet.inFreeSpins
         val res = wallet.playSpin(lineBet, lines) ?: run { sfx.play(Sfx.ERROR); return }
+        animateSpin(res)
+    }
+
+    /** Starts the reel animation for an already-settled result. */
+    internal fun animateSpin(res: SpinResult) {
+        val free = res.freeSpin
         result = res
         pendingWin = res.totalWinTokens
         spinStrips = if (free) GameConfig.FREE_STRIPS else GameConfig.BASE_STRIPS
@@ -391,7 +416,7 @@ class SlotView(context: Context, private val host: Host) : View(context) {
         teaseSoundPlayed = false
         for (r in 0 until REELS) {
             val tease = scatSoFar >= 2 && r >= 2
-            if (tease) extra += if (turbo) 0.7 else 1.1
+            if (tease) extra += if (turbo) 0.6 else 0.95
             reelTease[r] = tease
             val stopAt = t + baseDur + stepDur * r + extra
             val lift = 0.09
@@ -504,6 +529,7 @@ class SlotView(context: Context, private val host: Host) : View(context) {
             if (x >= 5) coinRate = 25f
         } else {
             pendingWin = 0
+            rollTarget = 0
         }
         enterPhase(Phase.PRESENT)
         afterPresentScheduled()
@@ -631,8 +657,14 @@ class SlotView(context: Context, private val host: Host) : View(context) {
             Phase.BIG_WIN -> if (now() - rollStart < rollDur) rollStart = now() - rollDur else rollStart = now() - rollDur - 2.2
             Phase.FEATURE_INTRO -> beginFreeSpins()
             Phase.FEATURE_OUTRO -> endFeature()
+            Phase.PRESENT -> if (now() - rollStart < rollDur) rollStart = now() - rollDur
             else -> {}
         }
+    }
+
+    /** Activity paused: never keep spending credit in the background. */
+    fun onHostPause() {
+        if (autoLeft != 0) autoLeft = 0
     }
 
     private val busy get() = phase == Phase.SPINNING || phase == Phase.BIG_WIN ||
@@ -830,9 +862,9 @@ class SlotView(context: Context, private val host: Host) : View(context) {
             }
         }
         // cylinder shading top/bottom
-        pFill.shader = LinearGradient(0f, reelRect.top, 0f, reelRect.top + cell * 0.45f, 0xAA000000.toInt(), 0, Shader.TileMode.CLAMP)
+        pFill.shader = shadeTop
         c.drawRect(reelRect.left, reelRect.top, reelRect.right, reelRect.top + cell * 0.45f, pFill)
-        pFill.shader = LinearGradient(0f, reelRect.bottom - cell * 0.45f, 0f, reelRect.bottom, 0, 0xAA000000.toInt(), Shader.TileMode.CLAMP)
+        pFill.shader = shadeBottom
         c.drawRect(reelRect.left, reelRect.bottom - cell * 0.45f, reelRect.right, reelRect.bottom, pFill)
         pFill.shader = null
         c.restore()
@@ -845,13 +877,23 @@ class SlotView(context: Context, private val host: Host) : View(context) {
     }
 
     private fun drawTease(c: Canvas, left: Float, t: Double) {
-        val a = (150 + 100 * sin(t * 16)).toInt().coerceIn(0, 255)
-        pStroke.strokeWidth = 7 * u
-        pStroke.color = Color.argb(a, 255, 215, 64)
-        tmpRect.set(left + 4 * u, reelRect.top + 4 * u, left + cell - 4 * u, reelRect.bottom - 4 * u)
-        c.drawRoundRect(tmpRect, 12 * u, 12 * u, pStroke)
-        pFill.color = Color.argb(a / 4, 255, 193, 7)
+        val pulse = (0.5 + 0.5 * sin(t * 14)).toFloat()
+        tmpRect.set(left + 3 * u, reelRect.top + 3 * u, left + cell - 3 * u, reelRect.bottom - 3 * u)
+        pFill.color = Color.argb((60 + 70 * pulse).toInt(), 255, 160, 0)
         c.drawRect(tmpRect, pFill)
+        for (k in 0..2) {
+            pStroke.strokeWidth = (14 - k * 5) * u
+            pStroke.color = when (k) { 0 -> Color.argb((90 + 90 * pulse).toInt(), 255, 87, 34); 1 -> 0xFFFFC107.toInt(); else -> 0xFFFFFDE7.toInt() }
+            c.drawRoundRect(tmpRect, 12 * u, 12 * u, pStroke)
+        }
+        // rising sparks
+        pFill.color = 0xFFFFF59D.toInt()
+        for (i in 0 until 6) {
+            val ph = ((t * 0.9 + i / 6.0) % 1.0).toFloat()
+            val x = left + cell * (0.15f + 0.7f * ((i * 37) % 10) / 10f)
+            val y = reelRect.bottom - ph * reelRect.height()
+            c.drawCircle(x, y, (5 * (1 - ph) + 2) * u, pFill)
+        }
     }
 
     private fun drawWins(c: Canvas, t: Double) {
@@ -966,7 +1008,7 @@ class SlotView(context: Context, private val host: Host) : View(context) {
 
     private fun drawPanel(c: Canvas, t: Double) {
         // CREDIT
-        val shown = wallet.balance - pendingWin
+        val shown = (wallet.balance - pendingWin).coerceAtLeast(0)
         meterLabel(c, creditRect, "CREDIT")
         val flash = t < creditFlashUntil && ((t * 8).toInt() % 2 == 0)
         pText.typeface = serifBold
@@ -983,14 +1025,19 @@ class SlotView(context: Context, private val host: Host) : View(context) {
         meterLabel(c, linesRect, "LINES")
         pText.typeface = serifBold; pText.color = 0xFFFFF8E1.toInt()
         pText.textSize = linesRect.height() * 0.3f
-        c.drawText("${if (freeLocked) wallet.fsLines else lines}", linesRect.centerX(), linesRect.top + linesRect.height() * 0.52f, pText)
+        c.drawText("${if (freeLocked) wallet.fsLines else lines}", linesRect.centerX(), linesRect.top + linesRect.height() * 0.5f, pText)
         // BET / LINE
         meterLabel(c, lineBetRect, "BET / LINE")
         pText.typeface = serifBold; pText.color = 0xFFFFF8E1.toInt()
-        pText.textSize = lineBetRect.height() * 0.3f
-        c.drawText("${if (freeLocked) wallet.fsLineBet else lineBet}", lineBetRect.centerX(), lineBetRect.top + lineBetRect.height() * 0.52f, pText)
-        pText.typeface = sansBold; pText.textSize = lineBetRect.height() * 0.11f; pText.color = 0xFFFFCC80.toInt()
-        c.drawText("MACKS", lineBetRect.centerX(), lineBetRect.top + lineBetRect.height() * 0.64f, pText)
+        pText.textSize = lineBetRect.height() * 0.27f
+        val lbTxt = "${if (freeLocked) wallet.fsLineBet else lineBet}"
+        val lbW = pText.measureText(lbTxt)
+        val lbY = lineBetRect.top + lineBetRect.height() * 0.5f
+        c.drawText(lbTxt, lineBetRect.centerX() - lineBetRect.height() * 0.08f, lbY, pText)
+        pText.typeface = sansBold; pText.textSize = lineBetRect.height() * 0.12f; pText.color = 0xFFFFCC80.toInt()
+        pText.textAlign = Paint.Align.LEFT
+        c.drawText("M", lineBetRect.centerX() - lineBetRect.height() * 0.08f + lbW / 2 + 3 * u, lbY, pText)
+        pText.textAlign = Paint.Align.CENTER
         // TOTAL BET
         meterLabel(c, betRect, "TOTAL BET")
         val tb = if (freeLocked) wallet.fsLines * wallet.fsLineBet else totalBetMacks
@@ -1051,7 +1098,8 @@ class SlotView(context: Context, private val host: Host) : View(context) {
         pFill.color = 0xFF000000.toInt(); pFill.alpha = 120
         c.drawRoundRect(r.left, r.top + 5 * u, r.right, r.bottom + 5 * u, rad, rad, pFill)
         pFill.alpha = 255
-        pFill.shader = LinearGradient(0f, tmpRect.top, 0f, tmpRect.bottom, lighter(top), bot, Shader.TileMode.CLAMP)
+        val key = (top.toLong() shl 32) xor (tmpRect.top.toRawBits().toLong() shl 8) xor tmpRect.bottom.toRawBits().toLong()
+        pFill.shader = buttonShaders.getOrPut(key) { LinearGradient(0f, tmpRect.top, 0f, tmpRect.bottom, lighter(top), bot, Shader.TileMode.CLAMP) }
         c.drawRoundRect(tmpRect, rad, rad, pFill)
         pFill.shader = null
         pStroke.strokeWidth = 2.5f * u

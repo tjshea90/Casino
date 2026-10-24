@@ -47,8 +47,19 @@ android {
     }
 }
 
+android.testOptions.unitTests.isIncludeAndroidResources = true
+android.testOptions.unitTests.all {
+    // Robolectric runtime jars are pre-fetched (see HANDOFF.md) because the sandbox can't reach Maven Central directly.
+    val deps = File(System.getProperty("user.home"), "robolectric-deps")
+    if (deps.isDirectory) {
+        it.systemProperty("robolectric.offline", "true")
+        it.systemProperty("robolectric.dependency.dir", deps.absolutePath)
+    }
+}
+
 dependencies {
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.14.1")
 }
 
 kotlin {
