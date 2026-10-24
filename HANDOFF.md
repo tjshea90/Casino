@@ -43,8 +43,8 @@ cp app/build/outputs/apk/release/app-release.apk release/DragonsHoard.apk
 
 ## Work queue
 - [x] Project scaffold, keystore, handoff doc
-- [ ] Tune reel strips to 80 % RTP (python tuner in scratchpad; result goes in `engine/GameConfig.kt`)
-- [ ] Engine (spin, line eval, scatter, free spins) + exact RTP unit test
+- [x] Tune reel strips to 80 % RTP (python tuner in scratchpad; result goes in `engine/GameConfig.kt`)
+- [x] Engine (spin, line eval, scatter, free spins) + exact RTP unit test
 - [ ] Wallet + password security
 - [ ] SlotView rendering & animations, sounds
 - [ ] Dialogs: setup password, deposit, withdraw, paytable/help, stats
@@ -52,4 +52,4 @@ cp app/build/outputs/apk/release/app-release.apk release/DragonsHoard.apk
 - [ ] Polish pass
 
 ## Status log
-- Session 1: scaffold created.
+- Session 1: scaffold created. Engine done: exact RTP 79.999%, sim 80.4%, hit 33%, SD 4.6, FS every ~126 spins.
