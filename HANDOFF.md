@@ -99,8 +99,8 @@ cp app/build/outputs/apk/release/app-release.apk release/DragonsHoard.apk
 - Small stakes (<10 tokens): wins below 10 tokens round to 0 (user accepted), so hit rate is lower there.
 
 ## Work queue (app 2)
-- [ ] Python tuner (tools/reaper_tune.py) → reel counts, feature, bonus params
-- [ ] Engine + exact per-stake RTP test
+- [x] Python tuner (tools/reaper_tune.py, tools/reaper_bonus.py) → reel counts, feature, bonus params
+- [x] Engine + per-stake calibration (CalibrationTest prints FEATURE_RATE; all stakes 87.0 %), FullGameTest sim 86–88 %
 - [ ] Wallet/Security copy (+ relics, average stake, bonus state persisted)
 - [ ] Art (procedural reaper/hooded/skull/raven/lantern + royals), base SlotView, music + SFX
 - [ ] Bonus screen + transitions

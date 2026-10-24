@@ -14,3 +14,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "DragonsHoard"
 include(":app")
+include(":reaper")
