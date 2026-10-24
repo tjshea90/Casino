@@ -115,3 +115,29 @@ class ScreenshotTest {
         println("big win macks=" + big.totalWinMacks + " " + Money.describe(big.totalWinTokens))
     }
 }
+
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [34], qualifiers = "w1280dp-h800dp-land-mdpi")
+class DialogScreenshotTest {
+    @Test fun dialogs() {
+        val act = org.robolectric.Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        val out = File("build/screens").apply { mkdirs() }
+        fun snap(name: String) {
+            org.robolectric.shadows.ShadowLooper.idleMainLooper()
+            val dlg = org.robolectric.shadows.ShadowDialog.getLatestDialog()
+            val root = dlg.window!!.decorView
+            root.measure(View.MeasureSpec.makeMeasureSpec(1280, View.MeasureSpec.AT_MOST), View.MeasureSpec.makeMeasureSpec(800, View.MeasureSpec.AT_MOST))
+            root.layout(0, 0, root.measuredWidth, root.measuredHeight)
+            val bmp = Bitmap.createBitmap(root.width.coerceAtLeast(1), root.height.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
+            val c = Canvas(bmp); c.drawColor(0xFF200000.toInt()); root.draw(c)
+            File(out, "dlg_$name.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            dlg.dismiss()
+        }
+        snap("setup")
+        act.wallet.setInitialPassword("abcd".toCharArray())
+        act.openDeposit(); snap("deposit")
+        act.openPaytable(); snap("paytable")
+        act.openStats(); snap("stats")
+    }
+}

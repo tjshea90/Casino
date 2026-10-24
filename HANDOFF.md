@@ -34,6 +34,15 @@ Slot machine APK for **Android 10 Go, MediaTek MT8168, armv7** (user's apps gene
 - `app/src/test/...` — exact RTP calculation + Monte-Carlo test.
 - `release/DragonsHoard.apk` — latest built APK (also built by GitHub Actions).
 
+## Visual testing without an emulator
+`ScreenshotTest` (Robolectric native graphics) renders the cabinet and dialogs to `app/build/screens/*.png`.
+Robolectric's runtime jars must be pre-fetched into `~/robolectric-deps/` (Maven Central is blocked here; the
+Google mirror works):
+```
+mkdir -p ~/robolectric-deps && cd ~/robolectric-deps
+for v in 14-robolectric-10818077-i7 15-robolectric-12650502-i7; do curl -fLO https://maven-central.storage-download.googleapis.com/maven2/org/robolectric/android-all-instrumented/$v/android-all-instrumented-$v.jar; done
+```
+
 ## Build
 ```
 echo "sdk.dir=/opt/android-sdk" > local.properties
@@ -46,10 +55,13 @@ cp app/build/outputs/apk/release/app-release.apk release/DragonsHoard.apk
 - [x] Tune reel strips to 80 % RTP (python tuner in scratchpad; result goes in `engine/GameConfig.kt`)
 - [x] Engine (spin, line eval, scatter, free spins) + exact RTP unit test
 - [x] Wallet + password security (data/Wallet.kt, data/Security.kt)
-- [ ] SlotView rendering & animations, sounds
-- [ ] Dialogs: setup password, deposit, withdraw, paytable/help, stats
-- [ ] Build release APK → `release/`, GitHub Actions workflow
-- [ ] Polish pass
+- [x] SlotView rendering & animations, sounds
+- [x] Dialogs: setup password, deposit, withdraw, paytable/help, stats
+- [x] Build release APK → `release/`, GitHub Actions workflow
+- [x] Polish pass 1 (tease effect, shader caching, flow fixes, wallet tests)
+- [ ] Ideas if the user asks for more: background music loop, gamble (double-up) feature,
+      progressive jackpot meters, more themes, real-device performance check on MT8168
 
 ## Status log
 - Session 1: scaffold created. Engine done: exact RTP 79.999%, sim 80.4%, hit 33%, SD 4.6, FS every ~126 spins.
+- Session 1 (cont.): full game built; 13 unit tests pass; release APK 114 KB in `release/`; README with screenshots.

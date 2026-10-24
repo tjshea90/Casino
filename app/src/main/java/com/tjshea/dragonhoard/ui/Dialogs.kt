@@ -329,7 +329,13 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
                 val name = GameConfig.SYMBOL_NAMES[s].uppercase() + if (s == GameConfig.WILD) " — substitutes for all symbols except the scatter" else ""
                 "$name\n5×: ${p[2] * lineBet}    4×: ${p[1] * lineBet}    3×: ${p[0] * lineBet}"
             }
-            val t = text(desc, 14f, cream).apply { setPadding(dp(12), 0, 0, 0) }
+            val nl = desc.indexOf('\n')
+            val styled = android.text.SpannableString(desc).apply {
+                setSpan(android.text.style.ForegroundColorSpan(gold), 0, nl, 0)
+                setSpan(android.text.style.StyleSpan(Typeface.BOLD), 0, nl, 0)
+                setSpan(android.text.style.RelativeSizeSpan(1.15f), nl, desc.length, 0)
+            }
+            val t = text(styled, 14f, cream).apply { setPadding(dp(12), 0, 0, 0) }
             val r = LinearLayout(act).apply {
                 orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
                 addView(img, LinearLayout.LayoutParams(dp(56), dp(56)))
