@@ -135,7 +135,8 @@ class Audio(context: Context) {
         return out
     }
 
-    private fun echo(a: FloatArray, delaySec: Double, fb: Float, tail: Double = 1.0): FloatArray {
+    private fun echo(a: FloatArray, delaySec: Double, fbD: Double, tail: Double = 1.0): FloatArray {
+        val fb = fbD.toFloat()
         val d = n(delaySec); val out = a.copyOf(a.size + n(tail))
         for (i in d until out.size) out[i] += out[i - d] * fb
         return out
