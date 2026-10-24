@@ -113,3 +113,21 @@ cp app/build/outputs/apk/release/app-release.apk release/DragonsHoard.apk
 - engine/ReaperEngine.kt, engine/SoulVault.kt (bonus is generated from a seed: credited at trigger, replayed by UI; replays after restart)
 - data/Wallet.kt — relics, average-stake bonus bet, vaultUnseen gate (spins blocked until the bonus has been shown)
 - Session 2: Neon Reaper built end to end; per-stake RTP 87.0 %; 148 KB APK.
+
+## NEON REAPER v1.1 (session 3) — user feedback round
+User asked for:
+0. GitHub Releases page with permanent latest-download links (workflow `.github/workflows/release.yml`).
+1. Better background music. 2. Much better, 3D-looking graphics/characters.
+3. Relics far more often (bonus attainable, not extremely rare) → target bonus ≈ every 90 spins.
+4. Winning spin ≈ 1 in 3.5 at EVERY stake; wins may be < stake; occasional 2×/5×/10×/15× and big wins.
+5. Every win pauses (even autoplay) with a big clear token amount + sound.
+6. 3D animated characters on the reels: dark red-eyed ones, some smiling/laughing; occasional extra animations + SFX.
+**Rule change from user: rounding to the mack happens ONLY at cash-out, never in game. In-game wins are exact tokens.**
+Design: line pays are integer multiples of the stake (so no fractional tokens at any stake), 25-book cap stays.
+
+Work queue v1.1:
+- [ ] release.yml workflow
+- [ ] math: new pays/reels (hit ≈ 28.6 %), relic chance, vault retune, calibration, cash-out rounding, tests
+- [ ] audio: reverb + composed music + laugh/caw SFX
+- [ ] 3D art: drum reels, animated characters (layered bitmaps), win banner, idle character events
+- [ ] screenshots, release build, verify release link

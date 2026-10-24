@@ -1,0 +1,38 @@
+name: Publish APKs
+
+# Publishes the committed APKs in release/ as a GitHub Release whenever they change.
+# Permanent download links (always the newest build):
+#   https://github.com/tjshea90/Casino/releases/latest/download/NeonReaper.apk
+#   https://github.com/tjshea90/Casino/releases/latest/download/DragonsHoard.apk
+on:
+  push:
+    paths:
+      - "release/*.apk"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Casino build ${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          make_latest: "true"
+          body: |
+            Tap an APK below to download it (open in your browser, not an in-app viewer).
+            - **NeonReaper.apk** — Neon Reaper
+            - **DragonsHoard.apk** — Dragon's Hoard
+
+            Permanent links to the newest build:
+            https://github.com/tjshea90/Casino/releases/latest/download/NeonReaper.apk
+            https://github.com/tjshea90/Casino/releases/latest/download/DragonsHoard.apk
+          files: |
+            release/NeonReaper.apk
+            release/DragonsHoard.apk
