@@ -21,16 +21,16 @@ class SpinOutcome(
 ) {
     val totalMult: Int = lineWins.sumOf { it.mult }
     val rawTokens: Long get() = totalMult.toLong() * stake
-    /** Paid amount: rounded down to the mack, capped at 25 books. */
+    /** Paid amount in exact tokens, capped at 25 books. */
     val payTokens: Long get() = ReaperEngine.settle(rawTokens)
-    val capped: Boolean get() = Money.floorToMack(rawTokens) > ReaperConfig.MAX_WIN_TOKENS
-    val roundedAway: Long get() = if (capped) 0 else rawTokens - payTokens
+    val capped: Boolean get() = rawTokens > ReaperConfig.MAX_WIN_TOKENS
     val feature: Boolean get() = wildReels.isNotEmpty()
 }
 
 object ReaperEngine {
 
-    fun settle(rawTokens: Long): Long = Money.floorToMack(rawTokens).coerceAtMost(ReaperConfig.MAX_WIN_TOKENS)
+    /** In-game wins are exact tokens (no rounding); only the 25-book cap applies. */
+    fun settle(rawTokens: Long): Long = rawTokens.coerceIn(0, ReaperConfig.MAX_WIN_TOKENS)
 
     /** Returns symbol, count, multiplier for one line, or null. */
     fun evaluateLine(s: IntArray): Triple<Int, Int, Int>? {

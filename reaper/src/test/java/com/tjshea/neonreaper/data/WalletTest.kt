@@ -1,6 +1,5 @@
 package com.tjshea.neonreaper.data
 
-import com.tjshea.neonreaper.engine.Money
 import com.tjshea.neonreaper.engine.ReaperConfig
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -27,8 +26,10 @@ class WalletTest {
         assertEquals(0L, w.balance)
         assertTrue(w.deposit(pw("grim"), 100) is AuthResult.Ok)
         assertTrue(w.withdraw(pw("y"), 50) is AuthResult.Wrong)
-        assertTrue(w.withdraw(pw("grim"), 35) is AuthResult.Ok)
-        assertEquals(65L, w.balance)
+        assertTrue(w.withdraw(pw("grim"), 35) is AuthResult.Ok)   // cash-out rounds down to 30
+        assertEquals(30L, w.lastCashOut)
+        assertEquals(70L, w.balance)
+        assertTrue(w.withdraw(pw("grim"), 7) is AuthResult.Failed)
         repeat(3) { w.deposit(pw("bad$it"), 1) }
         assertTrue(w.deposit(pw("bad9"), 1) is AuthResult.Wrong)
         assertTrue(w.deposit(pw("bad10"), 1) is AuthResult.Locked)
@@ -53,7 +54,7 @@ class WalletTest {
             val before = w.relics
             val p = w.playSpin(stake) ?: error("refused")
             expected += -stake + p.outcome.payTokens + (p.vault?.payTokens ?: 0)
-            assertEquals(0L, p.outcome.payTokens % Money.TOKENS_PER_MACK)
+            assertEquals(minOf(p.outcome.rawTokens, ReaperConfig.MAX_WIN_TOKENS), p.outcome.payTokens)
             assertTrue(p.outcome.payTokens <= ReaperConfig.MAX_WIN_TOKENS)
             assertEquals(expected, w.balance)
             if (p.relicIndex >= 0) assertEquals(before, p.relicIndex)

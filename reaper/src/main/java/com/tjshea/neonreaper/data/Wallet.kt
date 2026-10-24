@@ -201,14 +201,21 @@ class Wallet(private val context: Context) {
         return r
     }
 
+    /** Largest amount that can be cashed out: cash-outs are whole macks (the only place rounding happens). */
+    val cashableTokens: Long get() = Money.floorToMack(balance)
+
+    /** Cash-outs are rounded DOWN to whole macks; any odd tokens stay on the credit meter. Returns the amount actually paid via [lastCashOut]. */
+    var lastCashOut = 0L; private set
+
     @Synchronized
-    fun withdraw(pw: CharArray, tokens: Long): AuthResult {
-        if (tokens <= 0) return AuthResult.Failed("Invalid amount")
+    fun withdraw(pw: CharArray, requested: Long): AuthResult {
+        val tokens = Money.floorToMack(requested)
+        if (tokens <= 0) return AuthResult.Failed("Cash-outs are whole macks: enter at least 10 tokens")
         if (tokens > balance) return AuthResult.Failed("Amount exceeds balance")
         if (vaultUnseen) return AuthResult.Failed("Finish the Soul Vault bonus first")
         val r = authenticate(pw)
         if (r !is AuthResult.Ok) return r
-        balance -= tokens; totalWithdrawn += tokens; ticketNo++
+        balance -= tokens; totalWithdrawn += tokens; ticketNo++; lastCashOut = tokens
         log("WITHDRAW", tokens); save()
         return r
     }

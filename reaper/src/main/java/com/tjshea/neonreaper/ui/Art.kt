@@ -191,8 +191,8 @@ object Art {
             }
             ReaperConfig.SKULL -> skull(c, s * 0.5f, s * 0.5f, s * 0.8f, Neon.GREEN)
             ReaperConfig.RAVEN -> raven(c, s)
-            ReaperConfig.LANTERN -> lantern(c, s)
-            ReaperConfig.TOMB -> tomb(c, s)
+            ReaperConfig.PUMPKIN -> lantern(c, s)
+            ReaperConfig.GHOST -> tomb(c, s)
             else -> royal(c, s, sym)
         }
     }

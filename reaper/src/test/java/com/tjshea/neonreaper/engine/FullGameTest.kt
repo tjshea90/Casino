@@ -1,6 +1,7 @@
 package com.tjshea.neonreaper.engine
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.Random
 
@@ -27,6 +28,7 @@ class FullGameTest {
             println("stake %2d: RTP %.4f  hit %.3f  bonus every %.0f spins  max win %d tokens"
                 .format(stake, rtp, hits.toDouble() / spins, spins.toDouble() / bonuses, maxWin))
             assertEquals("stake $stake", 0.87, rtp, 0.02)
+            assertTrue("about 1 win in 3.5 spins at stake $stake", hits.toDouble() / spins in 0.27..0.31)
         }
     }
 }

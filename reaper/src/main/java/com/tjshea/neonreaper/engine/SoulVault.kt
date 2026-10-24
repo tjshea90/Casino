@@ -35,7 +35,7 @@ class VaultResult(
     val totalMult: Int = cells.sumOf { it?.value ?: 0 } + if (grand) ReaperConfig.GRAND else 0
     val rawTokens: Long get() = totalMult.toLong() * bet
     val payTokens: Long get() = ReaperEngine.settle(rawTokens)
-    val capped: Boolean get() = Money.floorToMack(rawTokens) > ReaperConfig.MAX_WIN_TOKENS
+    val capped: Boolean get() = rawTokens > ReaperConfig.MAX_WIN_TOKENS
 }
 
 object SoulVault {

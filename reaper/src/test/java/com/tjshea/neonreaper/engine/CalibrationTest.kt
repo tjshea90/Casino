@@ -47,6 +47,7 @@ class CalibrationTest {
         }
         val trig = ReaperConfig.RELIC_CHANCE / ReaperConfig.RELIC_COUNT
         val sb = StringBuilder("FEATURE_RATE = ")
+        val checks = ArrayList<Triple<Int, Double, Double>>()
         println("bonus mean multiplier %.2f, bonus every %.0f spins".format(sumBonus / nBonus, 1 / trig))
         for (k in stakes.indices) {
             val s = stakes[k]
@@ -57,23 +58,26 @@ class CalibrationTest {
             println("stake %2d: base %.4f feature %.2fx bonus %.4f -> f=%.4f (1 in %.0f) | stored f gives RTP %.4f | hit %.3f"
                 .format(s, rn, rf, rb, f, 1 / f, rtp, hits[k].toDouble() / nBase))
             sb.append("%.4f, ".format(f))
+            checks += Triple(s, f, rtp)
+        }
+        println(sb)
+        for ((s, f, rtp) in checks) {
             assertTrue("feature rate must be feasible at stake $s", f in 0.0..0.3)
             assertEquals("stake $s RTP", ReaperConfig.TARGET_RTP, rtp, 0.006)
         }
-        println(sb)
     }
 
     @Test fun lineRules() {
         val W = ReaperConfig.WILD; val H = ReaperConfig.HOODED; val A = ReaperConfig.ACE
-        assertEquals(Triple(W, 5, 250), ReaperEngine.evaluateLine(intArrayOf(W, W, W, W, W)))
-        assertEquals(Triple(H, 5, 100), ReaperEngine.evaluateLine(intArrayOf(W, H, W, H, H)))
-        assertEquals(Triple(W, 3, 5), ReaperEngine.evaluateLine(intArrayOf(W, W, W, A, H)))
+        assertEquals(Triple(W, 5, 150), ReaperEngine.evaluateLine(intArrayOf(W, W, W, W, W)))
+        assertEquals(Triple(H, 5, 60), ReaperEngine.evaluateLine(intArrayOf(W, H, W, H, H)))
+        assertEquals(Triple(W, 3, 8), ReaperEngine.evaluateLine(intArrayOf(W, W, W, A, H)))
         assertEquals(null, ReaperEngine.evaluateLine(intArrayOf(H, A, H, H, H)))
     }
 
-    @Test fun payoutsRoundDownAndCap() {
-        assertEquals(30L, ReaperEngine.settle(37))
-        assertEquals(0L, ReaperEngine.settle(9))
+    @Test fun payoutsAreExactAndCapped() {
+        assertEquals(37L, ReaperEngine.settle(37))
+        assertEquals(9L, ReaperEngine.settle(9))
         assertEquals(2000L, ReaperEngine.settle(99_999))
     }
 

@@ -932,8 +932,6 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
             "LINE ${w.line + 1}  •  ${w.count} × ${ReaperConfig.SYMBOL_NAMES[w.symbol].uppercase()}  •  ${w.mult}× STAKE = ${w.mult * o.stake} TOKENS"
         } else when {
             o.capped -> "MAXIMUM WIN — 25 BOOKS"
-            o.roundedAway > 0 && o.payTokens == 0L -> "WIN ${o.rawTokens} TOKENS — ROUNDED DOWN TO 0 (WHOLE MACKS ONLY)"
-            o.roundedAway > 0 -> "WIN ${o.rawTokens} TOKENS — ROUNDED DOWN TO ${o.payTokens}"
             else -> null
         } ?: return
         pText.typeface = cond; pText.textSize = 24 * u

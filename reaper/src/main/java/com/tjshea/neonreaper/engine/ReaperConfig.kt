@@ -2,20 +2,21 @@ package com.tjshea.neonreaper.engine
 
 /**
  * Neon Reaper math. Stake is in TOKENS (1..40). Line pays are whole multiples of
- * the stake. Every payout is rounded down to a whole mack and capped at 25 books.
+ * the stake, so every win is an exact number of tokens (rounding to the mack only
+ * happens at cash-out). Wins are capped at 25 books.
  *
- * Because rounding and the cap cost different amounts at different stakes, the
- * "Reaper's Touch" wild-reel feature triggers at a per-stake rate (FEATURE_RATE)
- * that brings every stake to 87 % RTP. Values come from CalibrationTest; do not
- * edit pays/reels without re-running it and pasting the new table.
+ * The cap costs more at high stakes, so the "Reaper's Touch" wild-reel feature
+ * triggers at a per-stake rate (FEATURE_RATE) that brings every stake to 87 % RTP.
+ * Values come from CalibrationTest; do not edit pays/reels without re-running it
+ * and pasting the new table.
  */
 object ReaperConfig {
     const val WILD = 0
     const val HOODED = 1
     const val SKULL = 2
     const val RAVEN = 3
-    const val LANTERN = 4
-    const val TOMB = 5
+    const val PUMPKIN = 4
+    const val GHOST = 5
     const val ACE = 6
     const val KING = 7
     const val QUEEN = 8
@@ -28,22 +29,22 @@ object ReaperConfig {
     const val TARGET_RTP = 0.87
     const val MAX_WIN_TOKENS = 25 * Money.TOKENS_PER_BOOK // 2000 tokens = 25 books
 
-    val SYMBOL_NAMES = arrayOf("Grim Reaper Wild", "Hooded Watcher", "Neon Skull", "Blood Raven", "Soul Lantern",
-        "Tombstone", "Ace", "King", "Queen", "Jack", "Ten")
+    val SYMBOL_NAMES = arrayOf("Grim Reaper Wild", "Hooded Watcher", "Laughing Skull", "Blood Raven", "Jack-o'-Lantern",
+        "Grinning Ghost", "Ace", "King", "Queen", "Jack", "Ten")
 
     /** PAYS[symbol] = multiples of the STAKE for 3, 4, 5 of a kind on a line. */
     val PAYS: Array<IntArray> = arrayOf(
-        intArrayOf(5, 25, 250),  // WILD
-        intArrayOf(4, 15, 100),  // HOODED
-        intArrayOf(3, 10, 60),   // SKULL
-        intArrayOf(2, 8, 40),    // RAVEN
-        intArrayOf(2, 6, 30),    // LANTERN
-        intArrayOf(2, 5, 25),    // TOMB
-        intArrayOf(1, 4, 15),    // ACE
-        intArrayOf(1, 3, 12),    // KING
-        intArrayOf(1, 2, 10),    // QUEEN
-        intArrayOf(1, 2, 8),     // JACK
-        intArrayOf(1, 2, 6),     // TEN
+        intArrayOf(8, 30, 150),  // WILD
+        intArrayOf(4, 12, 60),   // HOODED
+        intArrayOf(3, 8, 30),    // SKULL
+        intArrayOf(2, 6, 20),    // RAVEN
+        intArrayOf(2, 5, 15),    // PUMPKIN
+        intArrayOf(2, 4, 10),    // GHOST
+        intArrayOf(1, 3, 8),     // ACE
+        intArrayOf(1, 2, 6),     // KING
+        intArrayOf(1, 2, 5),     // QUEEN
+        intArrayOf(1, 2, 5),     // JACK
+        intArrayOf(1, 2, 4),     // TEN
     )
 
     val PAYLINES: Array<IntArray> = arrayOf(
@@ -54,8 +55,8 @@ object ReaperConfig {
         intArrayOf(1, 1, 2, 1, 1), intArrayOf(0, 0, 2, 0, 0), intArrayOf(2, 2, 0, 2, 2), intArrayOf(0, 2, 2, 2, 0),
     )
 
-    //                          W  HD SK RV LN TB A  K  Q  J  10
-    private val COUNTS = intArrayOf(1, 3, 4, 5, 5, 6, 7, 7, 8, 8, 8)
+    //                          W  HD SK RV PK GH A  K  Q  J  10
+    private val COUNTS = intArrayOf(1, 3, 3, 4, 5, 5, 7, 7, 8, 8, 9)
     val STRIPS: Array<IntArray> = Array(REELS) { buildStrip(COUNTS, it) }
 
     /** Reaper's Touch: which reels turn wild, and how likely each pattern is. */
@@ -66,22 +67,22 @@ object ReaperConfig {
 
     /** Per-stake chance a spin gets Reaper's Touch (from CalibrationTest). */
     val FEATURE_RATE = doubleArrayOf(
-        0.0475, 0.0360, 0.0321, 0.0273, 0.0148, 0.0193, 0.0035, 0.0091, 0.0055, 0.0103, 0.0086, 0.0128
+        0.0061, 0.0061, 0.0061, 0.0062, 0.0062, 0.0063, 0.0064, 0.0072, 0.0079, 0.0088, 0.0098, 0.0124
     )
 
     // ---- relics & Soul Vault bonus ----
     const val RELIC_COUNT = 5
-    /** Chance per spin to collect the next relic: bonus about every 220 spins. */
-    const val RELIC_CHANCE = 5.0 / 220.0
+    /** Chance per spin to collect the next relic: a relic about every 24 spins, bonus about every 120. */
+    const val RELIC_CHANCE = 5.0 / 120.0
     val RELIC_NAMES = arrayOf("Scythe", "Hourglass", "Skull Candle", "Raven Feather", "Cursed Tome")
 
     const val VAULT_COLS = 5
     const val VAULT_ROWS = 4
     const val VAULT_START_ORBS = 5
     const val VAULT_RESPINS = 3
-    const val VAULT_ORB_CHANCE = 0.05
+    const val VAULT_ORB_CHANCE = 0.03
     val ORB_VALUES = intArrayOf(1, 2, 3, 4, 5, 8, 10, 15, 25)        // × bonus bet
-    val ORB_WEIGHTS = intArrayOf(25, 22, 16, 12, 9, 7, 5, 3, 1)
+    val ORB_WEIGHTS = intArrayOf(36, 24, 14, 9, 6, 5, 3, 2, 1)
     const val P_MAJOR = 0.003
     const val P_MINOR = 0.012
     const val P_MINI = 0.03

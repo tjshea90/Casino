@@ -262,26 +262,28 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
         val pw = field("Password", password = true)
         val status = text("", 14f, 0xFFFF8A80.toInt(), center = true)
         lateinit var dlg: Dialog
-        val all = button("All", 0xFF6A1B9A.toInt()) { amt.set(wallet.balance) }.apply { textSize = 14f }
+        val all = button("All", 0xFF6A1B9A.toInt()) { amt.set(wallet.cashableTokens) }.apply { textSize = 14f }
         val ok = button("Cash out", 0xFFC62828.toInt()) { v ->
             val tokens = amt.value()
             if (tokens <= 0) { status.text = "Enter an amount."; return@button }
             if (tokens > wallet.balance) { status.text = "You only have ${Money.describe(wallet.balance)}."; return@button }
+            if (tokens < Money.TOKENS_PER_MACK) { status.text = "Cash-outs are whole macks — enter at least 10 tokens."; return@button }
             v.isEnabled = false; status.setTextColor(gold); status.text = "Verifying…"
             val chars = readPw(pw)
             background({ wallet.withdraw(chars, tokens).also { chars.fill('\u0000') } }) { r ->
                 if (r is AuthResult.Ok) {
                     dlg.dismiss()
-                    ticket(tokens)
+                    ticket(wallet.lastCashOut)
                 } else {
                     v.isEnabled = true; status.setTextColor(0xFFFF8A80.toInt()); status.text = authMessage(r); pw.setText("")
                 }
             }
         }
-        amt.set(wallet.balance)
+        amt.set(wallet.cashableTokens)
         dlg = show(vbox(
             title("CASH OUT"),
             text("Balance: %,d tokens  (%s)".format(wallet.balance, Money.describe(wallet.balance)), 15f, gold, bold = true, center = true),
+            text("Cash-outs are paid in whole macks: the amount is rounded down to the nearest 10 tokens and any odd tokens stay on your credit.", 13f, cream, center = true),
             amt.view(listOf("+1 M" to 10L, "+1 B" to 80L, "+10 B" to 800L), extra = all),
             pw, status,
             row(button("Cancel", 0xFF424242.toInt()) { dlg.dismiss() }, ok)
@@ -338,16 +340,16 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
             "REAPER'S TOUCH\n" +
             "At random the Grim Reaper swoops over the reels and slashes 1–3 of the middle reels completely WILD.\n\n" +
             "RELICS & THE SOUL VAULT\n" +
-            "Any spin may reveal a relic (Scythe, Hourglass, Skull Candle, Raven Feather, Cursed Tome). Collect all five to open the Soul Vault: " +
+            "About one spin in 24 reveals a relic (Scythe, Hourglass, Skull Candle, Raven Feather, Cursed Tome). Collect all five to open the Soul Vault: " +
             "5 soul orbs start in a 5×4 vault and you get 3 respins. Every orb that lands sticks and resets the respins to 3. " +
             "Orbs pay 1×–25× the bonus bet; MINI ${ReaperConfig.MINI}×, MINOR ${ReaperConfig.MINOR}×, MAJOR ${ReaperConfig.MAJOR}× jackpot orbs; " +
             "the Reaper orb harvests the value of every soul on the board; fill all 20 niches for the GRAND (${ReaperConfig.GRAND}×). " +
             "The bonus bet is your average stake while collecting the relics (now: ${wallet.averageStake}). Relics are kept between sessions.\n\n" +
             "MONEY RULES\n" +
             "• Stake 1–40 tokens (10 tokens = 1 mack, 80 tokens = 1 book).\n" +
-            "• Every payout is rounded down to a whole mack, so at stakes under 10 tokens small wins round to 0.\n" +
+            "• Every win pays exact tokens. Rounding down to a whole mack only happens when you cash out (odd tokens stay on the machine).\n" +
             "• Maximum win: 25 books (2,000 tokens) per spin and per Soul Vault.\n" +
-            "• Return to player: 87% at every stake (house edge 13%), medium-high volatility; about 1 in 4 spins wins at stakes of 10+.\n" +
+            "• Return to player: 87% at every stake (house edge 13%). About 1 spin in 3.5 is a winner, at every stake.\n" +
             "• Tap the reels to slam-stop; tap during the Soul Vault to fast-forward.", 14f))
         lateinit var dlg: Dialog
         list.addView(button("Close") { dlg.dismiss() })
