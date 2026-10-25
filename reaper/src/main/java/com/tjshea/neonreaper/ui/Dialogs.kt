@@ -314,7 +314,8 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
     }
 
     fun info(stake: Int) {
-        val art = Array(ReaperConfig.SYMBOL_COUNT) { Art.symbol(it, dp(56)) }
+        val chars = Characters(dp(64), dp(64))
+        val art = Array(ReaperConfig.SYMBOL_COUNT) { chars.body(it) }
         val list = vbox(
             title("PAYTABLE & RULES"),
             text("Wins pay left to right on any of the 20 lines, as multiples of your stake. Shown for your current stake of $stake token(s).", 14f)
@@ -354,7 +355,7 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
         lateinit var dlg: Dialog
         list.addView(button("Close") { dlg.dismiss() })
         dlg = show(list, widthFrac = 0.7f)
-        dlg.setOnDismissListener { art.forEach { it.recycle() }; onChanged() }
+        dlg.setOnDismissListener { chars.recycle(); onChanged() }
     }
 
     fun stats() {

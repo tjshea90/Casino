@@ -3,7 +3,7 @@
 | App | Module | Status |
 |-----|--------|--------|
 | Dragon's Hoard | `:app` | DONE (v1.0.0, `release/DragonsHoard.apk`) |
-| Neon Reaper | `:reaper` | DONE v1.0.0 (`release/NeonReaper.apk`) — see "NEON REAPER" section at the bottom |
+| Neon Reaper | `:reaper` | DONE v1.1.0 (`release/NeonReaper.apk`) — see "NEON REAPER" section at the bottom |
 
 ---
 # Dragon's Hoard (app 1)
@@ -129,5 +129,6 @@ Work queue v1.1:
 - [x] release.yml workflow (fires when release/*.apk changes; workflow_dispatch only works from default branch)
 - [x] math: new pays/reels (hit ≈ 28.6 %), relic chance, vault retune, calibration, cash-out rounding, tests
 - [x] audio: reverb + composed music + laugh/cackle/giggle/caw/chatter SFX (AudioRenderTest renders WAVs to reaper/build/audio)
-- [ ] 3D art: drum reels, animated characters (layered bitmaps), win banner, idle character events
-- [ ] screenshots, release build, verify release link
+- [x] 3D art (ui/Art3D.kt `Characters`): drum reels, animated characters, win banner, idle character events + voices
+- [x] screenshots, release build v1.1.0 (versionCode 2) → release/NeonReaper.apk; release workflow publishes it
+- Note: CI build.yml was failing at android-actions/setup-android; fixed by using the runner's preinstalled SDK.

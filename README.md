@@ -1,5 +1,10 @@
 # Casino — Android slot machines
 
+**Download the newest builds (open in your browser):**
+- Neon Reaper: https://github.com/tjshea90/Casino/releases/latest/download/NeonReaper.apk
+- Dragon's Hoard: https://github.com/tjshea90/Casino/releases/latest/download/DragonsHoard.apk
+- All builds: https://github.com/tjshea90/Casino/releases
+
 | Game | APK | Theme |
 |------|-----|-------|
 | **Neon Reaper** | [`release/NeonReaper.apk`](release/NeonReaper.apk) (~150 KB) | Dark horror: reapers, hooded watchers, neon green & blood red. 87 % RTP, Soul Vault bonus |
@@ -14,21 +19,24 @@ Both run on Android 10 (Go) and up (MT8168 / armv7 tested target), share the sam
 ![Neon Reaper](docs/reaper_idle.jpg)
 
 - **Stake:** one STAKE button, 1–40 tokens (1, 2, 3, 4, 5, 8, 10, 15, 20, 25, 30, 40).
-- **20 lines**, pays are multiples of the stake. Every payout rounds **down to a whole mack**; max win **25 books (2,000 tokens)** per spin and per bonus.
-- **RTP 87 % at every stake** (house edge 13 %). About **1 in 4 spins wins** at stakes of 10+ tokens. At stakes under 10, wins under 10 tokens round to 0, so wins are rarer there.
+- **20 lines**, pays are whole multiples of the stake, so **every win is exact tokens**. Rounding down to a whole mack happens **only at cash-out** (odd tokens stay on the machine). Max win **25 books (2,000 tokens)** per spin and per bonus.
+- **RTP 87 % at every stake** (house edge 13 %). About **1 spin in 3.4 wins** at every stake. Every win pauses with a big token amount and a sound (autoplay too).
+- **3D graphics:** curved 3D reel drum and lit 3D characters with animated faces — red-eyed Grim Reaper and Hooded Watcher, a laughing chattering skull, a cawing raven, a grinning jack-o'-lantern and a giggling ghost. Characters come alive at random with their own voices.
 - **Reaper's Touch:** the Grim Reaper swoops in and slashes 1–3 middle reels fully wild.
-- **Relics → Soul Vault bonus:** any spin can reveal one of 5 relics (kept between sessions). Collect all 5 (≈ every 220 spins) to open the **Soul Vault**, a separate hold-and-spin screen:
+- **Relics → Soul Vault bonus:** about 1 spin in 24 reveals one of 5 relics (kept between sessions). Collect all 5 (≈ every 120 spins) to open the **Soul Vault**, a separate hold-and-spin screen:
   5 starting orbs, 3 respins that reset whenever an orb lands; orbs worth 1×–25× the bonus bet; MINI 15×, MINOR 40×, MAJOR 150× jackpot orbs;
-  the Reaper orb harvests every soul on the board; fill all 20 niches for the GRAND (1000×). Averages ~50× the bonus bet. The bonus bet is your **average stake while collecting**, so switching to a big stake at the last relic doesn't game it.
+  the Reaper orb harvests every soul on the board; fill all 20 niches for the GRAND (1000×). Averages ~28× the bonus bet. The bonus bet is your **average stake while collecting**, so switching to a big stake at the last relic doesn't game it.
 - Big/Huge/Massive/Deadly win celebrations with the reaper rising, characters looming out of the reels on 5-of-a-kind, lightning, bats, fog, soul particles, synthesized horror music (separate bonus track) and sound effects.
 
 | Reaper's Touch | Big win | Soul Vault |
 |---|---|---|
 | ![](docs/reaper_touch.jpg) | ![](docs/reaper_bigwin.jpg) | ![](docs/reaper_vault.jpg) |
 
+![Win banner](docs/reaper_win.jpg)
+
 **Math verification** (`reaper/src/test/.../CalibrationTest.kt`, `FullGameTest.kt`): per-stake RTP is measured with rounding and the cap
 (4 M base spins, 800 k feature spins, 400 k bonuses); the Reaper's Touch rate is tuned per stake so each stake computes to 87.0 %.
-A 2-million-spin full-game simulation per stake confirms 86.3–87.9 %.
+A 2-million-spin full-game simulation per stake confirms 87.0–87.6 % with a 29 % hit rate.
 
 ---
 
