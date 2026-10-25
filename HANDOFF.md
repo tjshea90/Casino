@@ -172,7 +172,7 @@ Characters (3D procedural meshes): Grim Reaper, Hooded Watcher, Jack-o'-lantern,
 character symbols are live 3D models standing on the drum faces; royals are textured faces from the Canvas atlas.
 
 Work queue v2.0:
-- [ ] A. Gl/AndroidGl/LwjglGl, Mat4, Mesh, Shaders, minimal render test (sky + sphere) PNG
+- [x] A. Gl/AndroidGl/LwjglGl, Mat4, Mesh, Shaders, GlSmokeTest renders build/screens/gl_smoke.png (Headless.kt = EGL surfaceless + PNG writer)
 - [ ] B. Layout3D + 3D reel drums + atlas + cabinet frame
 - [ ] C. Environment: sky/moon/clouds, ground, tombstones, trees, fog, fireflies, lightning, camera
 - [ ] D. 3D characters + animation (jaw, eyes, flicker, flap), side characters, mini fly-ins, big-win reaper, coins
