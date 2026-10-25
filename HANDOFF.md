@@ -146,7 +146,7 @@ User asked for:
 Plan: rebudget RTP (base ↓, bonus a bit rarer, features ↑), per-stake calibration of total feature rate.
 
 Work queue v1.2:
-- [ ] engine: mini features (RAVEN wilds, PUMPKIN coins, SKULL multiplier, REAPER wild reels), rebudget + calibrate, tests
+- [x] engine: mini features (RAVEN wilds, PUMPKIN coins, SKULL multiplier, REAPER wild reels), rebudget + calibrate, tests
 - [ ] base view: feature fly-in animations, coins on reels, multiplier, win lock + count-up + tiered SFX, big hold-to-spin button
 - [ ] vault: spin button per respin, new epic music
 - [ ] audio: fanfare/count-end/coin-drop/spin-press SFX, new vault music

@@ -5,8 +5,9 @@ package com.tjshea.neonreaper.engine
  * the stake, so every win is an exact number of tokens (rounding to the mack only
  * happens at cash-out). Wins are capped at 25 books.
  *
- * The cap costs more at high stakes, so the "Reaper's Touch" wild-reel feature
- * triggers at a per-stake rate (FEATURE_RATE) that brings every stake to 87 % RTP.
+ * The cap costs more at high stakes, so the mini features (Reaper / Raven /
+ * Pumpkin / Skull) trigger at a per-stake rate (FEATURE_RATE) that brings every
+ * stake to 87 % RTP.
  * Values come from CalibrationTest; do not edit pays/reels without re-running it
  * and pasting the new table.
  */
@@ -34,17 +35,17 @@ object ReaperConfig {
 
     /** PAYS[symbol] = multiples of the STAKE for 3, 4, 5 of a kind on a line. */
     val PAYS: Array<IntArray> = arrayOf(
-        intArrayOf(8, 30, 150),  // WILD
-        intArrayOf(4, 12, 60),   // HOODED
-        intArrayOf(3, 8, 30),    // SKULL
-        intArrayOf(2, 6, 20),    // RAVEN
-        intArrayOf(2, 5, 15),    // PUMPKIN
-        intArrayOf(2, 4, 10),    // GHOST
-        intArrayOf(1, 3, 8),     // ACE
-        intArrayOf(1, 2, 6),     // KING
-        intArrayOf(1, 2, 5),     // QUEEN
-        intArrayOf(1, 2, 5),     // JACK
-        intArrayOf(1, 2, 4),     // TEN
+        intArrayOf(6, 20, 100),  // WILD
+        intArrayOf(3, 10, 40),   // HOODED
+        intArrayOf(3, 6, 25),    // SKULL
+        intArrayOf(2, 5, 15),    // RAVEN
+        intArrayOf(2, 4, 10),    // PUMPKIN
+        intArrayOf(2, 3, 8),     // GHOST
+        intArrayOf(1, 2, 6),     // ACE
+        intArrayOf(1, 2, 5),     // KING
+        intArrayOf(1, 2, 4),     // QUEEN
+        intArrayOf(1, 2, 4),     // JACK
+        intArrayOf(1, 2, 3),     // TEN
     )
 
     val PAYLINES: Array<IntArray> = arrayOf(
@@ -59,21 +60,35 @@ object ReaperConfig {
     private val COUNTS = intArrayOf(1, 3, 3, 4, 5, 5, 7, 7, 8, 8, 9)
     val STRIPS: Array<IntArray> = Array(REELS) { buildStrip(COUNTS, it) }
 
+    // ---- mini features: a character floats out and changes this one spin ----
+    const val MINI_NONE = 0
+    const val MINI_REAPER = 1   // Reaper's Touch: 1-3 middle reels turn fully wild
+    const val MINI_RAVEN = 2    // Raven's Flock: 3-6 random symbols become wild
+    const val MINI_PUMPKIN = 3  // Pumpkin's Treats: 3-6 soul coins land, each paying 1x-50x the stake
+    const val MINI_SKULL = 4    // Skull's Curse: 2 wilds plus a x2 / x3 / x5 multiplier on line wins
+    val MINI_NAMES = arrayOf("", "REAPER'S TOUCH", "RAVEN'S FLOCK", "PUMPKIN'S TREATS", "SKULL'S CURSE")
+    val MINI_WEIGHTS = doubleArrayOf(0.0, 0.25, 0.30, 0.30, 0.15)
+    val RAVEN_WILDS = intArrayOf(3, 4, 5, 6); val RAVEN_WILD_WEIGHTS = doubleArrayOf(0.5, 0.3, 0.15, 0.05)
+    val COIN_COUNTS = intArrayOf(3, 4, 5, 6); val COIN_COUNT_WEIGHTS = doubleArrayOf(0.45, 0.3, 0.17, 0.08)
+    val COIN_VALUES = intArrayOf(1, 2, 3, 5, 10, 20, 50); val COIN_WEIGHTS = doubleArrayOf(30.0, 25.0, 18.0, 13.0, 9.0, 4.0, 1.0)
+    val SKULL_MULTS = intArrayOf(2, 3, 5); val SKULL_MULT_WEIGHTS = doubleArrayOf(0.6, 0.3, 0.1)
+    const val SKULL_WILDS = 2
+
     /** Reaper's Touch: which reels turn wild, and how likely each pattern is. */
     val FEATURE_PATTERNS: Array<IntArray> = arrayOf(intArrayOf(1), intArrayOf(2), intArrayOf(3), intArrayOf(1, 3), intArrayOf(1, 2, 3))
     val FEATURE_WEIGHTS = doubleArrayOf(0.45, 0.25, 0.15, 0.08, 0.07)
 
     val STAKES = intArrayOf(1, 2, 3, 4, 5, 8, 10, 15, 20, 25, 30, 40)
 
-    /** Per-stake chance a spin gets Reaper's Touch (from CalibrationTest). */
+    /** Per-stake chance a spin gets a mini feature (from CalibrationTest). */
     val FEATURE_RATE = doubleArrayOf(
-        0.0061, 0.0061, 0.0061, 0.0062, 0.0062, 0.0063, 0.0064, 0.0072, 0.0079, 0.0088, 0.0098, 0.0124
+        0.0110, 0.0110, 0.0110, 0.0110, 0.0110, 0.0110, 0.0110, 0.0114, 0.0117, 0.0121, 0.0126, 0.0138
     )
 
     // ---- relics & Soul Vault bonus ----
     const val RELIC_COUNT = 5
-    /** Chance per spin to collect the next relic: a relic about every 24 spins, bonus about every 120. */
-    const val RELIC_CHANCE = 5.0 / 120.0
+    /** Chance per spin to collect the next relic: a relic about every 28 spins, bonus about every 140. */
+    const val RELIC_CHANCE = 5.0 / 140.0
     val RELIC_NAMES = arrayOf("Scythe", "Hourglass", "Skull Candle", "Raven Feather", "Cursed Tome")
 
     const val VAULT_COLS = 5

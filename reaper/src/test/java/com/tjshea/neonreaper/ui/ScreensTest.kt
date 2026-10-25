@@ -48,7 +48,7 @@ class ScreensTest {
         val r = Random(7)
         repeat(3_000_000) {
             val stops = IntArray(5) { r.nextInt(ReaperConfig.STRIPS[it].size) }
-            val o = ReaperEngine.outcome(10, stops, wild)
+            val o = ReaperEngine.outcome(10, stops, if (wild.isEmpty()) com.tjshea.neonreaper.engine.Mini.NONE else com.tjshea.neonreaper.engine.Mini(ReaperConfig.MINI_REAPER, wildReels = wild))
             if (pred(o)) return o
         }
         error("none")

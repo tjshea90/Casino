@@ -25,10 +25,9 @@ class CalibrationTest {
         val feat = LongArray(stakes.size)
         val bonus = LongArray(stakes.size)
         val stops = IntArray(5)
-        val none = IntArray(0)
         for (i in 0 until nBase) {
             for (r in 0 until 5) stops[r] = rng.nextInt(ReaperConfig.STRIPS[r].size)
-            val m = ReaperEngine.outcome(1, stops, none).totalMult.toLong()
+            val m = ReaperEngine.outcome(1, stops).totalMult.toLong()
             if (m == 0L) continue
             for (k in stakes.indices) {
                 val p = ReaperEngine.settle(m * stakes[k]); base[k] += p; if (p > 0) hits[k]++
@@ -36,7 +35,7 @@ class CalibrationTest {
         }
         for (i in 0 until nFeat) {
             for (r in 0 until 5) stops[r] = rng.nextInt(ReaperConfig.STRIPS[r].size)
-            val m = ReaperEngine.outcome(1, stops, ReaperEngine.pickFeature(rng)).totalMult.toLong()
+            val m = ReaperEngine.outcome(1, stops, ReaperEngine.rollMini(rng)).totalMult.toLong()
             for (k in stakes.indices) feat[k] += ReaperEngine.settle(m * stakes[k])
         }
         var sumBonus = 0.0
@@ -55,7 +54,7 @@ class CalibrationTest {
             val f = (ReaperConfig.TARGET_RTP - rb - rn) / (rf - rn)
             val stored = ReaperConfig.FEATURE_RATE[k]
             val rtp = (1 - stored) * rn + stored * rf + rb
-            println("stake %2d: base %.4f feature %.2fx bonus %.4f -> f=%.4f (1 in %.0f) | stored f gives RTP %.4f | hit %.3f"
+            println("stake %2d: base %.4f mini %.2fx bonus %.4f -> f=%.4f (1 in %.0f) | stored f gives RTP %.4f | hit %.3f"
                 .format(s, rn, rf, rb, f, 1 / f, rtp, hits[k].toDouble() / nBase))
             sb.append("%.4f, ".format(f))
             checks += Triple(s, f, rtp)
@@ -69,9 +68,9 @@ class CalibrationTest {
 
     @Test fun lineRules() {
         val W = ReaperConfig.WILD; val H = ReaperConfig.HOODED; val A = ReaperConfig.ACE
-        assertEquals(Triple(W, 5, 150), ReaperEngine.evaluateLine(intArrayOf(W, W, W, W, W)))
-        assertEquals(Triple(H, 5, 60), ReaperEngine.evaluateLine(intArrayOf(W, H, W, H, H)))
-        assertEquals(Triple(W, 3, 8), ReaperEngine.evaluateLine(intArrayOf(W, W, W, A, H)))
+        assertEquals(Triple(W, 5, 100), ReaperEngine.evaluateLine(intArrayOf(W, W, W, W, W)))
+        assertEquals(Triple(H, 5, 40), ReaperEngine.evaluateLine(intArrayOf(W, H, W, H, H)))
+        assertEquals(Triple(W, 3, 6), ReaperEngine.evaluateLine(intArrayOf(W, W, W, A, H)))
         assertEquals(null, ReaperEngine.evaluateLine(intArrayOf(H, A, H, H, H)))
     }
 
