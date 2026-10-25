@@ -106,7 +106,7 @@ void main(){
     albedo = mix(albedo, vec3(0.08,0.02,0.0), face);
     emis += face * vec3(1.0,0.65,0.1) * (1.6*flicker);
   } else if (uMode == 3) {                            // skull bone with deep glowing sockets
-    albedo = vec3(0.86,0.82,0.72) * (0.8 + 0.25*fbm(vLocal*9.0));
+    albedo = uColor * (0.8 + 0.25*fbm(vLocal*9.0));
     vec2 f = vLocal.xy;
     if (vLocal.z > 0.3) {
       float e1 = length((f - vec2(-0.36,0.05))*vec2(1.0,1.25));
@@ -119,22 +119,27 @@ void main(){
       emis -= uEmissive * (1.0 - glow) * step(0.0, 1.0);    // only sockets glow
     }
     emis = max(emis, vec3(0.0));
-  } else if (uMode == 4) {                            // ghost: translucent sheet, fresnel glow, cute face
+  } else if (uMode == 4) {                            // ghost: translucent sheet, fresnel glow, wailing face
     float fres = pow(1.0 - max(dot(N, V), 0.0), 2.0);
-    albedo = vec3(0.85,0.92,1.0);
+    albedo = vec3(0.78,0.9,0.86);
     alpha = uAlpha * (0.55 + 0.45*fres);
     emis += vec3(0.35,0.5,0.7) * (0.25 + fres);
     vec2 f = vLocal.xy;
     if (vLocal.z > 0.2) {
+      // wailing spectre: hollow drooping eye pits with a faint red ember, a long screaming mouth
       float blink = uParam.x;
-      float e1 = length((f - vec2(-0.3,0.25))*vec2(1.0,1.0/max(0.08,blink*0.9+0.1)));
-      float e2 = length((f - vec2(0.3,0.25))*vec2(1.0,1.0/max(0.08,blink*0.9+0.1)));
-      float eyes = 1.0 - smoothstep(0.11,0.14,min(e1,e2));
-      float open = uParam.y;
-      float m = open > 0.5 ? 1.0 - smoothstep(0.12,0.15, length((f - vec2(0.0,-0.1))*vec2(1.0, 1.6/open)))
-                           : (1.0 - smoothstep(0.02,0.04, abs(length(f - vec2(0.0,0.05)) - 0.25))) * step(f.y, -0.05) * step(abs(f.x), 0.2);
+      vec2 a = f - vec2(-0.3,0.22); a = vec2(a.x*0.94 + a.y*0.34, a.y*0.94 - a.x*0.34);
+      vec2 b = f - vec2(0.3,0.22);  b = vec2(b.x*0.94 - b.y*0.34, b.y*0.94 + b.x*0.34);
+      float sy = 1.0/max(0.1, blink*0.62);
+      float e1 = length(a*vec2(1.0, sy)); float e2 = length(b*vec2(1.0, sy));
+      float eyes = 1.0 - smoothstep(0.15,0.19,min(e1,e2));
+      float open = max(uParam.y, 0.55);
+      float mw = length((f - vec2(0.0,-0.28))*vec2(1.0, 0.75/open));
+      float m = 1.0 - smoothstep(0.13,0.17, mw);
       float k = max(eyes, m);
-      albedo = mix(albedo, vec3(0.02,0.02,0.05), k); emis *= (1.0 - k); alpha = mix(alpha, 1.0, k);
+      float ember = (1.0 - smoothstep(0.0,0.07,min(e1,e2))) * blink;
+      albedo = mix(albedo, vec3(0.01,0.0,0.02), k); emis *= (1.0 - k); alpha = mix(alpha, 1.0, k);
+      emis += vec3(1.0,0.08,0.15) * ember * (1.2 + uParam.y);
     }
   } else if (uMode == 5) {                            // cloth: folds + noise
     float folds = 0.75 + 0.25*sin(atan(vLocal.z, vLocal.x)*9.0 + vLocal.y*2.0);

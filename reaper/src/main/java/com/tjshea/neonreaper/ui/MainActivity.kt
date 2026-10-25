@@ -12,6 +12,7 @@ import android.widget.FrameLayout
 import com.tjshea.neonreaper.audio.Audio
 import com.tjshea.neonreaper.data.Wallet
 import com.tjshea.neonreaper.engine.VaultResult
+import com.tjshea.neonreaper.gl.GameGLView
 
 class MainActivity : Activity(), ReaperView.Host {
 
@@ -21,6 +22,7 @@ class MainActivity : Activity(), ReaperView.Host {
     private lateinit var game: ReaperView
     private lateinit var dialogs: Dialogs
     private var vault: VaultView? = null
+    private var glView: GameGLView? = null
     private var currentTrack = Audio.Track.BASE
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -33,6 +35,7 @@ class MainActivity : Activity(), ReaperView.Host {
         game = ReaperView(this, this)
         root = FrameLayout(this).apply { addView(game, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)) }
         setContentView(root)
+        attach3d()
         dialogs = Dialogs(this, wallet) { game.onWalletChanged(); hideSystemUi() }
         dialogs.toastBanner = { game.showMessage(it) }
         when {
@@ -40,6 +43,21 @@ class MainActivity : Activity(), ReaperView.Host {
             !wallet.hasPassword -> dialogs.setupPassword()
             else -> wallet.pendingVault()?.let { v -> game.post { game.resumeVault(v) } }
         }
+    }
+
+    /** OpenGL ES 3 world behind the HUD; falls back to the 2D renderer if unsupported or it fails. */
+    private fun attach3d() {
+        val ok = try { GameGLView.supported(this) } catch (e: Throwable) { false }
+        if (!ok) return
+        val gv = try { GameGLView(this) } catch (e: Throwable) { return }
+        gv.onFailed = {
+            game.gl3d = null
+            root.removeView(gv)
+            glView = null
+        }
+        root.addView(gv, 0, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        glView = gv
+        game.gl3d = gv
     }
 
     override fun openVault(result: VaultResult) {
@@ -50,9 +68,11 @@ class MainActivity : Activity(), ReaperView.Host {
             vault = null
             wallet.markVaultSeen()
             currentTrack = Audio.Track.BASE
+            glView?.setActive(true)
             game.onVaultFinished(paid)
         }
         vault = v
+        glView?.setActive(false)
         root.addView(v, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
     }
 
@@ -88,11 +108,13 @@ class MainActivity : Activity(), ReaperView.Host {
     override fun onPause() {
         super.onPause()
         game.onHostPause()
+        glView?.onPause()
         audio.pauseMusic()
     }
 
     override fun onResume() {
         super.onResume()
+        glView?.onResume()
         audio.playTrack(currentTrack)
     }
 

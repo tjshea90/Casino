@@ -46,6 +46,7 @@ class Scene3D(private val gl: Gl) {
     private lateinit var mStem: Mesh
     private lateinit var mRobe: Mesh
     private lateinit var mHood: Mesh
+    private lateinit var mHoodIn: Mesh
     private lateinit var mGhost: Mesh
     private lateinit var mBlade: Mesh
     private lateinit var mWing: Mesh
@@ -133,8 +134,10 @@ class Scene3D(private val gl: Gl) {
             0.35f to 0.25f, 0.4f to 0.1f, 0.44f to 0.0f, 0.38f to 0.0f), 40) { ang, k ->
             if (k >= 8) hem[((ang / (2 * PI.toFloat())) * 40).toInt().coerceIn(0, 40)] else 1f
         })
-        // hood: a cowl shell (open toward +Z is faked with a dark face disc)
-        mHood = mesh(Shapes.lathe(listOf(0f to 0.32f, 0.08f to 0.31f, 0.15f to 0.27f, 0.19f to 0.2f, 0.2f to 0.1f, 0.19f to 0.0f, 0.15f to -0.06f), 28))
+        // hood: a cowl shell with the face opening cut out toward +Z, plus a dark inner lining
+        val hoodProfile = listOf(0f to 0.32f, 0.08f to 0.31f, 0.15f to 0.27f, 0.19f to 0.2f, 0.2f to 0.1f, 0.19f to 0.0f, 0.15f to -0.06f)
+        mHood = mesh(cowl(hoodProfile, 112, 1f, inward = false))
+        mHoodIn = mesh(cowl(hoodProfile, 112, 0.96f, inward = true))
         // ghost: dome head then a flared sheet with a wavy hem (head centre at origin, radius 1)
         mGhost = mesh(Shapes.lathe((0..10).map { k -> val a = PI / 2 * k / 10; sin(a).toFloat() to cos(a).toFloat() } +
             listOf(1.02f to -0.4f, 1.06f to -0.9f, 1.15f to -1.4f, 1.28f to -1.85f), 40) { ang, k ->
@@ -153,6 +156,34 @@ class Scene3D(private val gl: Gl) {
         particleCount = 140
         for (k in 0 until particleCount) pd.vertex(r.nextFloat() - 0.5f, r.nextFloat(), r.nextFloat() - 0.5f, r.nextFloat(), 0.5f + r.nextFloat(), if (k % 5 == 0) 1f else 0f, 0f, 0f)
         mParticles = mesh(pd)
+    }
+
+    /** Lathed hood shell with the front (+Z) face opening removed; [inward] flips it into a lining. */
+    private fun cowl(profile: List<Pair<Float, Float>>, seg: Int, scale: Float, inward: Boolean): MeshData {
+        // subdivide the profile so the elliptical face opening has a smooth edge
+        val pf = ArrayList<Pair<Float, Float>>()
+        for (k in 0 until profile.size - 1) for (j in 0 until 8) {
+            val f = j / 8f; val p0 = profile[k]; val p1 = profile[k + 1]
+            pf += (p0.first + (p1.first - p0.first) * f) to (p0.second + (p1.second - p0.second) * f)
+        }
+        pf += profile.last()
+        val m = MeshData()
+        for ((k, pr) in pf.withIndex()) for (s in 0..seg) {
+            val ang = 2f * PI.toFloat() * s / seg
+            val r = pr.first * scale
+            m.vertex(r * cos(ang), pr.second * scale, r * sin(ang), 0f, 1f, 0f, s.toFloat() / seg, k.toFloat() / (pf.size - 1))
+        }
+        val front = PI.toFloat() / 2
+        for (k in 0 until pf.size - 1) for (s in 0 until seg) {
+            val mid = 2f * PI.toFloat() * (s + 0.5f) / seg
+            var d = abs(mid - front); if (d > PI) d = 2f * PI.toFloat() - d
+            val y = (pf[k].second + pf[k + 1].second) / 2
+            val ex = d / 0.78f; val ey = (y - 0.1f) / 0.17f
+            if (ex * ex + ey * ey < 1f) continue
+            val p = k * (seg + 1) + s; val q = p + seg + 1
+            if (inward) m.quad(p, q, q + 1, p + 1) else m.quad(p, p + 1, q + 1, q)
+        }
+        return m.computeNormals()
     }
 
     /** Extrudes any simple (possibly concave) outline by fanning from each vertex pair — fine for thin blades. */
@@ -490,18 +521,19 @@ class Scene3D(private val gl: Gl) {
         draw(mRobe, b, 5, cloth, rim = rim, spec = 0.12f, wave = 1f, dim = dim)
         val hood = copy(b); Mat4.translate(hood, 0f, 0.8f, 0.0f); Mat4.rotate(hood, 14f, 1f, 0f, 0f); Mat4.scale(hood, 1.25f, 1.12f, 1.3f)
         draw(mHood, hood, 5, cloth, rim = rim, spec = 0.12f, dim = dim)
-        // the deep, dark opening of the cowl
-        val voidM = copy(b); Mat4.translate(voidM, 0f, 0.86f, 0.16f); Mat4.scale(voidM, 0.17f, 0.2f, 0.1f)
-        draw(mSphere, voidM, 9, 0, emis = 0x000000, dim = dim)
+        // the deep, dark lining of the cowl and the shadow behind the face
+        draw(mHoodIn, hood, 9, 0, emis = 0x030104, dim = dim)
+        val voidM = copy(b); Mat4.translate(voidM, 0f, 0.87f, 0.02f); Mat4.scale(voidM, 0.16f, 0.19f, 0.12f)
+        draw(mSphere, voidM, 9, 0, emis = 0x020103, dim = dim)
         val eyeK = if (ex) 1.8f + 0.35f * sin(tt * 20f) else 0.95f + 0.15f * sin(tt * 2f)
         val blink = !ex && ((tt * 0.23f) % 1f) < 0.03f
         if (!crimson) {
             // a skull lurking in the shadow: dim bone, burning sockets
             val face = copy(b); Mat4.translate(face, 0f, 0.865f, 0.17f); Mat4.scale(face, 0.088f, 0.1f, 0.085f)
-            draw(mSphere, face, 3, 0x7A7262, emis = 0xFF1744, spec = 0.3f, p0 = if (blink) 0f else eyeK, dim = dim)
+            draw(mSphere, face, 3, 0x8A8070, emis = 0xFF1744, spec = 0.3f, p0 = if (blink) 0f else eyeK, dim = dim)
             val open = if (ex) abs(sin(tt * 15f)) else 0f
             val jaw = copy(b); Mat4.translate(jaw, 0f, 0.785f - open * 0.03f, 0.2f); Mat4.rotate(jaw, open * 15f, 1f, 0f, 0f); Mat4.scale(jaw, 0.052f, 0.026f, 0.05f)
-            draw(mSphere, jaw, 0, 0x6E6656, dim = dim)
+            draw(mSphere, jaw, 0, 0x5A5246, dim = dim)
             for (k in -2..2) {
                 val tooth = copy(b); Mat4.translate(tooth, k * 0.013f, 0.8f, 0.245f); Mat4.scale(tooth, 0.0055f, 0.011f, 0.005f)
                 draw(mLowSphere, tooth, 0, 0xB8B09C, dim = dim)
