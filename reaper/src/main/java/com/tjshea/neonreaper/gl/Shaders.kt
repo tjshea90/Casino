@@ -80,6 +80,10 @@ float inTri(vec2 p, vec2 a, vec2 b, vec2 c){
   return (neg && pos) ? 0.0 : 1.0; }
 void main(){
   vec3 N = normalize(vNormal); if (!gl_FrontFacing) N = -N;
+  if (uParam.z > 0.5) {                               // cowl: smooth elliptical face opening toward +Z
+    vec2 e = vec2(atan(vLocal.x, vLocal.z) / 0.78, (vLocal.y - 0.1) / 0.17);
+    if (vLocal.z > 0.0 && dot(e, e) < 1.0) discard;
+  }
   vec3 V = normalize(uCamPos - vWorld);
   vec3 albedo = uColor; vec3 emis = uEmissive; float alpha = uAlpha; float spec = uSpec; float shine = uShine;
   if (uMode == 1) {                                   // atlas texture (reel faces)

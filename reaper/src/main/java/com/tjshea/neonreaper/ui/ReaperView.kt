@@ -149,7 +149,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
     private val rightChar = RectF()
     private val relicSlots = Array(5) { RectF() }
     /** The OpenGL 3D world behind this HUD (null = classic 2D drawing). */
-    var gl3d: com.tjshea.neonreaper.gl.GameGLView? = null
+    var gl3d: com.tjshea.neonreaper.gl.SceneSink? = null
         set(v) { field = v; if (width > 0) layoutAll(width.toFloat(), height.toFloat()) }
     private var lay3d: com.tjshea.neonreaper.gl.Layout3D? = null
     private var hudChrome: Bitmap? = null

@@ -58,6 +58,14 @@ class SceneRenderTest {
         s.miniSymbol = -1; s.projCell[0] = -1; java.util.Arrays.fill(s.coin, 0)
         s.bigWin = 0.8f; s.flash = 0.6f
         scene.render(s, 6f, W, H); hl.save(File("build/screens/gl_bigwin.png"))
+        // HUD + 3D composites recorded by HudExportTest (run it first)
+        File("build/hud").listFiles { f -> f.name.endsWith(".bin") }?.sorted()?.forEachIndexed { i, f ->
+            val fr = SceneStateIO.read(f)
+            if (fr.w != W || fr.h != H) return@forEachIndexed
+            scene.setLayout(Layout3D(W.toFloat(), H.toFloat(), fr.window[0], fr.window[1], fr.window[2], fr.window[3]))
+            scene.render(fr.state, 7f + i * 0.37f, W, H)
+            hl.save(File("build/screens/full_${f.nameWithoutExtension}.png"), fr.hud)
+        }
         hl.close()
     }
 }

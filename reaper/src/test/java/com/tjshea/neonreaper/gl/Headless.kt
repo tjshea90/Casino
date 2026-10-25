@@ -44,14 +44,25 @@ class Headless(val w: Int, val h: Int) {
         check(GLES30.glCheckFramebufferStatus(GLES30.GL_FRAMEBUFFER) == GLES30.GL_FRAMEBUFFER_COMPLETE) { "FBO incomplete" }
     }
 
-    fun save(file: File) {
+    /** Saves the frame; [overlay] (ARGB, top-down, unpremultiplied) is alpha-blended on top, like the HUD on device. */
+    fun save(file: File, overlay: IntArray? = null) {
         val buf = ByteBuffer.allocateDirect(w * h * 4).order(ByteOrder.nativeOrder())
         GLES30.glReadPixels(0, 0, w, h, GLES30.GL_RGBA, GLES30.GL_UNSIGNED_BYTE, buf)
         // minimal PNG encoder (RGB, filter 0, flipped vertically)
         val raw = java.io.ByteArrayOutputStream()
         for (y in 0 until h) {
             raw.write(0)
-            for (x in 0 until w) { val i = ((h - 1 - y) * w + x) * 4; raw.write(buf[i].toInt()); raw.write(buf[i + 1].toInt()); raw.write(buf[i + 2].toInt()) }
+            for (x in 0 until w) {
+                val i = ((h - 1 - y) * w + x) * 4
+                var r = buf[i].toInt() and 255; var g = buf[i + 1].toInt() and 255; var b = buf[i + 2].toInt() and 255
+                if (overlay != null) {
+                    val o = overlay[y * w + x]; val a = (o ushr 24) and 255
+                    r = (((o shr 16) and 255) * a + r * (255 - a)) / 255
+                    g = (((o shr 8) and 255) * a + g * (255 - a)) / 255
+                    b = ((o and 255) * a + b * (255 - a)) / 255
+                }
+                raw.write(r); raw.write(g); raw.write(b)
+            }
         }
         val out = java.io.ByteArrayOutputStream()
         out.write(byteArrayOf(0x89.toByte(), 'P'.code.toByte(), 'N'.code.toByte(), 'G'.code.toByte(), 13, 10, 26, 10))

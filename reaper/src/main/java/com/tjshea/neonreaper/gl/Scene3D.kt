@@ -136,8 +136,8 @@ class Scene3D(private val gl: Gl) {
         })
         // hood: a cowl shell with the face opening cut out toward +Z, plus a dark inner lining
         val hoodProfile = listOf(0f to 0.32f, 0.08f to 0.31f, 0.15f to 0.27f, 0.19f to 0.2f, 0.2f to 0.1f, 0.19f to 0.0f, 0.15f to -0.06f)
-        mHood = mesh(cowl(hoodProfile, 112, 1f, inward = false))
-        mHoodIn = mesh(cowl(hoodProfile, 112, 0.96f, inward = true))
+        mHood = mesh(cowl(hoodProfile, 40, 1f, inward = false))
+        mHoodIn = mesh(cowl(hoodProfile, 40, 0.96f, inward = true))
         // ghost: dome head then a flared sheet with a wavy hem (head centre at origin, radius 1)
         mGhost = mesh(Shapes.lathe((0..10).map { k -> val a = PI / 2 * k / 10; sin(a).toFloat() to cos(a).toFloat() } +
             listOf(1.02f to -0.4f, 1.06f to -0.9f, 1.15f to -1.4f, 1.28f to -1.85f), 40) { ang, k ->
@@ -158,28 +158,15 @@ class Scene3D(private val gl: Gl) {
         mParticles = mesh(pd)
     }
 
-    /** Lathed hood shell with the front (+Z) face opening removed; [inward] flips it into a lining. */
+    /** Lathed hood shell ([inward] flips it into a lining); the face opening is cut per-pixel (uParam.z). */
     private fun cowl(profile: List<Pair<Float, Float>>, seg: Int, scale: Float, inward: Boolean): MeshData {
-        // subdivide the profile so the elliptical face opening has a smooth edge
-        val pf = ArrayList<Pair<Float, Float>>()
-        for (k in 0 until profile.size - 1) for (j in 0 until 8) {
-            val f = j / 8f; val p0 = profile[k]; val p1 = profile[k + 1]
-            pf += (p0.first + (p1.first - p0.first) * f) to (p0.second + (p1.second - p0.second) * f)
-        }
-        pf += profile.last()
         val m = MeshData()
-        for ((k, pr) in pf.withIndex()) for (s in 0..seg) {
+        for ((k, pr) in profile.withIndex()) for (s in 0..seg) {
             val ang = 2f * PI.toFloat() * s / seg
             val r = pr.first * scale
-            m.vertex(r * cos(ang), pr.second * scale, r * sin(ang), 0f, 1f, 0f, s.toFloat() / seg, k.toFloat() / (pf.size - 1))
+            m.vertex(r * cos(ang), pr.second * scale, r * sin(ang), 0f, 1f, 0f, s.toFloat() / seg, k.toFloat() / (profile.size - 1))
         }
-        val front = PI.toFloat() / 2
-        for (k in 0 until pf.size - 1) for (s in 0 until seg) {
-            val mid = 2f * PI.toFloat() * (s + 0.5f) / seg
-            var d = abs(mid - front); if (d > PI) d = 2f * PI.toFloat() - d
-            val y = (pf[k].second + pf[k + 1].second) / 2
-            val ex = d / 0.78f; val ey = (y - 0.1f) / 0.17f
-            if (ex * ex + ey * ey < 1f) continue
+        for (k in 0 until profile.size - 1) for (s in 0 until seg) {
             val p = k * (seg + 1) + s; val q = p + seg + 1
             if (inward) m.quad(p, q, q + 1, p + 1) else m.quad(p, p + 1, q + 1, q)
         }
@@ -281,13 +268,13 @@ class Scene3D(private val gl: Gl) {
     // ---- material draw helper
     private fun draw(mesh: Mesh, model: FloatArray, mode: Int, color: Int, emis: Int = 0, rim: Int = 0x000000,
                      spec: Float = 0.3f, shine: Float = 24f, wave: Float = 0f, alpha: Float = 1f,
-                     p0: Float = 1f, p1: Float = 1f, emisK: Float = 1f, dim: Float = 1f) {
+                     p0: Float = 1f, p1: Float = 1f, emisK: Float = 1f, dim: Float = 1f, cut: Boolean = false) {
         Mat4.mul(mvp, vp, model)
         lit.m4("uMvp", mvp); lit.m4("uModel", model); lit.m3("uNormalMat", Mat4.normalMatrix(nrm, model))
         lit.i("uMode", mode)
         lit.rgb("uColor", color, dim); lit.rgb("uEmissive", emis, emisK * dim); lit.rgb("uRim", rim, dim)
         lit.f("uSpec", spec); lit.f("uShine", shine); lit.f("uWave", wave); lit.f("uAlpha", alpha)
-        lit.f4("uParam", p0, p1, 0f, 0f)
+        lit.f4("uParam", p0, p1, if (cut) 1f else 0f, 0f)
         mesh.draw(gl)
     }
 
@@ -520,9 +507,9 @@ class Scene3D(private val gl: Gl) {
         val rim = if (crimson) 0x9F0020 else 0x3A9E14
         draw(mRobe, b, 5, cloth, rim = rim, spec = 0.12f, wave = 1f, dim = dim)
         val hood = copy(b); Mat4.translate(hood, 0f, 0.8f, 0.0f); Mat4.rotate(hood, 14f, 1f, 0f, 0f); Mat4.scale(hood, 1.25f, 1.12f, 1.3f)
-        draw(mHood, hood, 5, cloth, rim = rim, spec = 0.12f, dim = dim)
+        draw(mHood, hood, 5, cloth, rim = rim, spec = 0.12f, dim = dim, cut = true)
         // the deep, dark lining of the cowl and the shadow behind the face
-        draw(mHoodIn, hood, 9, 0, emis = 0x030104, dim = dim)
+        draw(mHoodIn, hood, 9, 0, emis = 0x030104, dim = dim, cut = true)
         val voidM = copy(b); Mat4.translate(voidM, 0f, 0.87f, 0.02f); Mat4.scale(voidM, 0.16f, 0.19f, 0.12f)
         draw(mSphere, voidM, 9, 0, emis = 0x020103, dim = dim)
         val eyeK = if (ex) 1.8f + 0.35f * sin(tt * 20f) else 0.95f + 0.15f * sin(tt * 2f)
@@ -532,7 +519,7 @@ class Scene3D(private val gl: Gl) {
             val face = copy(b); Mat4.translate(face, 0f, 0.865f, 0.17f); Mat4.scale(face, 0.088f, 0.1f, 0.085f)
             draw(mSphere, face, 3, 0x8A8070, emis = 0xFF1744, spec = 0.3f, p0 = if (blink) 0f else eyeK, dim = dim)
             val open = if (ex) abs(sin(tt * 15f)) else 0f
-            val jaw = copy(b); Mat4.translate(jaw, 0f, 0.785f - open * 0.03f, 0.2f); Mat4.rotate(jaw, open * 15f, 1f, 0f, 0f); Mat4.scale(jaw, 0.052f, 0.026f, 0.05f)
+            val jaw = copy(b); Mat4.translate(jaw, 0f, 0.79f - open * 0.03f, 0.205f); Mat4.rotate(jaw, open * 15f, 1f, 0f, 0f); Mat4.scale(jaw, 0.04f, 0.02f, 0.042f)
             draw(mSphere, jaw, 0, 0x5A5246, dim = dim)
             for (k in -2..2) {
                 val tooth = copy(b); Mat4.translate(tooth, k * 0.013f, 0.8f, 0.245f); Mat4.scale(tooth, 0.0055f, 0.011f, 0.005f)

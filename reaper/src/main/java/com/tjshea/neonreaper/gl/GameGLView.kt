@@ -13,9 +13,9 @@ import javax.microedition.khronos.opengles.GL10
  * (under [lock]); this view's renderer copies it and draws the scene.
  */
 @SuppressLint("ViewConstructor")
-class GameGLView(context: Context) : GLSurfaceView(context) {
-    val state = SceneState()
-    val lock = Any()
+class GameGLView(context: Context) : GLSurfaceView(context), SceneSink {
+    override val state = SceneState()
+    override val lock = Any()
     @Volatile private var window: FloatArray? = null
     @Volatile var failed = false; private set
     var onFailed: (() -> Unit)? = null
@@ -69,7 +69,7 @@ class GameGLView(context: Context) : GLSurfaceView(context) {
     }
 
     /** The HUD's reel window in pixels; the camera is fitted so the reels fill it exactly. */
-    fun setReelWindow(l: Float, t: Float, r: Float, b: Float) { window = floatArrayOf(l, t, r, b) }
+    override fun setReelWindow(l: Float, t: Float, r: Float, b: Float) { window = floatArrayOf(l, t, r, b) }
 
     /** Pause rendering while a full-screen overlay (the Soul Vault) covers the world. */
     fun setActive(active: Boolean) { renderMode = if (active) RENDERMODE_CONTINUOUSLY else RENDERMODE_WHEN_DIRTY }
