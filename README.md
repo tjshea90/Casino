@@ -7,7 +7,7 @@
 
 | Game | APK | Theme |
 |------|-----|-------|
-| **Neon Reaper** | [`release/NeonReaper.apk`](release/NeonReaper.apk) (~150 KB) | Dark horror: reapers, hooded watchers, neon green & blood red. 87 % RTP, Soul Vault bonus |
+| **Neon Reaper** | [`release/NeonReaper.apk`](release/NeonReaper.apk) (~250 KB) | Dark horror: reapers, hooded watchers, neon green & blood red. 87 % RTP, Soul Vault bonus |
 | **Dragon's Hoard** | [`release/DragonsHoard.apk`](release/DragonsHoard.apk) (~115 KB) | Red & gold Asian fortune. 80 % RTP, free spins |
 
 Both run on Android 10 (Go) and up (MT8168 / armv7 tested target), share the same currency and password security, and are separate apps (they can be installed side by side).
@@ -24,7 +24,7 @@ Both run on Android 10 (Go) and up (MT8168 / armv7 tested target), share the sam
 - Every win pops up a huge **"YOU WIN 70 TOKENS"**, can't be skipped until shown, and counts up with rising ticks for bigger wins (fanfare for big wins).
 - **Giant SPIN button** — tap for one spin, **hold for rapid spins** until you let go.
 - **Mini features (≈1 spin in 80):** a 3D character floats out in front of the reels — Reaper's Touch (wild reels), Raven's Flock (3–6 wilds), Pumpkin's Treats (3–6 soul coins worth their token value), Skull's Curse (2 wilds + ×2/×3/×5).
-- **3D graphics:** curved 3D reel drum and lit 3D characters with animated faces — red-eyed Grim Reaper and Hooded Watcher, a laughing chattering skull, a cawing raven, a grinning jack-o'-lantern and a giggling ghost. Characters come alive at random with their own voices.
+- **OpenGL ES 3 3D engine (v2.0):** real 3D reel drums, a moonlit graveyard (tombstones, dead trees, fog, fireflies, bats, lightning) and individually modelled Halloween characters with per-pixel lighting — a skull-faced Grim Reaper with a scythe, a red-eyed crimson Hooded Watcher holding a candle, a chattering skull, a cawing raven, a flickering jack-o'-lantern and a wailing ghost. Falls back to the 2D renderer on devices without OpenGL ES 3.
 - **Reaper's Touch:** the Grim Reaper swoops in and slashes 1–3 middle reels fully wild.
 - **Relics → Soul Vault bonus:** about 1 spin in 28 reveals one of 5 relics (kept between sessions). Collect all 5 (≈ every 140 spins) to open the **Soul Vault**, a separate hold-and-spin screen:
   its own epic soundtrack, 5 starting orbs, 3 respins (press SPIN for each) that reset whenever an orb lands; orbs worth 1×–25× the bonus bet; MINI 15×, MINOR 40×, MAJOR 150× jackpot orbs;

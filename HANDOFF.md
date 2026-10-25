@@ -151,7 +151,7 @@ Work queue v1.2:
 - [x] vault: spin button per respin, new epic music
 - [x] audio: fanfare/count-end/press SFX, new vault music
 - [x] release v1.2.0 (versionCode 3). Tests fork per class (exit 137 = OOM otherwise).
-- [ ] NEXT: v2.0 OpenGL 3D engine (see item 7 above)
+- [x] v2.0 OpenGL 3D engine shipped (see v2.0 section below)
 7. (mid-turn) "Make the graphics more 3D and animated like a video game with a good graphics engine."
    → Plan v2.0: OpenGL ES 3 renderer (GLSurfaceView) behind a transparent HUD View: real 3D reel cylinders textured
      from the Characters bitmaps with per-pixel lighting/specular, perspective camera (sway, zoom on big wins, shake),
@@ -173,7 +173,19 @@ character symbols are live 3D models standing on the drum faces; royals are text
 
 Work queue v2.0:
 - [x] A. Gl/AndroidGl/LwjglGl, Mat4, Mesh, Shaders, GlSmokeTest renders build/screens/gl_smoke.png (Headless.kt = EGL surfaceless + PNG writer)
-- [ ] B. Layout3D + 3D reel drums + atlas + cabinet frame
-- [ ] C. Environment: sky/moon/clouds, ground, tombstones, trees, fog, fireflies, lightning, camera
-- [ ] D. 3D characters + animation (jaw, eyes, flicker, flap), side characters, mini fly-ins, big-win reaper, coins
-- [ ] E. HUD integration (transparent ReaperView, projection for lines), GameGLView, fallback, tests, release v2.0.0
+- [x] B. Layout3D + 3D reel drums + atlas + cabinet frame
+- [x] C. Environment: sky/moon/clouds, ground, tombstones, trees, fog, fireflies, lightning, camera
+- [x] D. 3D characters + animation (jaw, eyes, flicker, flap), side characters, mini fly-ins, big-win reaper, coins
+- [x] E. HUD integration (transparent ReaperView, projection for lines), GameGLView, fallback, tests, release v2.0.0
+- [x] F. Polish: open cowl (per-pixel elliptical cut, uParam.z) so reaper skulls / watcher red eyes show; wailing
+      ghosts (hollow eyes + red ember, screaming mouth); adaptive resolution (GameGLView drops to 70 % if >half of
+      90 frames take >38 ms). Released v2.0.0 (versionCode 4).
+
+v2.0 testing notes:
+- Run order for screenshots: `AtlasExportTest` → `HudExportTest` → `SceneRenderTest` (writes gl_*.png and
+  full_*.png = real HUD composited over the 3D world, exactly what the device shows). All optional inputs.
+- `SceneSink` interface: GameGLView on device, `RecordingSink` in tests. ReaperView.gl3d != null ⇒ 3D mode
+  (HUD draws only chrome/text; world is GL). gl3d = null ⇒ old 2D renderer (fallback when GLES3 missing/fails).
+- MainActivity.attach3d(): GLSurfaceView at index 0 behind ReaperView; paused during Soul Vault (setActive(false)).
+- Ideas for next round: Soul Vault in 3D; per-device quality toggle in settings; LOD for fingers/teeth.
+

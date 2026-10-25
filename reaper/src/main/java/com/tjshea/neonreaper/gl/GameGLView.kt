@@ -26,6 +26,7 @@ class GameGLView(context: Context) : GLSurfaceView(context), SceneSink {
         private var w = 1; private var h = 1
         private var applied: FloatArray? = null
         private val start = SystemClock.uptimeMillis()
+        private var lastFrame = 0L; private var slowFrames = 0; private var frames = 0
 
         override fun onSurfaceCreated(unused: GL10?, config: EGLConfig?) {
             try {
@@ -47,11 +48,27 @@ class GameGLView(context: Context) : GLSurfaceView(context), SceneSink {
             val win = window
             if (win != null && win !== applied) { s.setLayout(Layout3D(w.toFloat(), h.toFloat(), win[0], win[1], win[2], win[3])); applied = win }
             synchronized(lock) { snapshot.copyFrom(state) }
+            snapshot.miniX *= scale; snapshot.miniY *= scale   // HUD pixels → surface pixels
             try {
                 s.render(snapshot, (SystemClock.uptimeMillis() - start) / 1000f, w, h)
             } catch (e: Throwable) {
                 fail()
             }
+            watchFrameRate()
+        }
+
+        /** Low-end GPUs: if frames stay slow, render the world at a reduced resolution (scaled up by the compositor). */
+        private fun watchFrameRate() {
+            val now = SystemClock.uptimeMillis()
+            if (lastFrame != 0L && !reduced) {
+                frames++
+                if (now - lastFrame > 38) slowFrames++
+                if (frames >= 90) {
+                    if (slowFrames > 45) { reduced = true; post { reduceResolution() } }
+                    frames = 0; slowFrames = 0
+                }
+            }
+            lastFrame = now
         }
 
         private fun fail() {
@@ -68,8 +85,21 @@ class GameGLView(context: Context) : GLSurfaceView(context), SceneSink {
         renderMode = RENDERMODE_CONTINUOUSLY
     }
 
+    @Volatile private var reduced = false
+
+    private fun reduceResolution() {
+        if (width <= 0 || height <= 0) return
+        val k = 0.7f
+        holder.setFixedSize((width * k).toInt(), (height * k).toInt())
+        // the reel window is in view pixels; rescale it to the smaller surface
+        window?.let { win -> window = floatArrayOf(win[0] * k, win[1] * k, win[2] * k, win[3] * k) }
+        scale = k
+    }
+
+    @Volatile private var scale = 1f
+
     /** The HUD's reel window in pixels; the camera is fitted so the reels fill it exactly. */
-    override fun setReelWindow(l: Float, t: Float, r: Float, b: Float) { window = floatArrayOf(l, t, r, b) }
+    override fun setReelWindow(l: Float, t: Float, r: Float, b: Float) { val k = scale; window = floatArrayOf(l * k, t * k, r * k, b * k) }
 
     /** Pause rendering while a full-screen overlay (the Soul Vault) covers the world. */
     fun setActive(active: Boolean) { renderMode = if (active) RENDERMODE_CONTINUOUSLY else RENDERMODE_WHEN_DIRTY }

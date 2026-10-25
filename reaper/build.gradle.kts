@@ -11,8 +11,8 @@ android {
         applicationId = "com.tjshea.neonreaper"
         minSdk = 29          // Android 10 (Go edition)
         targetSdk = 36       // Android 16
-        versionCode = 3
-        versionName = "1.2.0"
+        versionCode = 4
+        versionName = "2.0.0"
     }
 
     signingConfigs {
