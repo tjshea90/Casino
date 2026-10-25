@@ -96,6 +96,15 @@ class Mesh(private val data: MeshData) {
         gl.drawElements(Gl.TRIANGLES, indexCount)
     }
 
+    /** Binds the vertex buffer and attributes without drawing (for GL_POINTS via drawArrays). */
+    fun drawPointsSetup(gl: Gl) {
+        upload(gl)
+        gl.bindBuffer(Gl.ARRAY_BUFFER, vbo)
+        gl.vertexAttribPointer(0, 3, 32, 0); gl.enableVertexAttribArray(0)
+        gl.vertexAttribPointer(1, 3, 32, 12); gl.enableVertexAttribArray(1)
+        gl.disableVertexAttribArray(2)
+    }
+
     fun release(gl: Gl) { if (vbo != 0) { gl.deleteBuffer(vbo); gl.deleteBuffer(ibo); vbo = 0; ibo = 0 } }
 }
 

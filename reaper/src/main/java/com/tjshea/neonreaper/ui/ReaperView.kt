@@ -63,7 +63,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
 
     // ------------------------------------------------------------------ game state
     private var phase = Phase.IDLE
-    private var grid: Array<IntArray> = ReaperEngine.gridFor(IntArray(REELS) { fx.nextInt(ReaperConfig.STRIPS[it].size) })
+    private var grid: Array<IntArray> = Array(REELS) { IntArray(ROWS) }
     private var play: SpinPlay? = null
     private val outcome: SpinOutcome? get() = play?.outcome
     private var pendingWin = 0L
@@ -148,6 +148,13 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
     private val leftChar = RectF()
     private val rightChar = RectF()
     private val relicSlots = Array(5) { RectF() }
+    /** The OpenGL 3D world behind this HUD (null = classic 2D drawing). */
+    var gl3d: com.tjshea.neonreaper.gl.GameGLView? = null
+        set(v) { field = v; if (width > 0) layoutAll(width.toFloat(), height.toFloat()) }
+    private var lay3d: com.tjshea.neonreaper.gl.Layout3D? = null
+    private var hudChrome: Bitmap? = null
+    private val idleStops = IntArray(REELS) { fx.nextInt(ReaperConfig.STRIPS[it].size) }
+
     private var chars: Characters? = null       // reel symbols (cell size)
     private var bigChars: Characters? = null    // side characters / celebrations
     private var blurred: Array<Bitmap>? = null
@@ -200,7 +207,10 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
     private var soulAcc = 0f
     private var lastFrame = 0.0
 
-    init { isClickable = true }
+    init {
+        isClickable = true
+        grid = ReaperEngine.gridFor(idleStops)
+    }
 
     private fun now() = SystemClock.uptimeMillis() / 1000.0
 
@@ -285,6 +295,12 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         bigChars = Characters(leftChar.width().toInt().coerceAtLeast(8), leftChar.height().toInt().coerceAtLeast(8), plates = false)
         blurred = Array(ReaperConfig.SYMBOL_COUNT) { motionBlur(chars!!.body(it)) }
         bg = Bitmap.createBitmap(w.toInt(), h.toInt(), Bitmap.Config.ARGB_8888).also { paintBackground(Canvas(it), w, h) }
+        val g = gl3d
+        if (g != null) {
+            g.setReelWindow(reelRect.left, reelRect.top, reelRect.right, reelRect.bottom)
+            lay3d = com.tjshea.neonreaper.gl.Layout3D(w, h, reelRect.left, reelRect.top, reelRect.right, reelRect.bottom)
+            hudChrome = Bitmap.createBitmap(w.toInt(), h.toInt(), Bitmap.Config.ARGB_8888).also { paintBackground(Canvas(it), w, h, chromeOnly = true) }
+        } else { lay3d = null; hudChrome = null }
         fog = makeFog((w * 0.6f).toInt().coerceAtLeast(64), (h * 0.18f).toInt().coerceAtLeast(16))
         cloud = makeCloud((h * 0.5f).toInt().coerceAtLeast(32), (h * 0.16f).toInt().coerceAtLeast(16))
         val rs = relicSlots[0].width().toInt().coerceAtLeast(8)
@@ -327,9 +343,10 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         return b
     }
 
-    private fun paintBackground(c: Canvas, w: Float, h: Float) {
-        Art.graveyard(c, w, h, Neon.RED)
+    private fun paintBackground(c: Canvas, w: Float, h: Float, chromeOnly: Boolean = false) {
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        if (chromeOnly) { paintChrome(c, p); return }
+        Art.graveyard(c, w, h, Neon.RED)
         // foreground 3D tombstones (perspective: nearer = larger and brighter)
         val rr = Random(5)
         for (i in 0 until 7) {
@@ -387,10 +404,29 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         }
     }
 
+    /** HUD-only chrome (relic plate, bottom panel, meter boxes) for 3D mode: no scenery. */
+    private fun paintChrome(c: Canvas, p: Paint) {
+        p.shader = RadialGradient(width / 2f, height / 2f, max(width, height) * 0.75f, intArrayOf(0x00000000, 0x88000000.toInt()), floatArrayOf(0.6f, 1f), Shader.TileMode.CLAMP)
+        c.drawRect(0f, 0f, width.toFloat(), height.toFloat(), p); p.shader = null
+        p.color = 0xCC050805.toInt()
+        c.drawRoundRect(relicRect, relicRect.height() / 2, relicRect.height() / 2, p)
+        p.style = Paint.Style.STROKE; p.strokeWidth = 2 * u; p.color = 0x8876FF03.toInt()
+        c.drawRoundRect(relicRect, relicRect.height() / 2, relicRect.height() / 2, p)
+        p.style = Paint.Style.FILL
+        p.shader = LinearGradient(0f, panelRect.top, 0f, panelRect.bottom, 0xE8101410.toInt(), 0xF0020302.toInt(), Shader.TileMode.CLAMP)
+        c.drawRoundRect(panelRect, 18 * u, 18 * u, p); p.shader = null
+        Art.neonStroke(c, Path().apply { addRoundRect(panelRect, 18 * u, 18 * u, Path.Direction.CW) }, Neon.GREEN_DIM, 1.5f * u)
+        for (r in listOf(creditRect, winRect)) {
+            p.color = 0xFF000000.toInt(); c.drawRoundRect(r, 12 * u, 12 * u, p)
+            p.style = Paint.Style.STROKE; p.strokeWidth = 1.5f * u; p.color = 0xFF2E7D0A.toInt()
+            c.drawRoundRect(r, 12 * u, 12 * u, p); p.style = Paint.Style.FILL
+        }
+    }
+
     private fun recycleBitmaps() {
         chars?.recycle(); bigChars?.recycle(); blurred?.forEach { it.recycle() }
         relicLit?.forEach { it.recycle() }; relicDark?.forEach { it.recycle() }
-        bg?.recycle(); fog?.recycle(); cloud?.recycle()
+        bg?.recycle(); fog?.recycle(); cloud?.recycle(); hudChrome?.recycle()
     }
 
     fun release() = recycleBitmaps()
@@ -784,29 +820,34 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         updateFlow(t)
         ambient(t)
 
+        val g3 = lay3d != null
         canvas.save()
         if (t < shakeUntil) canvas.translate((fx.nextFloat() - 0.5f) * 10 * u, (fx.nextFloat() - 0.5f) * 8 * u)
-        canvas.drawBitmap(bg!!, 0f, 0f, null)
-        drawSky(canvas, t)
+        if (g3) hudChrome?.let { canvas.drawBitmap(it, 0f, 0f, null) }
+        else { canvas.drawBitmap(bg!!, 0f, 0f, null); drawSky(canvas, t) }
         drawLightning(canvas, t)
-        drawBats(canvas, t)
-        drawFog(canvas, t, reelRect.bottom - (fog?.height ?: 0) * 0.5f, 18.0, 160)
-        drawCharacters(canvas, t)
+        if (!g3) {
+            drawBats(canvas, t)
+            drawFog(canvas, t, reelRect.bottom - (fog?.height ?: 0) * 0.5f, 18.0, 160)
+            drawCharacters(canvas, t)
+        }
         drawTitle(canvas, t)
         drawRelics(canvas, t)
-        drawReels(canvas, ch, t)
+        if (!g3) drawReels(canvas, ch, t)
         drawMiniEffects(canvas, t)
         drawWins(canvas, t)
+        miniPoseValid = false
         drawMini(canvas, t)
         drawWinBanner(canvas, t)
+        touchQ = -1f
         drawFeature(canvas, t)
-        drawFog(canvas, t, reelRect.bottom - (fog?.height ?: 0) * 0.75f, -11.0, 90)
+        if (!g3) drawFog(canvas, t, reelRect.bottom - (fog?.height ?: 0) * 0.75f, -11.0, 90)
         drawPanel(canvas, t)
         drawButtons(canvas, t)
         canvas.restore()
         drawRelicFlight(canvas, t)
         updateParticles(dt.toFloat())
-        drawParticles(canvas)
+        if (!g3) drawParticles(canvas)
         when (phase) {
             Phase.BIG_WIN -> drawBigWin(canvas, t)
             Phase.SHOWCASE -> drawShowcase(canvas, t)
@@ -814,6 +855,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
             else -> {}
         }
         drawMessage(canvas, t)
+        if (g3) publishScene(t)
         if (phase == Phase.IN_VAULT) postInvalidateDelayed(250) else postInvalidateOnAnimation()
     }
 
@@ -858,13 +900,21 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         }
     }
 
+    private fun lightningLevel(t: Double): Float {
+        val e = t - lightningAt
+        if (e < 0 || e > 0.6) return 0f
+        val flicker = if (e < 0.08 || (e > 0.16 && e < 0.24)) 1f else 0.35f
+        return ((1 - e / 0.6) * flicker).toFloat()
+    }
+
     private fun drawLightning(c: Canvas, t: Double) {
         val e = t - lightningAt
         if (e < 0 || e > 0.6) return
-        val flicker = if (e < 0.08 || (e > 0.16 && e < 0.24)) 1f else 0.35f
-        val a = ((1 - e / 0.6) * flicker).toFloat()
-        pFill.color = Color.argb((120 * a).toInt(), 200, 255, 220)
-        c.drawRect(0f, 0f, width.toFloat(), height.toFloat(), pFill)
+        val a = lightningLevel(t)
+        if (lay3d == null) {
+            pFill.color = Color.argb((120 * a).toInt(), 200, 255, 220)
+            c.drawRect(0f, 0f, width.toFloat(), height.toFloat(), pFill)
+        }
         pStroke.color = Color.argb((255 * a).toInt(), 230, 255, 240)
         pStroke.strokeWidth = 3 * u
         c.drawPath(bolt, pStroke)
@@ -1032,8 +1082,10 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
     }
 
     /** Y of a row centre on the drum; row is fractional (0 = top row, 1 = middle, 2 = bottom). */
-    private fun rowY(row: Double): Float = reelRect.centerY() + drumR * sin((row - 1) * step).toFloat()
-    private fun rowScale(row: Double): Float = cos((row - 1) * step).toFloat()
+    private fun rowY(row: Double): Float = lay3d?.rowY(row.toFloat()) ?: (reelRect.centerY() + drumR * sin((row - 1) * step).toFloat())
+    private fun rowScale(row: Double): Float = lay3d?.rowScale(row.toFloat()) ?: cos((row - 1) * step).toFloat()
+    private fun cellX(r: Int): Float = lay3d?.reelScreenX(r) ?: (reelRect.left + (r + 0.5f) * cell)
+    private fun cellW(): Float = lay3d?.cellPx() ?: cell
     private fun cellPhase(r: Int, row: Int) = ((r * 0.37 + row * 0.61) % 1.0)
 
     private fun charSound(sym: Int): Sfx? = when (sym) {
@@ -1128,7 +1180,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
             val col = lineColors[w.line % lineColors.size]
             path.reset()
             path.moveTo(reelRect.left, rowY(line[0].toDouble()))
-            for (r in 0 until REELS) path.lineTo(reelRect.left + (r + 0.5f) * cell, rowY(line[r].toDouble()))
+            for (r in 0 until REELS) path.lineTo(cellX(r), rowY(line[r].toDouble()))
             path.lineTo(reelRect.right, rowY(line[4].toDouble()))
             pStroke.color = col; pStroke.alpha = 80; pStroke.strokeWidth = 14 * u; c.drawPath(path, pStroke)
             pStroke.alpha = 255; pStroke.strokeWidth = 4 * u; c.drawPath(path, pStroke)
@@ -1136,8 +1188,8 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
             pStroke.alpha = 255
             pStroke.color = col; pStroke.strokeWidth = 3 * u
             for (r in 0 until w.count) {
-                val x = reelRect.left + r * cell; val yc = rowY(line[r].toDouble()); val hh = cell * rowScale(line[r].toDouble()) / 2
-                tmp.set(x + 5 * u, yc - hh + 4 * u, x + cell - 5 * u, yc + hh - 4 * u)
+                val cw = cellW(); val x = cellX(r) - cw / 2; val yc = rowY(line[r].toDouble()); val hh = cw * rowScale(line[r].toDouble()) / 2
+                tmp.set(x + 5 * u, yc - hh + 4 * u, x + cw - 5 * u, yc + hh - 4 * u)
                 c.drawRoundRect(tmp, 10 * u, 10 * u, pStroke)
             }
         }
@@ -1160,6 +1212,9 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         c.drawText(cap, reelRect.centerX(), cy + 6 * u, pText)
     }
 
+    private var touchQ = -1f
+    private var touchSwing = 0f
+
     /** Reaper's Touch: the reaper flies over the reels and slashes reels wild. */
     private fun drawFeature(c: Canvas, t: Double) {
         if (featureStart < 0 || t < featureStart) return
@@ -1179,12 +1234,15 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         // shadow aura
         pFill.shader = RadialGradient(cx, cy, w.coerceAtLeast(1f), intArrayOf(0xAA000000.toInt(), 0x00000000), null, Shader.TileMode.CLAMP)
         c.drawCircle(cx, cy, w, pFill); pFill.shader = null
-        c.save()
         val swing = if (t in (slashAt - 0.12)..(slashAt + 0.15)) ((t - slashAt + 0.12) / 0.27 * 50 - 25).toFloat() else -10f * e
+        touchQ = q; touchSwing = swing
+        if (lay3d == null) {
+        c.save()
         c.rotate(swing, cx, cy + h * 0.2f)
         c.translate(cx - w / 2, cy - h / 2); c.scale(scale, scale)
         bc.draw(c, ReaperConfig.WILD, t, 0.71, Characters.EXCITED)
         c.restore()
+        }
         // slash streak across the wild reels
         val se = t - slashAt
         if (se in 0.0..0.45) {
@@ -1355,11 +1413,11 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
 
     private fun drawBigWin(c: Canvas, t: Double) {
         val e = t - phaseStart
-        pFill.color = Color.argb((min(1.0, e * 3) * 170).toInt(), 0, 0, 0)
+        pFill.color = Color.argb((min(1.0, e * 3) * (if (lay3d != null) 90 else 170)).toInt(), 0, 0, 0)
         c.drawRect(0f, 0f, width.toFloat(), height.toFloat(), pFill)
         // the reaper rises, enlarged, behind the text
         val bc = bigChars
-        if (bc != null) {
+        if (bc != null && lay3d == null) {
             // the reaper rises, enlarged and laughing, behind the text
             val rise = min(1.0, e / 1.2).toFloat()
             val ease = rise * rise * (3 - 2 * rise)
@@ -1405,9 +1463,11 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         c.drawRect(0f, 0f, width.toFloat(), height.toFloat(), pFill)
         val sc = 1 + 2.2f * grow
         val size = cell * sc
-        c.save(); c.translate(width / 2f - size / 2, reelRect.centerY() - size / 2); c.scale(sc, sc)
-        ch.draw(c, sym, t, 0.0, Characters.EXCITED, (255 * fade).toInt())
-        c.restore()
+        if (lay3d == null) {
+            c.save(); c.translate(width / 2f - size / 2, reelRect.centerY() - size / 2); c.scale(sc, sc)
+            ch.draw(c, sym, t, 0.0, Characters.EXCITED, (255 * fade).toInt())
+            c.restore()
+        }
         pText.typeface = serif; pText.textSize = 40 * u; pText.color = Neon.RED; pText.alpha = (255 * fade).toInt()
         pText.setShadowLayer(16 * u, 0f, 0f, Neon.RED)
         c.drawText("5 × ${ReaperConfig.SYMBOL_NAMES[sym].uppercase()}", width / 2f, reelRect.centerY() + size / 2 + 10 * u, pText)
@@ -1472,6 +1532,8 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         val cx = sx + (hx - sx) * ease + sin(t * 2.2).toFloat() * 12 * u
         val cy = sy + (hy - sy) * ease + sin(t * 3.1).toFloat() * 8 * u - leaving * height * 0.6f
         val scale = (0.6f + (1.25f - 0.45f * lift) * ease) * (1f - leaving * 0.4f)
+        miniPose[0] = cx; miniPose[1] = cy; miniPose[2] = scale; miniPoseValid = true
+        if (lay3d != null) { drawMiniTitle(c, type, ease); return }
         val w = bc.w * scale; val h = bc.h * scale
         // dark aura + shadow on the reels (depth)
         pFill.color = 0x66000000
@@ -1496,7 +1558,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
                 val t0 = 0.5 + k * actionGap
                 val q = ((e - t0) / 0.3).toFloat()
                 if (q < 0f || q > 1f) continue
-                val tx = reelRect.left + (cell / ROWS + 0.5f) * this.cell; val ty = rowY((cell % ROWS).toDouble())
+                val tx = cellX(cell / ROWS); val ty = rowY((cell % ROWS).toDouble())
                 val px0 = cx + (tx - cx) * q; val py0 = cy + (ty - cy) * q - sin(q * PI).toFloat() * 60 * u
                 if (type == ReaperConfig.MINI_PUMPKIN) ch.coin(c, px0, py0, this.cell * 0.18f, "", sin(t * 20).toFloat())
                 else {
@@ -1507,21 +1569,108 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         }
     }
 
+    /** Writes this frame's game state into the 3D world's shared [SceneState]. */
+    private fun publishScene(t: Double) {
+        val g = gl3d ?: return
+        val s = g.state
+        val o = outcome
+        val hl = highlight(t)
+        val showcase = phase == Phase.SHOWCASE || phase == Phase.BIG_WIN
+        val pulse = (1 + 0.06 * sin(t * 9)).toFloat()
+        synchronized(g.lock) {
+            for (r in 0 until REELS) {
+                val strip = ReaperConfig.STRIPS[r]
+                if (phase == Phase.SPINNING && !done[r]) {
+                    val off = offset(r, t); val base = floor(off).toInt()
+                    var n = 0
+                    for (k in base - 1..base + 4) { if (n >= com.tjshea.neonreaper.gl.SceneState.FACES) break; s.faceSym[r][n] = tapeSym(r, k); s.facePos[r][n] = (k - off).toFloat(); n++ }
+                    s.faceCount[r] = n
+                    s.fast[r] = t > liftEnd[r] && t < runEnd[r]
+                } else {
+                    val stop = o?.stops?.get(r) ?: idleStops[r]
+                    s.faceSym[r][0] = strip[Math.floorMod(stop - 1, strip.size)]; s.facePos[r][0] = -1f
+                    for (row in 0 until ROWS) { s.faceSym[r][row + 1] = grid[r][row]; s.facePos[r][row + 1] = row.toFloat() }
+                    s.faceSym[r][4] = strip[(stop + 3) % strip.size]; s.facePos[r][4] = 3f
+                    s.faceCount[r] = 5; s.fast[r] = false
+                }
+                s.wildReel[r] = isWildReel[r] && phase != Phase.IDLE && (t >= slashAt || slashAt < 0) && play != null
+                for (row in 0 until ROWS) {
+                    val cell = r * ROWS + row
+                    val lit = hl?.get(r)?.get(row) == true
+                    val event = r == eventReel && row == eventRow && t < eventUntil
+                    s.cellExcited[cell] = lit || event || (showcase && hl == null)
+                    s.cellDim[cell] = if (hl != null && !lit) 0.35f else 1f
+                    s.cellPop[cell] = when { lit -> pulse; event -> 1.12f; else -> 1f }
+                    s.coin[cell] = if (coinShown[cell] && o != null) o.mini.coins[cell] else 0
+                    val fl = (t - cellFlash[cell]).toFloat()
+                    s.cellFlash[cell] = if (fl in 0f..0.5f) (0.5f - fl) / 0.5f else 0f
+                }
+            }
+            val excited = phase == Phase.BIG_WIN || phase == Phase.SHOWCASE || phase == Phase.VAULT_TRIGGER ||
+                (phase == Phase.PRESENT && (o?.payTokens ?: 0) > 0 && t - presentStart < 2.2)
+            s.hoodedExcited = excited
+            s.reaperExcited = excited || t < sideLaughUntil
+            s.reaperAway = featureStart > 0 && t > featureStart && t < slashAt + 0.6
+            // mini-feature character + projectiles
+            if (miniPoseValid && o != null) {
+                s.miniSymbol = miniSymbol(miniType); s.miniX = miniPose[0]; s.miniY = miniPose[1]; s.miniScale = miniPose[2]
+                java.util.Arrays.fill(s.projCell, -1)
+                if (phase == Phase.MINI_ACTION) {
+                    val cells = actionCells(o); val e = t - actionStart
+                    var n = 0
+                    for ((k, cell) in cells.withIndex()) {
+                        val q = ((e - (0.5 + k * actionGap)) / 0.3).toFloat()
+                        if (q < 0f || q > 1f || n >= 6) continue
+                        s.projCell[n] = cell; s.projQ[n] = q; n++
+                    }
+                }
+                s.projCoin = miniType == ReaperConfig.MINI_PUMPKIN
+            } else { s.miniSymbol = -1; java.util.Arrays.fill(s.projCell, -1) }
+            s.reaperTouch = touchQ; s.reaperSwing = touchSwing
+            s.bigWin = if (phase == Phase.BIG_WIN) min(1.0, (t - phaseStart) / 1.2).toFloat() else -1f
+            if (phase == Phase.SHOWCASE && showcaseSym >= 0) {
+                val e = (t - phaseStart).toFloat()
+                s.showcaseSym = showcaseSym; s.showcaseGrow = min(1f, e / 0.45f) * (if (e > 1.6f) 1 - (e - 1.6f) / 0.4f else 1f)
+            } else s.showcaseSym = -1
+            s.flash = lightningLevel(t)
+            s.souls = (soulRate / 80f).coerceIn(0f, 1f)
+        }
+    }
+
+    private val miniPose = FloatArray(3)
+    private var miniPoseValid = false
+
+    private fun drawMiniTitle(c: Canvas, type: Int, ease: Float) {
+        if (phase != Phase.SPINNING && phase != Phase.MINI_ACTION) return
+        pText.typeface = serif; pText.textSize = 46 * u; pText.textAlign = Paint.Align.CENTER
+        val col = when (type) { ReaperConfig.MINI_RAVEN -> Neon.PURPLE; ReaperConfig.MINI_PUMPKIN -> Neon.ORANGE; else -> Neon.GREEN }
+        pText.color = col; pText.alpha = (255 * ease).toInt()
+        pText.setShadowLayer(20 * u, 0f, 0f, col)
+        c.drawText(ReaperConfig.MINI_NAMES[type], reelRect.centerX(), reelRect.bottom - 26 * u, pText)
+        pText.clearShadowLayer(); pText.alpha = 255
+    }
+
     /** Soul coins sitting on the reels, flashes where wilds/coins landed, and the skull's multiplier stamp. */
     private fun drawMiniEffects(c: Canvas, t: Double) {
         val ch = chars ?: return
         val o = outcome ?: return
         if (play == null || phase == Phase.SPINNING || phase == Phase.IDLE) return
         for (cell in 0 until REELS * ROWS) {
-            val x = reelRect.left + (cell / ROWS + 0.5f) * this.cell; val y = rowY((cell % ROWS).toDouble())
+            val x = cellX(cell / ROWS); val y = rowY((cell % ROWS).toDouble())
             val fl = (t - cellFlash[cell]).toFloat()
-            if (fl in 0f..0.5f) {
+            if (fl in 0f..0.5f && lay3d == null) {
                 pFill.color = Color.argb(((0.5f - fl) / 0.5f * 220).toInt(), 200, 255, 160)
                 c.drawCircle(x, y, this.cell * (0.3f + fl), pFill)
             }
             if (coinShown[cell]) {
                 val bounce = if (fl in 0f..0.35f) 1.3f - fl else 1f
-                ch.coin(c, x, y + this.cell * 0.12f, this.cell * 0.27f * bounce, Money.fmt(o.mini.coins[cell].toLong() * o.stake), 1f)
+                if (lay3d == null) ch.coin(c, x, y + this.cell * 0.12f, this.cell * 0.27f * bounce, Money.fmt(o.mini.coins[cell].toLong() * o.stake), 1f)
+                else {
+                    val label = Money.fmt(o.mini.coins[cell].toLong() * o.stake)
+                    pText.typeface = serif; pText.textSize = cellW() * 0.2f * bounce; pText.color = Color.WHITE
+                    pText.setShadowLayer(8 * u, 0f, 0f, Color.BLACK)
+                    c.drawText(label, x, y + cellW() * 0.08f, pText); pText.clearShadowLayer()
+                }
             }
         }
         if (multStampAt > 0) {
