@@ -84,6 +84,19 @@ class ScreensTest {
         step(v, 1.4); shot(v, "r_after_touch")
         step(v, 3.0); shot(v, "r_big_win")
         step(v, 5.0)
+        for ((type, name) in listOf(ReaperConfig.MINI_RAVEN to "raven", ReaperConfig.MINI_PUMPKIN to "pumpkin", ReaperConfig.MINI_SKULL to "skull")) {
+            val rr = Random(type.toLong())
+            var o: SpinOutcome
+            do {
+                val stops = IntArray(5) { rr.nextInt(ReaperConfig.STRIPS[it].size) }
+                o = ReaperEngine.outcome(10, stops, ReaperEngine.rollMini(rr, type))
+            } while (o.totalMult < 6 || o.totalMult > 60)
+            v.animateSpin(SpinPlay(o, -1, null))
+            step(v, 1.0); shot(v, "r_mini_${name}_flyin")
+            step(v, 3.0); shot(v, "r_mini_${name}_action")
+            step(v, 3.2); shot(v, "r_mini_${name}_win")
+            step(v, 7.0)
+        }
         val five = find(IntArray(0)) { o -> o.lineWins.any { it.count == 5 && it.symbol == ReaperConfig.HOODED } }
         v.animateSpin(SpinPlay(five, -1, null))
         step(v, 2.3); shot(v, "r_showcase")
@@ -105,8 +118,12 @@ class ScreensTest {
         val res = SoulVault.play(seed, 10)
         val v = VaultView(ctx, audio, res) {}
         size(v); step(v, 1.0); shot(v, "v_intro")
-        tap(v); step(v, 4.0); shot(v, "v_respins")
-        step(v, 6.0); shot(v, "v_mid")
+        tap(v); step(v, 3.0); shot(v, "v_wait_spin")
+        fun press() { val r = v.spinButton; val e = MotionEvent.obtain(0, 0, MotionEvent.ACTION_UP, r.centerX(), r.centerY(), 0); v.onTouchEvent(e); e.recycle() }
+        press(); step(v, 0.6); shot(v, "v_respins")
+        var guard = 0
+        while (guard++ < 60) { step(v, 0.5); if (v.awaitingSpin) press() }
+        step(v, 2.0); shot(v, "v_mid")
         step(v, 60.0); shot(v, "v_summary")
     }
 }

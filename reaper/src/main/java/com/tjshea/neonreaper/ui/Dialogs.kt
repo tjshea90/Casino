@@ -318,13 +318,13 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
         val art = Array(ReaperConfig.SYMBOL_COUNT) { chars.body(it) }
         val list = vbox(
             title("PAYTABLE & RULES"),
-            text("Wins pay left to right on any of the 20 lines, as multiples of your stake. Shown for your current stake of $stake token(s).", 14f)
+            text("Wins pay left to right on any of the 20 lines. Amounts below are in tokens for your current stake of $stake token(s).", 14f)
         )
         for (s in 0 until ReaperConfig.SYMBOL_COUNT) {
             val p = ReaperConfig.PAYS[s]
             val name = ReaperConfig.SYMBOL_NAMES[s].uppercase() + if (s == ReaperConfig.WILD) " — substitutes for every symbol" else ""
             fun v(m: Int): String { val x = m.toLong() * stake; return if (x > ReaperConfig.MAX_WIN_TOKENS) "${ReaperConfig.MAX_WIN_TOKENS} (max)" else "$x" }
-            val desc = "$name\n5×: ${v(p[2])}    4×: ${v(p[1])}    3×: ${v(p[0])} tokens   (${p[2]}× / ${p[1]}× / ${p[0]}× stake)"
+            val desc = "$name\n5 in a row: ${v(p[2])}    4: ${v(p[1])}    3: ${v(p[0])} tokens"
             val nl = desc.indexOf('\n')
             val styled = android.text.SpannableString(desc).apply {
                 setSpan(android.text.style.ForegroundColorSpan(gold), 0, nl, 0)
@@ -338,11 +338,17 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
             list.addView(r, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(4), 0, dp(4)) })
         }
         list.addView(text(
-            "REAPER'S TOUCH\n" +
-            "At random the Grim Reaper swoops over the reels and slashes 1–3 of the middle reels completely WILD.\n\n" +
+            "MINI FEATURES (about 1 spin in 80)\n" +
+            "A character floats out in front of the reels and changes that spin:\n" +
+            "• Reaper's Touch — the Grim Reaper slashes 1–3 middle reels completely WILD.\n" +
+            "• Raven's Flock — the raven drops 3–6 WILDS onto the reels.\n" +
+            "• Pumpkin's Treats — the jack-o'-lantern spits 3–6 soul coins onto the reels; every coin pays its token value.\n" +
+            "• Skull's Curse — the skull adds 2 WILDS and multiplies the spin's line wins ×2, ×3 or ×5.\n\n" +
+            "SPINNING\n" +
+            "Tap SPIN for one spin. HOLD the SPIN button for rapid spins until you let go. Every win pauses to show the amount.\n\n" +
             "RELICS & THE SOUL VAULT\n" +
-            "About one spin in 24 reveals a relic (Scythe, Hourglass, Skull Candle, Raven Feather, Cursed Tome). Collect all five to open the Soul Vault: " +
-            "5 soul orbs start in a 5×4 vault and you get 3 respins. Every orb that lands sticks and resets the respins to 3. " +
+            "About one spin in 28 reveals a relic (Scythe, Hourglass, Skull Candle, Raven Feather, Cursed Tome). Collect all five to open the Soul Vault: " +
+            "5 soul orbs start in a 5×4 vault and you get 3 respins — press SPIN for each one. Every orb that lands sticks and resets the respins to 3. " +
             "Orbs pay 1×–25× the bonus bet; MINI ${ReaperConfig.MINI}×, MINOR ${ReaperConfig.MINOR}×, MAJOR ${ReaperConfig.MAJOR}× jackpot orbs; " +
             "the Reaper orb harvests the value of every soul on the board; fill all 20 niches for the GRAND (${ReaperConfig.GRAND}×). " +
             "The bonus bet is your average stake while collecting the relics (now: ${wallet.averageStake}). Relics are kept between sessions.\n\n" +
@@ -350,7 +356,7 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
             "• Stake 1–40 tokens (10 tokens = 1 mack, 80 tokens = 1 book).\n" +
             "• Every win pays exact tokens. Rounding down to a whole mack only happens when you cash out (odd tokens stay on the machine).\n" +
             "• Maximum win: 25 books (2,000 tokens) per spin and per Soul Vault.\n" +
-            "• Return to player: 87% at every stake (house edge 13%). About 1 spin in 3.5 is a winner, at every stake.\n" +
+            "• Return to player: 87% at every stake — over time the machine keeps 13% of every token wagered. About 1 spin in 3.4 is a winner.\n" +
             "• Tap the reels to slam-stop; tap during the Soul Vault to fast-forward.", 14f))
         lateinit var dlg: Dialog
         list.addView(button("Close") { dlg.dismiss() })

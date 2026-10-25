@@ -147,10 +147,11 @@ Plan: rebudget RTP (base ↓, bonus a bit rarer, features ↑), per-stake calibr
 
 Work queue v1.2:
 - [x] engine: mini features (RAVEN wilds, PUMPKIN coins, SKULL multiplier, REAPER wild reels), rebudget + calibrate, tests
-- [ ] base view: feature fly-in animations, coins on reels, multiplier, win lock + count-up + tiered SFX, big hold-to-spin button
-- [ ] vault: spin button per respin, new epic music
-- [ ] audio: fanfare/count-end/coin-drop/spin-press SFX, new vault music
-- [ ] release v1.2.0
+- [x] base view: feature fly-in animations, coins on reels, multiplier, win lock + count-up + tiered SFX, big hold-to-spin button
+- [x] vault: spin button per respin, new epic music
+- [x] audio: fanfare/count-end/press SFX, new vault music
+- [x] release v1.2.0 (versionCode 3). Tests fork per class (exit 137 = OOM otherwise).
+- [ ] NEXT: v2.0 OpenGL 3D engine (see item 7 above)
 7. (mid-turn) "Make the graphics more 3D and animated like a video game with a good graphics engine."
    → Plan v2.0: OpenGL ES 3 renderer (GLSurfaceView) behind a transparent HUD View: real 3D reel cylinders textured
      from the Characters bitmaps with per-pixel lighting/specular, perspective camera (sway, zoom on big wins, shake),

@@ -20,11 +20,14 @@ Both run on Android 10 (Go) and up (MT8168 / armv7 tested target), share the sam
 
 - **Stake:** one STAKE button, 1–40 tokens (1, 2, 3, 4, 5, 8, 10, 15, 20, 25, 30, 40).
 - **20 lines**, pays are whole multiples of the stake, so **every win is exact tokens**. Rounding down to a whole mack happens **only at cash-out** (odd tokens stay on the machine). Max win **25 books (2,000 tokens)** per spin and per bonus.
-- **RTP 87 % at every stake** (house edge 13 %). About **1 spin in 3.4 wins** at every stake. Every win pauses with a big token amount and a sound (autoplay too).
+- **RTP 87 % at every stake**: over time the machine keeps **13 % of every token wagered** (4-million-spin simulations per stake: 12.9–13.5 %). About **1 spin in 3.4 wins**.
+- Every win pops up a huge **"YOU WIN 70 TOKENS"**, can't be skipped until shown, and counts up with rising ticks for bigger wins (fanfare for big wins).
+- **Giant SPIN button** — tap for one spin, **hold for rapid spins** until you let go.
+- **Mini features (≈1 spin in 80):** a 3D character floats out in front of the reels — Reaper's Touch (wild reels), Raven's Flock (3–6 wilds), Pumpkin's Treats (3–6 soul coins worth their token value), Skull's Curse (2 wilds + ×2/×3/×5).
 - **3D graphics:** curved 3D reel drum and lit 3D characters with animated faces — red-eyed Grim Reaper and Hooded Watcher, a laughing chattering skull, a cawing raven, a grinning jack-o'-lantern and a giggling ghost. Characters come alive at random with their own voices.
 - **Reaper's Touch:** the Grim Reaper swoops in and slashes 1–3 middle reels fully wild.
-- **Relics → Soul Vault bonus:** about 1 spin in 24 reveals one of 5 relics (kept between sessions). Collect all 5 (≈ every 120 spins) to open the **Soul Vault**, a separate hold-and-spin screen:
-  5 starting orbs, 3 respins that reset whenever an orb lands; orbs worth 1×–25× the bonus bet; MINI 15×, MINOR 40×, MAJOR 150× jackpot orbs;
+- **Relics → Soul Vault bonus:** about 1 spin in 28 reveals one of 5 relics (kept between sessions). Collect all 5 (≈ every 140 spins) to open the **Soul Vault**, a separate hold-and-spin screen:
+  its own epic soundtrack, 5 starting orbs, 3 respins (press SPIN for each) that reset whenever an orb lands; orbs worth 1×–25× the bonus bet; MINI 15×, MINOR 40×, MAJOR 150× jackpot orbs;
   the Reaper orb harvests every soul on the board; fill all 20 niches for the GRAND (1000×). Averages ~28× the bonus bet. The bonus bet is your **average stake while collecting**, so switching to a big stake at the last relic doesn't game it.
 - Big/Huge/Massive/Deadly win celebrations with the reaper rising, characters looming out of the reels on 5-of-a-kind, lightning, bats, fog, soul particles, synthesized horror music (separate bonus track) and sound effects.
 
@@ -32,7 +35,9 @@ Both run on Android 10 (Go) and up (MT8168 / armv7 tested target), share the sam
 |---|---|---|
 | ![](docs/reaper_touch.jpg) | ![](docs/reaper_bigwin.jpg) | ![](docs/reaper_vault.jpg) |
 
-![Win banner](docs/reaper_win.jpg)
+| Pumpkin's Treats | Raven's Flock |
+|---|---|
+| ![](docs/reaper_coins.jpg) | ![](docs/reaper_raven.jpg) |
 
 **Math verification** (`reaper/src/test/.../CalibrationTest.kt`, `FullGameTest.kt`): per-stake RTP is measured with rounding and the cap
 (4 M base spins, 800 k feature spins, 400 k bonuses); the Reaper's Touch rate is tuned per stake so each stake computes to 87.0 %.

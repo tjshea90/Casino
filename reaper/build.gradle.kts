@@ -11,8 +11,8 @@ android {
         applicationId = "com.tjshea.neonreaper"
         minSdk = 29          // Android 10 (Go edition)
         targetSdk = 36       // Android 16
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.2.0"
     }
 
     signingConfigs {
@@ -49,6 +49,8 @@ android {
 
 android.testOptions.unitTests.isIncludeAndroidResources = true
 android.testOptions.unitTests.all {
+    it.maxHeapSize = "1536m"
+    it.forkEvery = 1      // each test class in a fresh JVM: screenshot rendering is memory-hungry
     // Robolectric runtime jars are pre-fetched (see HANDOFF.md) because the sandbox can't reach Maven Central directly.
     val deps = File(System.getProperty("user.home"), "robolectric-deps")
     if (deps.isDirectory) {

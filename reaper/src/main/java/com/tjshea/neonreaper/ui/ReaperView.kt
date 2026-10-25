@@ -55,7 +55,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         fun openVault(result: VaultResult)
     }
 
-    private enum class Phase { IDLE, SPINNING, PRESENT, SHOWCASE, BIG_WIN, VAULT_TRIGGER, IN_VAULT }
+    private enum class Phase { IDLE, SPINNING, MINI_ACTION, PRESENT, SHOWCASE, BIG_WIN, VAULT_TRIGGER, IN_VAULT }
 
     private val wallet get() = host.wallet
     private val audio get() = host.audio
@@ -94,6 +94,23 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
     private val isWildReel = BooleanArray(REELS)
     private val landTime = 0.28
     private val landDist = 2.0
+
+    // mini features (Raven / Pumpkin / Skull fly out and act after the reels stop)
+    private var miniType = ReaperConfig.MINI_NONE
+    private var miniStart = -1.0
+    private var actionStart = 0.0
+    private var actionEvents = 0
+    private val coinShown = BooleanArray(REELS * ROWS)
+    private val cellFlash = DoubleArray(REELS * ROWS)
+    private var multStampAt = -1.0
+
+    // win presentation lock: a win can't be skipped until its amount has been shown
+    private var winLockUntil = 0.0
+    private var countEndPlayed = true
+
+    // hold-to-spin
+    private var spinHeldSince = -1.0
+    private var holdMode = false
 
     // Reaper's Touch
     private var featureStart = -1.0
@@ -233,9 +250,10 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         // bottom panel
         buttons.clear()
         val ph = panelRect.height()
-        val spinR = ph * 0.42f
-        val spinCx = panelRect.right - spinR - 14 * u
-        buttons += Btn("spin", "SPIN", RectF(spinCx - spinR, panelRect.centerY() - spinR, spinCx + spinR, panelRect.centerY() + spinR), round = true)
+        val spinR = min(ph * 0.82f, w * 0.1f)
+        val spinCx = panelRect.right - spinR - 10 * u
+        val spinCy = panelRect.bottom - spinR - 6 * u
+        buttons += Btn("spin", "SPIN", RectF(spinCx - spinR, spinCy - spinR, spinCx + spinR, spinCy + spinR), round = true)
         val autoW = ph * 0.6f
         val auto = RectF(spinCx - spinR - autoW - 14 * u, panelRect.centerY() - ph * 0.2f, spinCx - spinR - 14 * u, panelRect.centerY() + ph * 0.2f)
         buttons += Btn("auto", "AUTO", auto)
@@ -382,17 +400,17 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
 
     fun showMessage(text: String, sec: Double = 2.6) { message = text; messageUntil = now() + sec; invalidate() }
 
-    fun onHostPause() { autoLeft = 0 }
+    fun onHostPause() { autoLeft = 0; holdMode = false; spinHeldSince = -1.0 }
 
     private fun enter(p: Phase) { phase = p; phaseStart = now(); invalidate() }
 
-    private val busy get() = phase != Phase.IDLE && phase != Phase.PRESENT
+    private val busy get() = (phase != Phase.IDLE && phase != Phase.PRESENT) || now() < winLockUntil
 
     private fun startSpin() {
         if (busy) return
         val stake = wallet.stake
         if (!wallet.canAfford(stake)) {
-            autoLeft = 0; audio.play(Sfx.ERROR); creditFlashUntil = now() + 1.5
+            autoLeft = 0; holdMode = false; audio.play(Sfx.ERROR); creditFlashUntil = now() + 1.5
             showMessage(if (wallet.balance == 0L) "Deposit tokens to play" else "Not enough credit for this stake")
             return
         }
@@ -408,21 +426,28 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         pendingWin = o.payTokens
         pendingVault = p.vault?.payTokens ?: 0L
         vaultWinShown = 0
+        rollTarget = 0
         audio.play(Sfx.SPIN, 0.6f)
         val t = now()
-        val turbo = wallet.turbo
+        val turbo = wallet.turbo || holdMode
         val base = if (turbo) 0.32 else 0.6
         val step = if (turbo) 0.1 else 0.2
+        miniType = o.mini.type
+        java.util.Arrays.fill(coinShown, false); java.util.Arrays.fill(cellFlash, -10.0)
+        multStampAt = -1.0; actionEvents = 0
+        val reaper = miniType == ReaperConfig.MINI_REAPER
         val feature = o.feature
-        featureStart = if (feature) t + 0.3 else -1.0
-        slashAt = if (feature) t + 1.05 else -1.0
+        featureStart = if (reaper) t + 0.3 else -1.0
+        slashAt = if (reaper) t + 1.05 else -1.0
+        miniStart = if (feature && !reaper) t + 0.25 else -1.0
         slashPlayed = false
-        if (feature) audio.play(Sfx.GROWL, 0.9f)
+        if (reaper) audio.play(Sfx.GROWL, 0.9f)
+        if (feature && !reaper) { audio.play(Sfx.WHOOSH); miniVoice(miniType)?.let { audio.play(it, 0.9f) } }
         for (r in 0 until REELS) {
             isWildReel[r] = r in o.wildReels
             val stopAt = when {
                 isWildReel[r] -> slashAt
-                feature -> t + base + step * r + 1.25
+                feature -> t + base + step * r + 1.3
                 else -> t + base + step * r
             }
             liftEnd[r] = t + 0.09
@@ -482,11 +507,56 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
             }
             if (!done[r] && t >= runEnd[r] + landTime) {
                 done[r] = true
-                for (row in 0 until ROWS) grid[r][row] = o.grid[r][row]
+                for (row in 0 until ROWS) grid[r][row] = if (needsAction(o)) o.landed[r][row] else o.grid[r][row]
                 tape[r] = null
             }
         }
-        if (done.all { it }) onStopped(o)
+        if (done.all { it }) {
+            if (needsAction(o)) { actionStart = t; actionEvents = 0; enter(Phase.MINI_ACTION) } else onStopped(o)
+        }
+    }
+
+    private fun needsAction(o: SpinOutcome) = o.mini.type == ReaperConfig.MINI_RAVEN ||
+        o.mini.type == ReaperConfig.MINI_PUMPKIN || o.mini.type == ReaperConfig.MINI_SKULL
+
+    private fun miniVoice(type: Int): Sfx? = when (type) {
+        ReaperConfig.MINI_RAVEN -> Sfx.CAW; ReaperConfig.MINI_PUMPKIN -> Sfx.CACKLE
+        ReaperConfig.MINI_SKULL -> Sfx.CHATTER; ReaperConfig.MINI_REAPER -> Sfx.LAUGH; else -> null
+    }
+
+    private fun miniSymbol(type: Int) = when (type) {
+        ReaperConfig.MINI_RAVEN -> ReaperConfig.RAVEN; ReaperConfig.MINI_PUMPKIN -> ReaperConfig.PUMPKIN
+        ReaperConfig.MINI_SKULL -> ReaperConfig.SKULL; else -> ReaperConfig.WILD
+    }
+
+    /** Cells the action touches, in order, and the time each lands (relative to actionStart). */
+    private fun actionCells(o: SpinOutcome): IntArray =
+        if (o.mini.type == ReaperConfig.MINI_PUMPKIN) (0 until REELS * ROWS).filter { o.mini.coins[it] > 0 }.toIntArray()
+        else o.mini.wildCells
+
+    private val actionGap = 0.38
+    private fun actionEnd(o: SpinOutcome): Double =
+        0.5 + actionCells(o).size * actionGap + if (o.mini.type == ReaperConfig.MINI_SKULL) 1.3 else 0.5
+
+    private fun updateAction(t: Double) {
+        val o = outcome ?: return
+        val cells = actionCells(o)
+        val e = t - actionStart
+        while (actionEvents < cells.size && e >= 0.5 + actionEvents * actionGap + 0.3) {
+            val cell = cells[actionEvents++]
+            cellFlash[cell] = t
+            if (o.mini.type == ReaperConfig.MINI_PUMPKIN) { coinShown[cell] = true; audio.play(Sfx.COINS, 0.7f) }
+            else { grid[cell / ROWS][cell % ROWS] = WILD; audio.play(Sfx.SLASH, 0.6f); audio.play(Sfx.STOP, 0.6f) }
+            performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+        }
+        if (o.mini.type == ReaperConfig.MINI_SKULL && multStampAt < 0 && e >= 0.5 + cells.size * actionGap + 0.2) {
+            multStampAt = t; shakeUntil = t + 0.3
+            audio.play(Sfx.BELL, 0.8f); audio.play(Sfx.CHATTER)
+        }
+        if (e >= actionEnd(o)) {
+            for (r in 0 until REELS) for (row in 0 until ROWS) grid[r][row] = o.grid[r][row]
+            onStopped(o)
+        }
     }
 
     private fun onStopped(o: SpinOutcome) {
@@ -501,15 +571,22 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         showcaseSym = o.lineWins.filter { it.count == 5 && it.symbol <= ReaperConfig.RAVEN }.minByOrNull { it.symbol }?.symbol ?: -1
         if (win > 0) {
             rollTarget = win; rollStart = t
-            rollDur = if (tier > 0) 2.4 + tier * 1.2 else (0.45 + 0.35 * ln(1 + x)).coerceAtMost(1.6)
-            bannerHold = max(2.2, rollDur + 1.2)
+            // small wins show instantly; bigger ones count up (suspense, but never slow)
+            rollDur = when {
+                tier > 0 -> 2.2 + tier * 0.9
+                x >= 2 -> (0.9 + 0.35 * ln(x)).coerceAtMost(2.0)
+                else -> 0.0
+            }
+            countEndPlayed = rollDur == 0.0
+            bannerHold = rollDur + if (x >= 2) 1.3 else 1.4
+            winLockUntil = t + rollDur + 0.9
             // the best character in the win gets to laugh / chatter / caw
             val star = o.lineWins.map { it.symbol }.filter { it <= ReaperConfig.GHOST }.minOrNull()
             star?.let { sym -> charSound(sym)?.let { snd -> audio.play(snd, 0.85f) } }
             when {
-                tier > 0 -> { audio.play(Sfx.BIG_WIN); audio.play(Sfx.LAUGH); soulRate = 30f + tier * 20f; shakeUntil = t + 0.6; sideLaughUntil = t + 3; enter(Phase.BIG_WIN); return }
+                tier > 0 -> { audio.play(Sfx.FANFARE); audio.play(Sfx.BIG_WIN, 0.8f); audio.play(Sfx.LAUGH); soulRate = 30f + tier * 20f; shakeUntil = t + 0.6; sideLaughUntil = t + 3; enter(Phase.BIG_WIN); return }
                 showcaseSym >= 0 -> { audio.play(Sfx.WIN_MED); enter(Phase.SHOWCASE); return }
-                else -> { audio.play(if (x >= 3) Sfx.WIN_MED else Sfx.WIN, 0.9f); audio.play(Sfx.COINS, 0.5f) }
+                else -> { audio.play(if (x >= 3) Sfx.WIN_MED else Sfx.WIN, 0.9f); if (x < 2) audio.play(Sfx.COINS, 0.6f) }
             }
             if (x >= 4) soulRate = 18f
         } else {
@@ -525,14 +602,16 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
     private fun schedule() {
         val o = outcome ?: return
         // every win pauses long enough to read the amount, autoplay included
-        val delay = if (o.payTokens > 0) bannerHold + 0.5 else if (wallet.turbo) 0.25 else 0.45
+        val delay = if (o.payTokens > 0) bannerHold + 0.3 else if (holdMode) 0.12 else if (wallet.turbo) 0.25 else 0.45
         nextAt = now() + delay
     }
 
     private fun rollValue(t: Double): Long {
         if (rollTarget == 0L) return 0
+        if (rollDur <= 0.0) return rollTarget
         val q = ((t - rollStart) / rollDur).coerceIn(0.0, 1.0)
-        return if (q >= 1) rollTarget else Money.floorToMack((rollTarget * q).toLong())
+        val eased = 1 - (1 - q) * (1 - q) * (1 - q)          // fast start, suspenseful slow finish
+        return if (q >= 1) rollTarget else (rollTarget * eased).toLong()
     }
 
     private fun settleRoll() { rollStart = now() - rollDur - 1; pendingWin = 0; soulRate = 0f }
@@ -540,8 +619,14 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
     private fun relicBusy(t: Double) = relicFly >= 0 && t < relicStart + relicDur
 
     private fun updateFlow(t: Double) {
+        if (!countEndPlayed && rollTarget > 0 && t - rollStart >= rollDur) {
+            countEndPlayed = true
+            audio.play(Sfx.COUNT_END); audio.play(Sfx.COINS, 0.7f)
+            soulRate = max(soulRate, 12f)
+        }
         if (rollTarget > 0 && t - rollStart < rollDur) {
-            if (t - lastTick > 0.08) { lastTick = t; audio.play(Sfx.TICK, 0.3f, 0.9f + 0.4f * ((t - rollStart) / rollDur).toFloat()) }
+            val q = ((t - rollStart) / rollDur).toFloat()
+            if (t - lastTick > 0.07 + 0.08 * q) { lastTick = t; audio.play(Sfx.TICK, 0.35f, 0.8f + 0.8f * q) }
             if (phase != Phase.IN_VAULT && vaultWinShown == 0L) pendingWin = rollTarget - rollValue(t)
             else if (vaultWinShown > 0) pendingVault = rollTarget - rollValue(t)
         } else if (phase != Phase.SPINNING && (pendingWin != 0L || (vaultWinShown > 0 && pendingVault != 0L))) {
@@ -556,17 +641,19 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         when (phase) {
             Phase.BIG_WIN -> if (t - rollStart > rollDur + 2.0) { soulRate = 0f; enter(Phase.PRESENT); presentStart = t - 10; nextAt = t + 0.8 }
             Phase.SHOWCASE -> if (t - phaseStart > 2.0) { enter(Phase.PRESENT); presentStart = t; rollStart = min(rollStart, t); schedule() }
-            Phase.PRESENT -> if (t >= nextAt && !relicBusy(t)) {
+            Phase.PRESENT -> if (t >= nextAt && t >= winLockUntil && !relicBusy(t)) {
                 val v = play?.vault
                 if (v != null && vaultWinShown == 0L) {
                     audio.play(Sfx.BELL); audio.play(Sfx.VAULT)
                     enter(Phase.VAULT_TRIGGER)
+                } else if (holdMode) {
+                    startSpin()
                 } else if (autoLeft != 0) {
                     if (autoLeft > 0) autoLeft--
                     startSpin()
                 }
             }
-            Phase.IDLE -> if (autoLeft != 0 && t >= nextAt) { if (autoLeft > 0) autoLeft--; startSpin() }
+            Phase.IDLE -> if (holdMode) startSpin() else if (autoLeft != 0 && t >= nextAt) { if (autoLeft > 0) autoLeft--; startSpin() }
             Phase.VAULT_TRIGGER -> if (t - phaseStart > 3.2) {
                 val v = play?.vault
                 enter(Phase.IN_VAULT)
@@ -606,16 +693,36 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(e: MotionEvent): Boolean {
         when (e.actionMasked) {
-            MotionEvent.ACTION_DOWN -> { pressed = buttons.firstOrNull { it.enabled && hit(it, e.x, e.y) }; invalidate() }
-            MotionEvent.ACTION_MOVE -> pressed?.let { if (!hit(it, e.x, e.y)) { pressed = null; invalidate() } }
-            MotionEvent.ACTION_UP -> {
-                val p = pressed; pressed = null
-                if (p != null && hit(p, e.x, e.y)) onButton(p.id) else onTap()
+            MotionEvent.ACTION_DOWN -> {
+                pressed = buttons.firstOrNull { it.enabled && hit(it, e.x, e.y) }
+                if (pressed?.id == "spin") { spinHeldSince = now(); audio.play(Sfx.PRESS) }
                 invalidate()
             }
-            MotionEvent.ACTION_CANCEL -> pressed = null
+            MotionEvent.ACTION_MOVE -> pressed?.let { if (!hit(it, e.x, e.y)) { pressed = null; endHold(); invalidate() } }
+            MotionEvent.ACTION_UP -> {
+                val p = pressed; pressed = null
+                val wasHolding = holdMode
+                endHold()
+                if (p != null && hit(p, e.x, e.y)) { if (!(p.id == "spin" && wasHolding)) onButton(p.id) } else onTap()
+                invalidate()
+            }
+            MotionEvent.ACTION_CANCEL -> { pressed = null; endHold() }
         }
         return true
+    }
+
+    private fun endHold() {
+        spinHeldSince = -1.0
+        if (holdMode) { holdMode = false; showMessage("Rapid spins stopped", 1.2) }
+    }
+
+    /** Holding SPIN for half a second starts rapid spins until the finger lifts. */
+    private fun checkHold(t: Double) {
+        if (spinHeldSince > 0 && !holdMode && t - spinHeldSince > 0.5 && pressed?.id == "spin" && autoLeft == 0) {
+            holdMode = true
+            audio.play(Sfx.CLICK)
+            if (!busy) startSpin()
+        }
     }
 
     private fun hit(b: Btn, x: Float, y: Float): Boolean { tmp.set(b.rect); tmp.inset(-6 * u, -6 * u); return tmp.contains(x, y) }
@@ -624,9 +731,8 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         val t = now()
         when (phase) {
             Phase.SPINNING -> slamStop()
-            Phase.BIG_WIN -> rollStart = if (t - rollStart < rollDur) t - rollDur else t - rollDur - 2.0
-            Phase.SHOWCASE -> phaseStart = t - 2.0
-            Phase.PRESENT -> if (t - rollStart < rollDur) rollStart = t - rollDur
+            Phase.BIG_WIN -> if (t - rollStart > rollDur + 1.0) rollStart = t - rollDur - 2.0
+            Phase.SHOWCASE -> if (t - phaseStart > 1.2) phaseStart = t - 2.0
             else -> {}
         }
     }
@@ -673,6 +779,8 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         val dt = if (lastFrame == 0.0) 0.016 else (t - lastFrame).coerceIn(0.0, 0.05)
         lastFrame = t
         if (phase == Phase.SPINNING) updateSpin(t)
+        if (phase == Phase.MINI_ACTION) updateAction(t)
+        checkHold(t)
         updateFlow(t)
         ambient(t)
 
@@ -687,7 +795,9 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         drawTitle(canvas, t)
         drawRelics(canvas, t)
         drawReels(canvas, ch, t)
+        drawMiniEffects(canvas, t)
         drawWins(canvas, t)
+        drawMini(canvas, t)
         drawWinBanner(canvas, t)
         drawFeature(canvas, t)
         drawFog(canvas, t, reelRect.bottom - (fog?.height ?: 0) * 0.75f, -11.0, 90)
@@ -765,19 +875,28 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
     private fun drawBats(c: Canvas, t: Double) {
         val e = t - batsStart
         if (e < 0 || e > 6) return
-        pStroke.color = 0xFF000000.toInt(); pStroke.strokeWidth = 3 * u
-        for (i in 0 until 5) {
-            val bx = (-60 * u + (e / 6 * (width + 120 * u)) - i * 45 * u).toFloat()
-            val by = batsY + (sin(e * 3 + i) * 18 * u).toFloat() + (i % 2) * 22 * u
-            val flap = sin(e * 22 + i * 1.3).toFloat()
-            val s = (12 + (i % 3) * 3) * u
-            path.reset()
-            path.moveTo(bx - s, by - flap * s * 0.8f)
-            path.quadTo(bx - s * 0.5f, by + s * 0.2f, bx, by)
-            path.quadTo(bx + s * 0.5f, by + s * 0.2f, bx + s, by - flap * s * 0.8f)
-            c.drawPath(path, pStroke)
+        for (i in 0 until 6) {
+            val depth = 0.6f + (i % 3) * 0.3f                   // nearer bats are bigger, faster, lower
+            val bx = (-80 * u + (e / 6 * (width + 160 * u)) * depth - i * 50 * u).toFloat()
+            val by = batsY + (sin(e * 3 + i) * 20 * u).toFloat() + (i % 3) * 30 * u
+            val flap = sin(e * 20 + i * 1.3).toFloat()
+            val s = 16 * u * depth
+            for (side in intArrayOf(-1, 1)) {
+                path.reset()
+                path.moveTo(bx, by)
+                path.quadTo(bx + side * s * 0.6f, by - s * (0.2f + flap * 0.7f), bx + side * s * 1.6f, by - flap * s * 0.9f)
+                path.lineTo(bx + side * s * 1.3f, by + s * 0.15f - flap * s * 0.3f)
+                path.lineTo(bx + side * s * 0.95f, by + s * 0.05f)
+                path.lineTo(bx + side * s * 0.6f, by + s * 0.3f)
+                path.close()
+                pFill.shader = LinearGradient(bx, by - s, bx, by + s, 0xFF2A2234.toInt(), 0xFF050308.toInt(), Shader.TileMode.CLAMP)
+                c.drawPath(path, pFill)
+            }
+            pFill.shader = RadialGradient(bx - s * 0.1f, by - s * 0.1f, s * 0.4f, 0xFF3A3046.toInt(), 0xFF000000.toInt(), Shader.TileMode.CLAMP)
+            c.drawOval(bx - s * 0.28f, by - s * 0.3f, bx + s * 0.28f, by + s * 0.35f, pFill)
+            pFill.shader = null
             pFill.color = Neon.RED
-            c.drawCircle(bx, by, 1.4f * u, pFill)
+            c.drawCircle(bx - s * 0.1f, by - s * 0.1f, 1.6f * u * depth, pFill); c.drawCircle(bx + s * 0.1f, by - s * 0.1f, 1.6f * u * depth, pFill)
         }
     }
 
@@ -1025,9 +1144,10 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         if (phase != Phase.PRESENT) return
         val cap = if (idx >= 0) {
             val w = o.lineWins[idx]
-            "LINE ${w.line + 1}  •  ${w.count} × ${ReaperConfig.SYMBOL_NAMES[w.symbol].uppercase()}  •  ${w.mult}× STAKE = ${w.mult * o.stake} TOKENS"
+            "LINE ${w.line + 1}  •  ${w.count} × ${ReaperConfig.SYMBOL_NAMES[w.symbol].uppercase()}  •  ${Money.fmt(w.mult.toLong() * o.stake * o.mini.multiplier)} TOKENS"
         } else when {
             o.capped -> "MAXIMUM WIN — 25 BOOKS"
+            o.coinMult > 0 -> "SOUL COINS  •  ${Money.fmt(o.coinMult.toLong() * o.stake)} TOKENS"
             else -> null
         } ?: return
         pText.typeface = cond; pText.textSize = 24 * u
@@ -1109,7 +1229,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         c.drawText(sub, creditRect.centerX(), creditRect.bottom - creditRect.height() * 0.1f, pText)
 
         val o = outcome
-        meterLabel(c, winRect, "WIN")
+        meterLabel(c, winRect, if ((o?.mini?.multiplier ?: 1) > 1 && phase != Phase.SPINNING) "WIN  ×${o!!.mini.multiplier}" else "WIN")
         val wv = if (phase == Phase.SPINNING) 0L else rollValue(t)
         pText.typeface = serif; pText.color = if (wv > 0) Neon.GREEN else 0xFF3A4A3A.toInt()
         fit(Money.fmt(wv), winRect.width() * 0.9f, winRect.height() * 0.38f)
@@ -1187,25 +1307,34 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
 
     private fun drawSpin(c: Canvas, b: Btn, t: Double) {
         val r = b.rect
-        val cx = r.centerX(); val cy = r.centerY() + if (pressed === b) 3 * u else 0f
+        val down = pressed === b
+        val cx = r.centerX(); val cy = r.centerY() + if (down) 4 * u else 0f
         val rad = r.width() / 2
-        val stop = phase == Phase.SPINNING || autoLeft != 0
+        val stop = phase == Phase.SPINNING || autoLeft != 0 || holdMode
+        val locked = now() < winLockUntil
         val col = if (stop) Neon.RED else Neon.GREEN
         val ready = !busy && autoLeft == 0
-        val glow = if (ready) (0.5 + 0.5 * sin(t * 3.5)).toFloat() else 0.3f
-        pFill.shader = RadialGradient(cx, cy, rad * 1.35f, intArrayOf(col and 0x00FFFFFF or ((90 + 100 * glow).toInt() shl 24), 0x00000000), null, Shader.TileMode.CLAMP)
-        c.drawCircle(cx, cy, rad * 1.35f, pFill)
-        pFill.shader = RadialGradient(cx, cy - rad * 0.3f, rad * 1.2f, intArrayOf(0xFF1C1C1C.toInt(), 0xFF000000.toInt()), null, Shader.TileMode.CLAMP)
-        c.drawCircle(cx, cy, rad, pFill); pFill.shader = null
-        path.reset(); path.addCircle(cx, cy, rad * 0.92f, Path.Direction.CW)
-        Art.neonStroke(c, path, col, 3 * u)
-        // skull emblem behind text
-        pFill.color = col; pFill.alpha = 40
-        c.drawCircle(cx, cy, rad * 0.6f, pFill); pFill.alpha = 255
-        pText.typeface = serif; pText.color = Color.WHITE; pText.textSize = rad * 0.42f
-        pText.setShadowLayer(10 * u, 0f, 0f, col)
-        c.drawText(if (stop) "STOP" else "SPIN", cx, cy - (pText.fontMetrics.ascent + pText.fontMetrics.descent) / 2, pText)
+        val glow = if (ready) (0.5 + 0.5 * sin(t * 3.5)).toFloat() else 0.35f
+        // outer glow + chrome bezel
+        pFill.shader = RadialGradient(cx, cy, rad * 1.3f, intArrayOf(col and 0x00FFFFFF or ((70 + 110 * glow).toInt() shl 24), 0x00000000), floatArrayOf(0.7f, 1f), Shader.TileMode.CLAMP)
+        c.drawCircle(cx, cy, rad * 1.3f, pFill)
+        pFill.shader = LinearGradient(0f, cy - rad, 0f, cy + rad, intArrayOf(0xFFE0E0E0.toInt(), 0xFF5A5A5A.toInt(), 0xFF1A1A1A.toInt(), 0xFF8A8A8A.toInt()), null, Shader.TileMode.CLAMP)
+        c.drawCircle(cx, cy, rad, pFill)
+        // dome: lit sphere cap
+        val dome = if (stop) intArrayOf(0xFFFF8A80.toInt(), Neon.RED, 0xFF4A0010.toInt()) else intArrayOf(0xFFCCFF90.toInt(), 0xFF2E9E0A.toInt(), 0xFF0B2A04.toInt())
+        pFill.shader = RadialGradient(cx - rad * 0.25f, cy - rad * 0.35f, rad * 1.15f, dome, floatArrayOf(0f, 0.45f, 1f), Shader.TileMode.CLAMP)
+        c.drawCircle(cx, cy, rad * (if (down) 0.84f else 0.86f), pFill)
+        // specular highlight
+        pFill.shader = RadialGradient(cx - rad * 0.28f, cy - rad * 0.42f, rad * 0.45f, intArrayOf(0xBBFFFFFF.toInt(), 0x00FFFFFF), null, Shader.TileMode.CLAMP)
+        c.drawOval(cx - rad * 0.65f, cy - rad * 0.8f, cx + rad * 0.15f, cy - rad * 0.1f, pFill)
+        pFill.shader = null
+        pText.typeface = serif; pText.color = Color.WHITE; pText.textSize = rad * 0.36f
+        pText.setShadowLayer(10 * u, 0f, 3 * u, 0xCC000000.toInt())
+        val label = when { holdMode -> "RAPID"; stop -> "STOP"; locked -> "WIN"; else -> "SPIN" }
+        c.drawText(label, cx, cy + rad * 0.02f - (pText.fontMetrics.ascent + pText.fontMetrics.descent) / 2, pText)
         pText.clearShadowLayer()
+        pText.typeface = cond; pText.textSize = rad * 0.12f; pText.color = 0xDDFFFFFF.toInt()
+        c.drawText(if (holdMode) "RELEASE TO STOP" else "HOLD FOR RAPID", cx, cy + rad * 0.5f, pText)
     }
 
     private fun drawMessage(c: Canvas, t: Double) {
@@ -1285,7 +1414,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         pText.clearShadowLayer(); pText.alpha = 255
     }
 
-    /** Big, clear win amount over the reels for every winning spin. */
+    /** Big, clear win amount over the reels for every winning spin: "WIN  8  TOKENS". */
     private fun drawWinBanner(c: Canvas, t: Double) {
         val o = outcome ?: return
         if (phase != Phase.PRESENT || o.payTokens <= 0 || vaultWinShown != 0L) return
@@ -1297,28 +1426,115 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         val outQ = if (e > hold) 1f - (e - hold) / 0.35f else 1f
         val a = (255 * outQ).toInt().coerceIn(0, 255)
         val v = rollValue(t)
-        val x = o.payTokens.toDouble() / o.stake
+        val counting = t - rollStart < rollDur
+        val beat = if (!counting && t - rollStart < rollDur + 0.4) 1f + 0.12f * sin(((t - rollStart - rollDur) / 0.4 * PI)).toFloat() else 1f
         c.save(); c.scale(pop, pop, reelRect.centerX(), reelRect.centerY())
-        val bw = reelRect.width() * 0.62f; val bh = reelRect.height() * 0.5f
+        val bw = reelRect.width() * 0.6f; val bh = reelRect.height() * 0.6f
         tmp.set(reelRect.centerX() - bw / 2, reelRect.centerY() - bh / 2, reelRect.centerX() + bw / 2, reelRect.centerY() + bh / 2)
-        pFill.color = Color.argb((a * 0.86f).toInt(), 0, 0, 0)
-        c.drawRoundRect(tmp, 26 * u, 26 * u, pFill)
-        path.reset(); path.addRoundRect(tmp, 26 * u, 26 * u, Path.Direction.CW)
-        val col = if (x >= 5) Neon.RED else Neon.GREEN
-        pStroke.color = col; pStroke.alpha = a; pStroke.strokeWidth = 4 * u
+        pFill.color = Color.argb((a * 0.88f).toInt(), 0, 0, 0)
+        c.drawRoundRect(tmp, 28 * u, 28 * u, pFill)
+        path.reset(); path.addRoundRect(tmp, 28 * u, 28 * u, Path.Direction.CW)
+        pStroke.color = Neon.GREEN; pStroke.alpha = a; pStroke.strokeWidth = 5 * u
         c.drawPath(path, pStroke)
         pText.typeface = serif; pText.textAlign = Paint.Align.CENTER
-        pText.textSize = bh * 0.2f; pText.color = col; pText.alpha = a
-        c.drawText(if (x >= 5) "BIG WIN!" else "WIN!", tmp.centerX(), tmp.top + bh * 0.26f, pText)
-        pText.textSize = bh * 0.44f; pText.color = Color.WHITE; pText.alpha = a
-        pText.setShadowLayer(18 * u, 0f, 0f, col)
-        c.drawText("+" + Money.fmt(v), tmp.centerX(), tmp.top + bh * 0.68f, pText)
+        pText.textSize = bh * 0.16f; pText.color = Neon.GREEN; pText.alpha = a
+        c.drawText("YOU WIN", tmp.centerX(), tmp.top + bh * 0.2f, pText)
+        c.save(); c.scale(beat, beat, tmp.centerX(), tmp.top + bh * 0.55f)
+        pText.color = Color.WHITE; pText.alpha = a
+        fit(Money.fmt(v), bw * 0.9f, bh * 0.5f)
+        pText.setShadowLayer(22 * u, 0f, 0f, Neon.GREEN)
+        c.drawText(Money.fmt(v), tmp.centerX(), tmp.top + bh * 0.72f, pText)
         pText.clearShadowLayer()
-        pText.typeface = cond; pText.textSize = bh * 0.13f; pText.color = 0xFFCCFF90.toInt(); pText.alpha = a
-        val mult = if (x >= 1) "%.0f× YOUR STAKE".format(x) else "%.1f× YOUR STAKE".format(x)
-        c.drawText("TOKENS  •  $mult", tmp.centerX(), tmp.top + bh * 0.88f, pText)
+        c.restore()
+        pText.typeface = serif; pText.textSize = bh * 0.16f; pText.color = 0xFFCCFF90.toInt(); pText.alpha = a
+        c.drawText(if (v == 1L) "TOKEN" else "TOKENS", tmp.centerX(), tmp.top + bh * 0.93f, pText)
         pText.alpha = 255
         c.restore()
+    }
+
+    /** The mini-feature character floats out in front of the reels; coins/wilds fly from it to the cells. */
+    private fun drawMini(c: Canvas, t: Double) {
+        val bc = bigChars ?: return
+        val ch = chars ?: return
+        val o = outcome ?: return
+        val type = miniType
+        if (type == ReaperConfig.MINI_NONE || type == ReaperConfig.MINI_REAPER || miniStart < 0 || t < miniStart) return
+        val leaving = if (phase == Phase.PRESENT) ((t - presentStart) / 0.6).coerceIn(0.0, 1.0).toFloat() else 0f
+        if (leaving >= 1f || (phase != Phase.SPINNING && phase != Phase.MINI_ACTION && phase != Phase.PRESENT)) return
+        val inQ = ((t - miniStart) / 0.9).coerceIn(0.0, 1.0).toFloat()
+        val ease = inQ * inQ * (3 - 2 * inQ)
+        // flies from the left side to hover above the middle of the reels, growing toward the viewer
+        // front-and-centre while the reels spin, then it lifts up over the top row to do its work
+        val lift = if (phase == Phase.SPINNING) 0f else ((t - (if (phase == Phase.MINI_ACTION) actionStart else presentStart - 10)) / 0.4).coerceIn(0.0, 1.0).toFloat()
+        val hx = reelRect.centerX()
+        val hy = reelRect.centerY() + (reelRect.top + bc.h * 0.12f - reelRect.centerY()) * lift
+        val sx = leftChar.centerX(); val sy = leftChar.centerY()
+        val cx = sx + (hx - sx) * ease + sin(t * 2.2).toFloat() * 12 * u
+        val cy = sy + (hy - sy) * ease + sin(t * 3.1).toFloat() * 8 * u - leaving * height * 0.6f
+        val scale = (0.6f + (1.25f - 0.45f * lift) * ease) * (1f - leaving * 0.4f)
+        val w = bc.w * scale; val h = bc.h * scale
+        // dark aura + shadow on the reels (depth)
+        pFill.color = 0x66000000
+        c.drawOval(cx - w * 0.4f, reelRect.top + 10 * u, cx + w * 0.4f, reelRect.top + 40 * u, pFill)
+        c.save(); c.translate(cx - w / 2, cy - h / 2); c.scale(scale, scale)
+        bc.draw(c, miniSymbol(type), t, 0.4, Characters.EXCITED)
+        c.restore()
+        // title
+        if (phase == Phase.SPINNING || phase == Phase.MINI_ACTION) {
+            pText.typeface = serif; pText.textSize = 46 * u; pText.textAlign = Paint.Align.CENTER
+            val col = when (type) { ReaperConfig.MINI_RAVEN -> Neon.PURPLE; ReaperConfig.MINI_PUMPKIN -> Neon.ORANGE; else -> Neon.GREEN }
+            pText.color = col; pText.alpha = (255 * ease).toInt()
+            pText.setShadowLayer(20 * u, 0f, 0f, col)
+            c.drawText(ReaperConfig.MINI_NAMES[type], reelRect.centerX(), reelRect.bottom - 26 * u, pText)
+            pText.clearShadowLayer(); pText.alpha = 255
+        }
+        // projectiles in flight toward their cells
+        if (phase == Phase.MINI_ACTION) {
+            val cells = actionCells(o)
+            val e = t - actionStart
+            for ((k, cell) in cells.withIndex()) {
+                val t0 = 0.5 + k * actionGap
+                val q = ((e - t0) / 0.3).toFloat()
+                if (q < 0f || q > 1f) continue
+                val tx = reelRect.left + (cell / ROWS + 0.5f) * this.cell; val ty = rowY((cell % ROWS).toDouble())
+                val px0 = cx + (tx - cx) * q; val py0 = cy + (ty - cy) * q - sin(q * PI).toFloat() * 60 * u
+                if (type == ReaperConfig.MINI_PUMPKIN) ch.coin(c, px0, py0, this.cell * 0.18f, "", sin(t * 20).toFloat())
+                else {
+                    pFill.color = Neon.GREEN; pFill.alpha = 90; c.drawCircle(px0, py0, this.cell * 0.2f, pFill)
+                    pFill.alpha = 255; pFill.color = Color.WHITE; c.drawCircle(px0, py0, this.cell * 0.06f, pFill)
+                }
+            }
+        }
+    }
+
+    /** Soul coins sitting on the reels, flashes where wilds/coins landed, and the skull's multiplier stamp. */
+    private fun drawMiniEffects(c: Canvas, t: Double) {
+        val ch = chars ?: return
+        val o = outcome ?: return
+        if (play == null || phase == Phase.SPINNING || phase == Phase.IDLE) return
+        for (cell in 0 until REELS * ROWS) {
+            val x = reelRect.left + (cell / ROWS + 0.5f) * this.cell; val y = rowY((cell % ROWS).toDouble())
+            val fl = (t - cellFlash[cell]).toFloat()
+            if (fl in 0f..0.5f) {
+                pFill.color = Color.argb(((0.5f - fl) / 0.5f * 220).toInt(), 200, 255, 160)
+                c.drawCircle(x, y, this.cell * (0.3f + fl), pFill)
+            }
+            if (coinShown[cell]) {
+                val bounce = if (fl in 0f..0.35f) 1.3f - fl else 1f
+                ch.coin(c, x, y + this.cell * 0.12f, this.cell * 0.27f * bounce, Money.fmt(o.mini.coins[cell].toLong() * o.stake), 1f)
+            }
+        }
+        if (multStampAt > 0) {
+            val e = (t - multStampAt).toFloat()
+            val s = if (e < 0.2f) 2.2f - e / 0.2f * 1.2f else 1f
+            val x = reelRect.centerX(); val y = reelRect.top + reelRect.height() * 0.2f
+            c.save(); c.scale(s, s, x, y)
+            pText.typeface = serif; pText.textSize = 72 * u; pText.color = Neon.RED
+            pText.setShadowLayer(24 * u, 0f, 0f, Neon.RED)
+            if (phase == Phase.MINI_ACTION || e < 2.5f) c.drawText("×${o.mini.multiplier}", x, y + 24 * u, pText)
+            pText.clearShadowLayer()
+            c.restore()
+        }
     }
 
     private fun drawSky(c: Canvas, t: Double) {

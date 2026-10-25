@@ -58,7 +58,7 @@ class Characters(val w: Int, val h: Int, private val plates: Boolean = true) {
     fun recycle() {
         bodies.forEach { it?.recycle() }
         listOf(reaperJaw, skullJaw, ravenBeak, pumpkinEyes, pumpkinMouth, redGlow, greenGlow, orangeGlow).forEach { it?.recycle() }
-        flames.values.forEach { it.recycle() }
+        flames.values.forEach { it.recycle() }; coinBmp?.recycle()
     }
 
     private fun glow(color: Int): Bitmap = Art.bitmap(64) { c, s ->
@@ -99,6 +99,33 @@ class Characters(val w: Int, val h: Int, private val plates: Boolean = true) {
         val sx = size * (1f + 0.08f * flicker); val sy = size * (1f + 0.15f * flicker)
         r.set(cx - sx * 0.6f, base - sy * 2.15f, cx + sx * 0.6f, base + sy * 0.25f)
         c.drawBitmap(bmp, null, r, pb)
+    }
+
+    private var coinBmp: Bitmap? = null
+
+    /** 3D soul coin (gold rim, glowing green face) centred at (cx, cy) with its token value. */
+    fun coin(c: Canvas, cx: Float, cy: Float, radius: Float, label: String, spin: Float = 1f) {
+        val bmp = coinBmp ?: Art.bitmap(128) { cc, sz ->
+            val q = Paint(Paint.ANTI_ALIAS_FLAG); val m = sz / 2
+            q.shader = RadialGradient(m, m, m, intArrayOf(0x8876FF03.toInt(), 0x00000000), floatArrayOf(0.6f, 1f), Shader.TileMode.CLAMP)
+            cc.drawCircle(m, m, m, q)
+            q.shader = LinearGradient(0f, m * 0.3f, 0f, m * 1.7f, intArrayOf(0xFFFFF59D.toInt(), 0xFFFFB300.toInt(), 0xFF6D4C00.toInt()), null, Shader.TileMode.CLAMP)
+            cc.drawCircle(m, m, m * 0.74f, q)
+            q.shader = RadialGradient(m * 0.8f, m * 0.75f, m * 0.7f, intArrayOf(0xFFB9F6CA.toInt(), 0xFF2E7D32.toInt(), 0xFF0B2A0B.toInt()), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
+            cc.drawCircle(m, m, m * 0.6f, q)
+            q.shader = RadialGradient(m * 0.7f, m * 0.6f, m * 0.25f, intArrayOf(0xCCFFFFFF.toInt(), 0x00FFFFFF), null, Shader.TileMode.CLAMP)
+            cc.drawCircle(m * 0.7f, m * 0.6f, m * 0.25f, q)
+        }.also { coinBmp = it }
+        val sx = radius * abs(spin).coerceAtLeast(0.12f)
+        r.set(cx - sx * 1.35f, cy - radius * 1.35f, cx + sx * 1.35f, cy + radius * 1.35f)
+        c.drawBitmap(bmp, null, r, pb)
+        if (abs(spin) > 0.6f) {
+            p.color = Color.WHITE; p.alpha = pb.alpha; p.textAlign = Paint.Align.CENTER; p.typeface = serif
+            p.textSize = radius * (if (label.length > 3) 0.62f else 0.8f)
+            p.setShadowLayer(radius * 0.15f, 0f, 0f, Color.BLACK)
+            c.drawText(label, cx, cy - (p.fontMetrics.ascent + p.fontMetrics.descent) / 2, p)
+            p.clearShadowLayer()
+        }
     }
 
     private fun blinking(t: Double, phase: Double): Boolean = ((t * 0.23 + phase * 7.3) % 1.0) < 0.035

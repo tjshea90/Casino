@@ -37,7 +37,7 @@ import kotlin.math.sin
 class VaultView(context: Context, private val audio: Audio, private val result: VaultResult,
                 private val onFinished: (Long) -> Unit) : View(context) {
 
-    private enum class Kind { RESPIN_START, LAND, COUNT, TALLY, GRAND, SUMMARY }
+    private enum class Kind { RESPIN_START, LAND, COLSTOP, COUNT, TALLY, GRAND, SUMMARY }
     private class Ev(val time: Double, val kind: Kind, val cell: Int = -1, val orb: Orb? = null,
                      val collected: IntArray? = null, val value: Int = 0, val step: Int = -1)
 
@@ -104,37 +104,55 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
 
     private fun now() = SystemClock.uptimeMillis() / 1000.0
 
+    /** Initial orbs drop in automatically; every respin after that waits for the SPIN button. */
     private fun buildTimeline() {
         var t = 0.6
         for (l in result.initial) { events += Ev(t, Kind.LAND, l.cell, l.orb, null); t += 0.28 }
-        t += 0.6
-        for ((si, step) in result.steps.withIndex()) {
-            events += Ev(t, Kind.RESPIN_START, step = si)
-            val reveal = t + 0.9
-            var extra = 0.0
-            val byCol = step.landings.groupBy { it.cell % VAULT_COLS }
-            for (col in 0 until VAULT_COLS) {
-                val ct = reveal + col * 0.17 + extra
-                for (l in byCol[col].orEmpty().sortedBy { it.cell }) {
-                    events += Ev(ct, Kind.LAND, l.cell, l.orb, l.collected, step = si)
-                    if (l.orb.kind == Orb.REAPER) extra += 1.3
-                    else if (l.orb.kind != Orb.SOUL) extra += 0.7
-                }
+    }
+
+    private var nextStep = 0
+    private val spinBtn = RectF()
+    internal val spinButton: RectF get() = spinBtn
+    internal val awaitingSpin: Boolean get() = waitingForSpin
+    private var spinPressedAt = -10.0
+
+    /** True when the game is waiting for the player to press SPIN. */
+    private val waitingForSpin get() = started && evIndex >= events.size && nextStep < result.steps.size && summaryAt < 0
+
+    /** Queues the events for the next respin, starting now. */
+    private fun startRespin() {
+        val si = nextStep++
+        val step = result.steps[si]
+        val chunk = ArrayList<Ev>()
+        var t = vt + 0.05
+        chunk += Ev(t, Kind.RESPIN_START, step = si)
+        val reveal = t + 0.9
+        var extra = 0.0
+        val byCol = step.landings.groupBy { it.cell % VAULT_COLS }
+        for (col in 0 until VAULT_COLS) {
+            val ct = reveal + col * 0.17 + extra
+            chunk += Ev(ct - 0.001, Kind.COLSTOP, value = col)
+            for (l in byCol[col].orEmpty().sortedBy { it.cell }) {
+                chunk += Ev(ct, Kind.LAND, l.cell, l.orb, l.collected, step = si)
+                if (l.orb.kind == Orb.REAPER) extra += 1.3
+                else if (l.orb.kind != Orb.SOUL) extra += 0.7
             }
-            t = reveal + VAULT_COLS * 0.17 + extra + 0.25
-            events += Ev(t, Kind.COUNT, value = step.respinsAfter, step = si)
-            t += if (step.landings.isNotEmpty()) 0.7 else 0.45
         }
-        t += 0.6
-        // tally in reading order
-        for (c in 0 until SoulVault.CELLS) {
-            val o = result.cells[c] ?: continue
-            events += Ev(t, Kind.TALLY, c)
-            t += if (o.kind == Orb.SOUL) 0.16 else 0.5
+        t = reveal + VAULT_COLS * 0.17 + extra + 0.25
+        chunk += Ev(t, Kind.COUNT, value = step.respinsAfter, step = si)
+        if (nextStep >= result.steps.size) {
+            // last respin: tally the vault and show the summary
+            t += 1.0
+            for (c in 0 until SoulVault.CELLS) {
+                val o = result.cells[c] ?: continue
+                chunk += Ev(t, Kind.TALLY, c)
+                t += if (o.kind == Orb.SOUL) 0.16 else 0.5
+            }
+            if (result.grand) { t += 0.4; chunk += Ev(t, Kind.GRAND); t += 3.0 }
+            chunk += Ev(t + 0.6, Kind.SUMMARY)
         }
-        if (result.grand) { t += 0.4; events += Ev(t, Kind.GRAND); t += 3.0 }
-        events += Ev(t + 0.6, Kind.SUMMARY)
-        events.sortBy { it.time }
+        chunk.sortBy { it.time }
+        events += chunk
     }
 
     // ================================================================== layout
@@ -155,6 +173,8 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         respinRect.set(x0, H * 0.865f, x0 + 300 * u, H * 0.975f)
         totalRect.set(respinRect.right + 16 * u, H * 0.865f, respinRect.right + 416 * u, H * 0.975f)
         betRect.set(totalRect.right + 16 * u, H * 0.865f, totalRect.right + 176 * u, H * 0.975f)
+        val sr = min(gridRect.left * 0.42f, 120 * u)
+        spinBtn.set(W - gridRect.left / 2 - sr, H * 0.62f - sr, W - gridRect.left / 2 + sr, H * 0.62f + sr)
         bg?.recycle()
         bg = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888).also { paintCrypt(Canvas(it), W, H) }
         orbBmp?.forEach { it.recycle() }
@@ -221,6 +241,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
                     for (c in 0 until SoulVault.CELLS) revealAt[c] = if (cells[c] == null) e.time + 0.9 + (c % VAULT_COLS) * 0.17 else -1.0
                     audio.play(Sfx.SPIN, 0.4f, 0.8f)
                 }
+                Kind.COLSTOP -> audio.play(Sfx.STOP, 0.55f, 1.1f)
                 Kind.LAND -> {
                     val o = e.orb!!
                     cells[e.cell] = o
@@ -267,14 +288,20 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
     // ================================================================== input
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(e: MotionEvent): Boolean {
+        if (e.actionMasked == MotionEvent.ACTION_DOWN && waitingForSpin && hitSpin(e.x, e.y)) {
+            spinPressedAt = now(); audio.play(Sfx.PRESS); invalidate()
+        }
         if (e.actionMasked != MotionEvent.ACTION_UP) return true
-        audio.play(Sfx.CLICK, 0.5f)
         when {
-            !started -> { started = true; startReal = now(); lastReal = startReal }
+            !started -> { audio.play(Sfx.CLICK, 0.5f); started = true; startReal = now(); lastReal = startReal }
             summaryAt >= 0 && outroAt < 0 -> if (vt - summaryAt > 0.8) outroAt = now()
-            else -> speed = if (speed > 1.0) 1.0 else 3.0
+            waitingForSpin && hitSpin(e.x, e.y) -> { audio.play(Sfx.SPIN, 0.8f); startRespin() }
         }
         return true
+    }
+
+    private fun hitSpin(x: Float, y: Float): Boolean {
+        tmp.set(spinBtn); tmp.inset(-20 * u, -20 * u); return tmp.contains(x, y)
     }
 
     // ================================================================== draw
@@ -291,6 +318,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         drawGrid(c, real)
         drawBeams(c)
         drawTotal(c)
+        drawSpinButton(c, real)
         if (vt - jackpotFlash < 1.4) drawJackpotFlash(c)
         if (grandAt >= 0 && vt - grandAt < 3.0) drawGrand(c)
         if (!started) drawIntro(c, real)
@@ -307,6 +335,32 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
     }
 
     private var introStart = 0.0
+
+    private fun drawSpinButton(c: Canvas, t: Double) {
+        if (!started || summaryAt >= 0) return
+        val ready = waitingForSpin
+        val down = t - spinPressedAt < 0.15
+        val cx = spinBtn.centerX(); val cy = spinBtn.centerY() + if (down) 4 * u else 0f
+        val rad = spinBtn.width() / 2
+        val col = if (ready) Neon.GREEN else 0xFF2A3A2A.toInt()
+        val glow = if (ready) (0.5 + 0.5 * sin(t * 4)).toFloat() else 0f
+        pFill.shader = RadialGradient(cx, cy, rad * 1.35f, intArrayOf(col and 0x00FFFFFF or ((60 + 120 * glow).toInt() shl 24), 0x00000000), floatArrayOf(0.65f, 1f), Shader.TileMode.CLAMP)
+        c.drawCircle(cx, cy, rad * 1.35f, pFill)
+        pFill.shader = LinearGradient(0f, cy - rad, 0f, cy + rad, intArrayOf(0xFFE0E0E0.toInt(), 0xFF4A4A4A.toInt(), 0xFF151515.toInt()), null, Shader.TileMode.CLAMP)
+        c.drawCircle(cx, cy, rad, pFill)
+        val dome = if (ready) intArrayOf(0xFFCCFF90.toInt(), 0xFF2E9E0A.toInt(), 0xFF0B2A04.toInt()) else intArrayOf(0xFF4A5A4A.toInt(), 0xFF1A221A.toInt(), 0xFF050805.toInt())
+        pFill.shader = RadialGradient(cx - rad * 0.25f, cy - rad * 0.35f, rad * 1.15f, dome, floatArrayOf(0f, 0.45f, 1f), Shader.TileMode.CLAMP)
+        c.drawCircle(cx, cy, rad * 0.85f, pFill)
+        pFill.shader = RadialGradient(cx - rad * 0.28f, cy - rad * 0.42f, rad * 0.45f, intArrayOf(0x99FFFFFF.toInt(), 0x00FFFFFF), null, Shader.TileMode.CLAMP)
+        c.drawOval(cx - rad * 0.65f, cy - rad * 0.8f, cx + rad * 0.15f, cy - rad * 0.1f, pFill)
+        pFill.shader = null
+        pText.typeface = serif; pText.color = if (ready) Color.WHITE else 0xFF777777.toInt(); pText.textSize = rad * 0.38f
+        c.drawText("SPIN", cx, cy - (pText.fontMetrics.ascent + pText.fontMetrics.descent) / 2, pText)
+        if (ready) {
+            pText.typeface = cond; pText.textSize = 24 * u; pText.color = if ((t * 2).toInt() % 2 == 0) Neon.GREEN else 0xFFCCFF90.toInt()
+            c.drawText("TAP SPIN TO RESPIN", cx, spinBtn.bottom + 40 * u, pText)
+        }
+    }
 
     private fun drawTorches(c: Canvas, t: Double) {
         val m = gridRect.left
@@ -365,7 +419,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         pText.typeface = cond; pText.textSize = r.height() * 0.22f; pText.color = 0xFFE1A6FF.toInt()
         c.drawText("BONUS BET", tmp.centerX(), tmp.top + r.height() * 0.36f, pText)
         pText.typeface = serif; pText.textSize = r.height() * 0.36f; pText.color = Color.WHITE
-        c.drawText(if (speed > 1.0 && summaryAt < 0) "${result.bet} ▸▸" else "${result.bet}", tmp.centerX(), tmp.bottom - r.height() * 0.16f, pText)
+        c.drawText("${result.bet}", tmp.centerX(), tmp.bottom - r.height() * 0.16f, pText)
     }
 
     private fun cellRect(i: Int, out: RectF) {
@@ -489,7 +543,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         pText.clearShadowLayer(); c.restore()
         pText.typeface = cond; pText.textSize = height * 0.042f; pText.color = Color.WHITE
         val lines = arrayOf(
-            "Soul orbs stick in the vault. Every new orb resets your respins to 3.",
+            "Press SPIN for each respin. Soul orbs stick, and every new orb resets your respins to 3.",
             "Jackpot orbs: MINI ${ReaperConfig.MINI}×  •  MINOR ${ReaperConfig.MINOR}×  •  MAJOR ${ReaperConfig.MAJOR}×  •  fill all 20 for the GRAND (${ReaperConfig.GRAND}×)",
             "The Reaper orb harvests every soul on the board.",
             "Bonus bet: ${result.bet} tokens (your average stake while collecting relics)")
@@ -517,7 +571,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         val note = when {
             result.capped -> "Harvest of ${Money.fmt(result.rawTokens)} tokens capped at the 25-book maximum win"
             result.rawTokens != result.payTokens -> "${Money.fmt(result.rawTokens)} tokens rounded down to whole macks"
-            else -> "${result.totalMult}× your bonus bet of ${result.bet}"
+            else -> "Bonus bet: ${result.bet} tokens"
         }
         c.drawText(note, width / 2f, height * 0.65f, pText)
         c.drawText("Added to your credit", width / 2f, height * 0.7f, pText)
