@@ -157,3 +157,23 @@ Work queue v1.2:
      from the Characters bitmaps with per-pixel lighting/specular, perspective camera (sway, zoom on big wins, shake),
      GPU particles, bloom-style glow, 3D environment; characters as lit billboards in depth. Do AFTER v1.2 ships.
 8. (mid-turn) Win pop-up must be a huge clear "8 TOKENS" — no "× your stake" text anywhere.
+
+## NEON REAPER v2.0 (session 5) — OpenGL 3D engine (user: "Build the 3d engine with opengl. Polished graphics,
+## individual scary Halloween characters")
+Architecture (package `com.tjshea.neonreaper.gl`):
+- `Gl` interface (subset of GLES 3.0) → `AndroidGl` (GLES30) on device, `LwjglGl` (LWJGL + Mesa EGL surfaceless) in
+  JVM tests so 3D scenes can be rendered to PNG here (apt: libegl1 libegl-mesa0 libgles2 libgbm1; env EGL_PLATFORM=surfaceless).
+- `Mat4` math, `Mesh`/`MeshBuilder` (procedural lathe/sphere/box/drum-face/wings...), `Shaders` (lit PBR-lite with
+  procedural surfaces for pumpkin face/skull sockets/ghost face, sky with clouds+stars+moon, fog, particles, glow).
+- `Scene3D` renders `SceneState` (snapshot filled by ReaperView each frame). `Layout3D` = shared camera/reel math so
+  the 2D HUD (ReaperView, now transparent) can place win lines/boxes/text over 3D cells.
+- `GameGLView` (GLSurfaceView) sits behind the HUD. 2D drawing stays as fallback when GL is unavailable.
+Characters (3D procedural meshes): Grim Reaper, Hooded Watcher, Jack-o'-lantern, Skull, Ghost, Raven, Bats; reel
+character symbols are live 3D models standing on the drum faces; royals are textured faces from the Canvas atlas.
+
+Work queue v2.0:
+- [ ] A. Gl/AndroidGl/LwjglGl, Mat4, Mesh, Shaders, minimal render test (sky + sphere) PNG
+- [ ] B. Layout3D + 3D reel drums + atlas + cabinet frame
+- [ ] C. Environment: sky/moon/clouds, ground, tombstones, trees, fog, fireflies, lightning, camera
+- [ ] D. 3D characters + animation (jaw, eyes, flicker, flap), side characters, mini fly-ins, big-win reaper, coins
+- [ ] E. HUD integration (transparent ReaperView, projection for lines), GameGLView, fallback, tests, release v2.0.0
