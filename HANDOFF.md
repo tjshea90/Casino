@@ -151,3 +151,8 @@ Work queue v1.2:
 - [ ] vault: spin button per respin, new epic music
 - [ ] audio: fanfare/count-end/coin-drop/spin-press SFX, new vault music
 - [ ] release v1.2.0
+7. (mid-turn) "Make the graphics more 3D and animated like a video game with a good graphics engine."
+   → Plan v2.0: OpenGL ES 3 renderer (GLSurfaceView) behind a transparent HUD View: real 3D reel cylinders textured
+     from the Characters bitmaps with per-pixel lighting/specular, perspective camera (sway, zoom on big wins, shake),
+     GPU particles, bloom-style glow, 3D environment; characters as lit billboards in depth. Do AFTER v1.2 ships.
+8. (mid-turn) Win pop-up must be a huge clear "8 TOKENS" — no "× your stake" text anywhere.
