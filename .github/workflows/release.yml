@@ -8,6 +8,7 @@ on:
   push:
     paths:
       - "release/*.apk"
+      - ".github/workflows/release.yml"
   workflow_dispatch:
 
 permissions:
@@ -18,6 +19,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # Phone browsers often hang at 100 % on .apk downloads (security scan); a .zip downloads normally.
+      - name: Zip copies
+        run: |
+          cd release
+          zip -j NeonReaper.zip NeonReaper.apk
+          zip -j DragonsHoard.zip DragonsHoard.apk
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
@@ -30,9 +37,16 @@ jobs:
             - **NeonReaper.apk** — Neon Reaper
             - **DragonsHoard.apk** — Dragon's Hoard
 
+            If the .apk download sticks at 100 %, use the .zip instead: open it in the Files app,
+            extract, then tap the .apk inside to install.
+            https://github.com/tjshea90/Casino/releases/latest/download/NeonReaper.zip
+            https://github.com/tjshea90/Casino/releases/latest/download/DragonsHoard.zip
+
             Permanent links to the newest build:
             https://github.com/tjshea90/Casino/releases/latest/download/NeonReaper.apk
             https://github.com/tjshea90/Casino/releases/latest/download/DragonsHoard.apk
           files: |
             release/NeonReaper.apk
             release/DragonsHoard.apk
+            release/NeonReaper.zip
+            release/DragonsHoard.zip

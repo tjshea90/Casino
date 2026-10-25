@@ -3,6 +3,7 @@
 **Download the newest builds (open in your browser):**
 - Neon Reaper: https://github.com/tjshea90/Casino/releases/latest/download/NeonReaper.apk
 - Dragon's Hoard: https://github.com/tjshea90/Casino/releases/latest/download/DragonsHoard.apk
+- If an .apk download sticks at 100 %, use the zip: [NeonReaper.zip](https://github.com/tjshea90/Casino/releases/latest/download/NeonReaper.zip) · [DragonsHoard.zip](https://github.com/tjshea90/Casino/releases/latest/download/DragonsHoard.zip) (extract in the Files app, tap the .apk)
 - All builds: https://github.com/tjshea90/Casino/releases
 
 | Game | APK | Theme |

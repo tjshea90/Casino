@@ -189,3 +189,4 @@ v2.0 testing notes:
 - MainActivity.attach3d(): GLSurfaceView at index 0 behind ReaperView; paused during Soul Vault (setActive(false)).
 - Ideas for next round: Soul Vault in 3D; per-device quality toggle in settings; LOD for fingers/teeth.
 
+- Downloads: phone browsers hang at 100 % on .apk; release.yml also publishes NeonReaper.zip / DragonsHoard.zip.
