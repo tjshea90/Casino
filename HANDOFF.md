@@ -132,3 +132,22 @@ Work queue v1.1:
 - [x] 3D art (ui/Art3D.kt `Characters`): drum reels, animated characters, win banner, idle character events + voices
 - [x] screenshots, release build v1.1.0 (versionCode 2) → release/NeonReaper.apk; release workflow publishes it
 - Note: CI build.yml was failing at android-actions/setup-android; fixed by using the runner's preinstalled SDK.
+
+## NEON REAPER v1.2 (session 4) — user feedback round
+User asked for:
+1. Confirm house keeps 13 % over time (answer: 13 % of every token WAGERED; explain vs deposits).
+2. Relics rare enough that bonuses don't make the machine lose money (bonus is inside the 87 %; verify with long sims).
+3. Soul Vault: special music + a SPIN button for each respin (press sound + spin sounds) instead of auto respins.
+4. Wins can't be skipped instantly: brief pause showing the amount; count-up (suspenseful, not slow) for non-small wins;
+   positive win SFX, more exciting for bigger wins.
+5. More 3D graphics/characters + rare MINI FEATURES: a 3D character floats to the front with a sound and alters the reels
+   for that spin (raven drops wilds, pumpkin spits soul coins with cash values, skull multiplies wins, reaper wild reels).
+6. (mid-turn) SPIN button much larger; HOLD spin = rapid auto spins until released.
+Plan: rebudget RTP (base ↓, bonus a bit rarer, features ↑), per-stake calibration of total feature rate.
+
+Work queue v1.2:
+- [ ] engine: mini features (RAVEN wilds, PUMPKIN coins, SKULL multiplier, REAPER wild reels), rebudget + calibrate, tests
+- [ ] base view: feature fly-in animations, coins on reels, multiplier, win lock + count-up + tiered SFX, big hold-to-spin button
+- [ ] vault: spin button per respin, new epic music
+- [ ] audio: fanfare/count-end/coin-drop/spin-press SFX, new vault music
+- [ ] release v1.2.0
