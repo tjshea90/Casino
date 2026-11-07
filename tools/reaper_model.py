@@ -51,18 +51,18 @@ STAKES = [1, 2, 3, 4, 5, 8, 10, 15, 20, 25, 30, 40]
 CFG = SimpleNamespace(
     pays=[(6, 20, 100), (3, 10, 40), (3, 6, 25), (2, 5, 15), (2, 4, 10), (2, 3, 8),
           (1, 2, 6), (1, 2, 5), (1, 2, 4), (1, 2, 4), (1, 2, 3)],          # x stake for 3/4/5 of a kind
-    counts=[1, 3, 3, 4, 5, 5, 7, 7, 8, 8, 9],                              # symbols per reel strip (same on all 5 reels)
+    counts=[1, 3, 3, 5, 5, 5, 6, 6, 8, 9, 12],                             # symbols per reel strip (same on all 5 reels)
     mini_weights=[0.25, 0.30, 0.30, 0.15],                                 # reaper, raven, pumpkin, skull
     reaper_patterns=[[1], [2], [3], [1, 3], [1, 2, 3]], reaper_weights=[0.45, 0.25, 0.15, 0.08, 0.07],
     raven_wilds=[3, 4, 5, 6], raven_weights=[0.5, 0.3, 0.15, 0.05],
     coin_counts=[3, 4, 5, 6], coin_count_weights=[0.45, 0.3, 0.17, 0.08],
     coin_values=[1, 2, 3, 5, 10, 20, 50], coin_weights=[30, 25, 18, 13, 9, 4, 1],
     skull_mults=[2, 3, 5], skull_mult_weights=[0.6, 0.3, 0.1], skull_wilds=2,
-    relic_count=5, relic_chance=5 / 140,
+    relic_count=5, relic_chance=5 / 125,                                  # a bonus about every 125 spins
     vault_cols=5, vault_rows=4, vault_start=5, vault_respins=3, vault_orb_chance=0.03,
     orb_values=[1, 2, 3, 4, 5, 8, 10, 15, 25], orb_weights=[36, 24, 14, 9, 6, 5, 3, 2, 1],
     p_major=0.003, p_minor=0.012, p_mini=0.03, p_reaper=0.02, v_mini=15, v_minor=40, v_major=150, grand=1000,
-    target=0.87,
+    target=0.94,
 )
 
 
@@ -386,19 +386,32 @@ def capped_mean(x, stake, cap=CAP_TOKENS):
 
 # ----------------------------------------------------------------------------------------------
 def report(cfg=CFG, n_base=8_000_000, n_mini=2_000_000, n_vault=4_000_000, seed=1, stakes=STAKES, quiet=False):
+    """Exact budget + per-stake RTP.
+
+    Design rule (strategy-proofness): the mini-feature rate f is the SAME at every stake and is solved at the
+    cap-free stake (stakes[0]) so that RTP(stake 1) = target exactly.  The 25-book cap then only ever *lowers*
+    RTP at high stakes, so no staking pattern can push RTP above the target (see strategy_rtp).  The per-stake
+    f that would force exactly `target` everywhere is printed for reference -- and is NOT used, because it
+    over-compensates the cap and can be exploited by mixing stakes."""
     rng = np.random.default_rng(seed)
     ex = exact_means(cfg)
     trig = cfg.relic_chance / cfg.relic_count
     xb = sample_base(cfg, n_base, rng)
     xm = sample_mini(cfg, n_mini, rng)
     xv = sample_vault(cfg, n_vault, rng)
-    rows = []
+    per = []
     for s in stakes:
         rb = ex['base'] - np.maximum(xb - CAP_TOKENS / s, 0).mean()
         rm = ex['mini'] - np.maximum(xm - CAP_TOKENS / s, 0).mean()
         rv = ex['vault'] - np.maximum(xv - CAP_TOKENS / s, 0).mean()
-        f = (cfg.target - trig * rv - rb) / (rm - rb)
-        rows.append(dict(stake=s, base=rb, mini=rm, vault=rv, f=f, rtp=(1 - f) * rb + f * rm + trig * rv))
+        per.append((s, rb, rm, rv))
+    # uniform f from the cap-free stake: exact means (no simulation needed there)
+    f = (cfg.target - trig * ex['vault'] - ex['base']) / (ex['mini'] - ex['base'])
+    rows = []
+    for s, rb, rm, rv in per:
+        f_force = (cfg.target - trig * rv - rb) / (rm - rb)
+        rows.append(dict(stake=s, base=rb, mini=rm, vault=rv, f_force=f_force,
+                         rtp=(1 - f) * rb + f * rm + trig * rv, A=(1 - f) * rb + f * rm))
     hit_base = (xb > 0).mean()
     if not quiet:
         print("EXACT mean multipliers (x stake, uncapped):")
@@ -408,16 +421,19 @@ def report(cfg=CFG, n_base=8_000_000, n_mini=2_000_000, n_vault=4_000_000, seed=
         vd = ex['vault_detail']
         print("  Soul Vault         %.3f  (soul orbs %.2f + jackpot orbs %.2f + GRAND %.2f; P(full board)=1/%.0f; MC mean %.3f)"
               % (ex['vault'], vd['soul'], vd['jackpots'], vd['grand'], 1 / vd['p_full'] if vd['p_full'] else 0, xv.mean()))
-        print("  relics: bonus every %.0f spins (p_relic %.4f)" % (1 / trig, cfg.relic_chance))
+        print("  relics: bonus every %.0f spins (p_relic %.4f); mini feature f = %.5f (1 in %.1f)" % (1 / trig, cfg.relic_chance, f, 1 / f))
+        print("  RTP BUDGET at stake 1: base %.2f%% + mini features %.2f%% + Soul Vault %.2f%% = %.3f%%"
+              % (100 * (1 - f) * ex['base'], 100 * f * ex['mini'], 100 * trig * ex['vault'],
+                 100 * ((1 - f) * ex['base'] + f * ex['mini'] + trig * ex['vault'])))
         print("  base-game hit rate (any win, all >= stake): %.4f  (1 in %.2f)" % (hit_base, 1 / hit_base))
         print("  MC check of exact means: base %.4f vs %.4f | mini %.3f vs %.3f | vault %.3f vs %.3f"
               % (xb.mean(), ex['base'], xm.mean(), ex['mini'], xv.mean(), ex['vault']))
-        print("\nstake | base RTP  mini mult  vault mult | f (1 in)   | RTP at f")
+        print("\nstake | base mult  mini mult  vault mult | RTP at uniform f | (f that would force exact target: not used)")
         for r in rows:
-            print("%5d | %.4f   %8.3f   %9.3f | %.5f (%4.0f) | %.5f" %
-                  (r['stake'], r['base'], r['mini'], r['vault'], r['f'], 1 / r['f'] if r['f'] > 0 else 0, r['rtp']))
-        print("FEATURE_RATE = [" + ", ".join("%.4f" % r['f'] for r in rows) + "]")
-    return ex, rows, dict(hit_base=hit_base, xb=xb, xm=xm, xv=xv)
+            print("%5d | %.4f   %8.3f   %9.3f |     %.4f        | %.5f" %
+                  (r['stake'], r['base'], r['mini'], r['vault'], r['rtp'], r['f_force']))
+        print("FEATURE_RATE = %.4f" % f)
+    return ex, rows, dict(hit_base=hit_base, xb=xb, xm=xm, xv=xv, f=f)
 
 
 if __name__ == "__main__":
@@ -430,3 +446,43 @@ if __name__ == "__main__":
         print(ex['vault_detail'])
     else:
         report()
+
+
+# ----------------------------------------------------------------------------------------------
+# Strategy-proofness: can a player beat the advertised RTP by choosing stakes cleverly?
+# The vault pays on the AVERAGE stake of the relic-collecting window, so mixing stakes could
+# matter.  `strategy_rtp` computes the expected RTP of a staking pattern exactly (expectation
+# over the random cycle length via simulation of cycle lengths only; vault/base values are exact
+# per-bet tables), for a given bonus-bet rule and feature-rate table.
+# ----------------------------------------------------------------------------------------------
+def vault_bet_table(cfg, xv, max_bet=40):
+    """R_v(b)*b = E[min(V*b, cap)] for b = 0..max_bet (index = bet)."""
+    t = np.zeros(max_bet + 1)
+    for b in range(1, max_bet + 1):
+        t[b] = np.minimum(xv * b, CAP_TOKENS).mean()
+    return t
+
+
+def strategy_rtp(cfg, ex, rows_by_stake, vtab, s_lo, s_hi, pi=0.0, rule="round", phase=False, n_cycles=400_000, seed=3):
+    """Expected RTP when the player bets s_hi with probability pi per spin (or, if phase=True, bets s_hi only
+    once 4 relics are collected) and s_lo otherwise.  rows_by_stake: {stake: dict(A=non-vault RTP part)}"""
+    rng = np.random.default_rng(seed)
+    p = cfg.relic_chance
+    if phase:
+        n_first = rng.negative_binomial(cfg.relic_count - 1, p, n_cycles) + (cfg.relic_count - 1)   # spins to get 4 relics
+        n_last = rng.geometric(p, n_cycles)                                                      # spins for the 5th
+        n_lo, n_hi = n_first, n_last
+    else:
+        n = rng.negative_binomial(cfg.relic_count, p, n_cycles) + cfg.relic_count
+        n_hi = rng.binomial(n, pi)
+        n_lo = n - n_hi
+    wager = s_lo * n_lo + s_hi * n_hi
+    avg = wager / (n_lo + n_hi)
+    if rule == "round":                      # the OLD rule (Kotlin roundToInt: ties up) -- kept to show the exploit
+        bet = np.floor(avg + 0.5)
+    else:                                    # the NEW rule: floor, so the bet never exceeds the average actually wagered
+        bet = np.floor(avg + 1e-9)
+    bet = np.clip(bet, 1, 40).astype(int)
+    vault_pay = vtab[bet]
+    nonvault = n_lo * s_lo * rows_by_stake[s_lo]['A'] + n_hi * s_hi * rows_by_stake[s_hi]['A']
+    return (nonvault.sum() + vault_pay.sum()) / wager.sum()

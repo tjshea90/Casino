@@ -42,7 +42,13 @@ Work queue (tick as you go):
 - [ ] docs/MATH.md, README, CLAUDE.md numbers (94 %), CI test list
 - [ ] Full test run both modules, independent review of the math, APK build + release (SHIP=1) — ask/announce before publishing
 
-Status line: Dragon's Hoard DONE at 94 % (tests green). `tools/reaper_model.py` written (untested) — next: run it, design Neon Reaper's 94 % budget.
+Status line: Dragon's Hoard DONE at 94 % (tests green). Neon Reaper DESIGN FINAL (in tools/reaper_model.py, validated vs old Kotlin
+calibration): reels [1,3,3,5,5,5,6,6,8,9,12], relic chance 5/125 (bonus ~every 125 spins), ONE stake-independent mini-feature rate
+0.00992, bonus bet = FLOOR(average stake), vault + minis unchanged. Exact budget at stake 1: base 59.34 % + minis 11.98 % + vault 22.68 %
+= 94.000 %; base hit 32.8 % (1 in 3.05). The 25-book cap only lowers RTP at high stakes (stake 10 93.94, 25 92.76, 40 90.95).
+WHY uniform rate + floor: the OLD rule (roundToInt average stake + per-stake rate) is EXPLOITABLE by mixing stakes — at 94 % the worst
+mix (30 % stake 1 / 70 % stake 2) pays 98.0 % RTP; with floor + uniform rate the worst strategy found is 93.9 %.
+NEXT: Kotlin for :reaper (ReaperConfig, ReaperEngine.bonusBet, Wallet.averageStake, Dialogs text, tests RtpExactTest/CalibrationTest/FullGameTest).
 
 ---
 # HANDOFF — Casino repo (two apps)
