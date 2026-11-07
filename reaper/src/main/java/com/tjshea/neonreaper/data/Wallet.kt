@@ -11,7 +11,6 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.security.SecureRandom
-import kotlin.math.roundToInt
 
 class LedgerEntry(val time: Long, val type: String, val tokens: Long, val balanceAfter: Long)
 
@@ -71,10 +70,9 @@ class Wallet(private val context: Context) {
     val hasPassword: Boolean get() = pwHash != null
     val stake: Int get() = ReaperConfig.STAKES[stakeIndex.coerceIn(0, ReaperConfig.STAKES.size - 1)]
 
-    /** Bonus bet the Soul Vault would use right now: average stake while collecting relics. */
+    /** Bonus bet the Soul Vault would use right now: average stake while collecting relics, rounded down. */
     val averageStake: Int
-        get() = if (collectSpins == 0L) stake
-        else (collectWagered.toDouble() / collectSpins).roundToInt().coerceIn(1, ReaperConfig.STAKES.last())
+        get() = ReaperEngine.bonusBet(collectWagered, collectSpins, stake)
 
     @Synchronized
     fun load(): LoadStatus {

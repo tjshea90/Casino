@@ -48,6 +48,17 @@ object ReaperEngine {
     /** In-game wins are exact tokens (no rounding); only the 25-book cap applies. */
     fun settle(rawTokens: Long): Long = rawTokens.coerceIn(0, ReaperConfig.MAX_WIN_TOKENS)
 
+    /**
+     * Soul Vault bonus bet: the average stake over the spins spent collecting the relics, rounded DOWN.
+     * Never round up: with round-half-up a player alternating stakes 1 and 2 (average 1.5) was paid as if
+     * they had staked 2, a +33 % bonus that pushed the real RTP towards 98-100 % (see NoExploitTest). With
+     * floor the bet can never exceed what was actually wagered per spin, so constant-stake play is exactly
+     * fair and every mixed pattern is slightly worse for the player.
+     */
+    fun bonusBet(wagered: Long, spins: Long, fallbackStake: Int): Int =
+        if (spins <= 0L) fallbackStake
+        else (wagered / spins).toInt().coerceIn(1, ReaperConfig.STAKES.last())
+
     /** Returns symbol, count, multiplier for one line, or null. */
     fun evaluateLine(s: IntArray): Triple<Int, Int, Int>? {
         var w = 0
@@ -120,8 +131,7 @@ object ReaperEngine {
 
     fun spin(rng: Random, stake: Int): SpinOutcome {
         val stops = IntArray(REELS) { rng.nextInt(ReaperConfig.STRIPS[it].size) }
-        val rate = ReaperConfig.FEATURE_RATE[ReaperConfig.stakeIndex(stake)]
-        val mini = if (rng.nextDouble() < rate) rollMini(rng) else Mini.NONE
+        val mini = if (rng.nextDouble() < ReaperConfig.FEATURE_RATE) rollMini(rng) else Mini.NONE
         return outcome(stake, stops, mini)
     }
 }

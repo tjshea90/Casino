@@ -5,13 +5,15 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.Random
 
-/** Independent full-game simulation (base + Reaper's Touch + relics + Soul Vault) at several stakes. */
+/** Independent full-game simulation (base + mini features + relics + Soul Vault) at several constant stakes. */
 class FullGameTest {
     @Test fun rtpHoldsAtEveryStake() {
+        val stakes = ReaperConfig.STAKES
         for (stake in intArrayOf(1, 5, 10, 25, 40)) {
             val rng = Random(stake * 7919L)
             val spins = 4_000_000
             var bet = 0L; var won = 0L; var relics = 0; var hits = 0; var bonuses = 0; var maxWin = 0L
+            var sumSq = 0.0
             for (i in 0 until spins) {
                 bet += stake
                 val o = ReaperEngine.spin(rng, stake)
@@ -23,13 +25,19 @@ class FullGameTest {
                 if (w > 0) hits++
                 if (w > maxWin) maxWin = w
                 won += w
+                val x = w.toDouble() / stake
+                sumSq += x * x
             }
             val rtp = won.toDouble() / bet
-            println("stake %2d: house kept %.2f%% of %d tokens wagered".format(stake, 100 * (1 - rtp), bet))
-            println("stake %2d: RTP %.4f  hit %.3f  bonus every %.0f spins  max win %d tokens"
-                .format(stake, rtp, hits.toDouble() / spins, spins.toDouble() / bonuses, maxWin))
-            assertEquals("stake $stake", 0.87, rtp, 0.02)
-            assertTrue("about 1 win in 3.5 spins at stake $stake", hits.toDouble() / spins in 0.27..0.31)
+            val se = Math.sqrt(sumSq / spins - rtp * rtp) / Math.sqrt(spins.toDouble())
+            val expected = ReaperConfig.RTP_BY_STAKE[stakes.indexOf(stake)]
+            println("stake %2d: RTP %.4f (theory %.4f, 1 sigma %.4f) -> house kept %.2f%% of %d tokens wagered".format(stake, rtp, expected, se, 100 * (1 - rtp), bet))
+            println("stake %2d: hit %.3f (1 in %.2f)  bonus every %.0f spins  max win %d tokens"
+                .format(stake, hits.toDouble() / spins, spins.toDouble() / hits, spins.toDouble() / bonuses, maxWin))
+            assertEquals("stake $stake", expected, rtp, Math.max(5 * se, 0.003))
+            assertTrue("the house must keep at least ~6% at stake $stake", rtp <= ReaperConfig.TARGET_RTP + 5 * se)
+            assertTrue("about 1 win in 3 spins at stake $stake", hits.toDouble() / spins in 0.31..0.345)
+            assertTrue("a Soul Vault about every 125 spins at stake $stake", spins.toDouble() / bonuses in 110.0..140.0)
         }
     }
 }

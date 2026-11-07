@@ -338,7 +338,7 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
             list.addView(r, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { setMargins(0, dp(4), 0, dp(4)) })
         }
         list.addView(text(
-            "MINI FEATURES (about 1 spin in 80)\n" +
+            "MINI FEATURES (about 1 spin in 100)\n" +
             "A character floats out in front of the reels and changes that spin:\n" +
             "• Reaper's Touch — the Grim Reaper slashes 1–3 middle reels completely WILD.\n" +
             "• Raven's Flock — the raven drops 3–6 WILDS onto the reels.\n" +
@@ -347,16 +347,19 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
             "SPINNING\n" +
             "Tap SPIN for one spin. HOLD the SPIN button for rapid spins until you let go. Every win pauses to show the amount.\n\n" +
             "RELICS & THE SOUL VAULT\n" +
-            "About one spin in 28 reveals a relic (Scythe, Hourglass, Skull Candle, Raven Feather, Cursed Tome). Collect all five to open the Soul Vault: " +
+            "About one spin in 25 reveals a relic (Scythe, Hourglass, Skull Candle, Raven Feather, Cursed Tome). Collect all five to open the Soul Vault: " +
             "5 soul orbs start in a 5×4 vault and you get 3 respins — press SPIN for each one. Every orb that lands sticks and resets the respins to 3. " +
             "Orbs pay 1×–25× the bonus bet; MINI ${ReaperConfig.MINI}×, MINOR ${ReaperConfig.MINOR}×, MAJOR ${ReaperConfig.MAJOR}× jackpot orbs; " +
             "the Reaper orb harvests the value of every soul on the board; fill all 20 niches for the GRAND (${ReaperConfig.GRAND}×). " +
-            "The bonus bet is your average stake while collecting the relics (now: ${wallet.averageStake}). Relics are kept between sessions.\n\n" +
+            "The bonus bet is your average stake while collecting the relics, rounded down (now: ${wallet.averageStake}) — so keep your stake steady for the biggest bonus. Relics are kept between sessions.\n\n" +
             "MONEY RULES\n" +
             "• Stake 1–40 tokens (10 tokens = 1 mack, 80 tokens = 1 book).\n" +
             "• Every win pays exact tokens. Rounding down to a whole mack only happens when you cash out (odd tokens stay on the machine).\n" +
             "• Maximum win: 25 books (2,000 tokens) per spin and per Soul Vault.\n" +
-            "• Return to player: 87% at every stake — over time the machine keeps 13% of every token wagered. About 1 spin in 3.4 is a winner.\n" +
+            "• Return to player: ${"%.0f".format(ReaperConfig.TARGET_RTP * 100)}% at stakes 1–10 — over time the machine keeps ${"%.0f".format(100 - ReaperConfig.TARGET_RTP * 100)}% of every token wagered. " +
+            "The 25-book win cap trims it a little at higher stakes (this stake: ${"%.1f".format(ReaperConfig.RTP_BY_STAKE[ReaperConfig.stakeIndex(wallet.stake)] * 100)}%). " +
+            "About 1 spin in 3 is a winner (${ReaperConfig.HIT_FREQUENCY_TEXT}) and every win pays at least your stake back.\n" +
+            "• Each spin is decided by a secure random number (SecureRandom) the instant you press spin; the animation is only for show.\n" +
             "• Tap the reels to slam-stop; tap during the Soul Vault to fast-forward.", 14f))
         lateinit var dlg: Dialog
         list.addView(button("Close") { dlg.dismiss() })
@@ -373,7 +376,7 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
             .append("Total withdrawn:    %,d tokens\n".format(wallet.totalWithdrawn))
             .append("Total wagered:      %,d tokens\n".format(wallet.totalWagered))
             .append("Total won:          %,d tokens\n".format(wallet.totalWon))
-            .append("Your actual RTP:    $rtp (theory 87.0%)\n")
+            .append("Your actual RTP:    $rtp (theory up to ${"%.1f".format(ReaperConfig.TARGET_RTP * 100)}%)\n")
             .append("Spins played:       %,d\n".format(wallet.spins))
             .append("Reaper's Touch:     %,d\n".format(wallet.features))
             .append("Soul Vaults:        %,d (paid %,d tokens)\n".format(wallet.bonuses, wallet.bonusWon))

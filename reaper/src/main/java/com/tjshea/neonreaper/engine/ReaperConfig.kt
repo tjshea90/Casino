@@ -3,13 +3,16 @@ package com.tjshea.neonreaper.engine
 /**
  * Neon Reaper math. Stake is in TOKENS (1..40). Line pays are whole multiples of
  * the stake, so every win is an exact number of tokens (rounding to the mack only
- * happens at cash-out). Wins are capped at 25 books.
+ * happens at cash-out). Wins are capped at 25 books (2000 tokens) per spin and per bonus.
  *
- * The cap costs more at high stakes, so the mini features (Reaper / Raven /
- * Pumpkin / Skull) trigger at a per-stake rate (FEATURE_RATE) that brings every
- * stake to 87 % RTP.
- * Values come from CalibrationTest; do not edit pays/reels without re-running it
- * and pasting the new table.
+ * RTP design (94.00 %, house edge 6 %):
+ *   base game 59.34 % + mini features 11.98 % + Soul Vault 22.68 % = 94.000 % at stakes 1-10 (exact, see
+ *   tools/reaper_model.py and RtpExactTest). The mini-feature rate is the SAME at every stake on purpose: the
+ *   25-book cap can then only ever LOWER the return at high stakes (RTP_BY_STAKE), so no staking pattern can
+ *   beat 94 %. (A per-stake rate that "refills" the cap loss, plus rounding the bonus bet up, let a player who
+ *   mixes stakes reach ~98 % in testing -- see ReaperEngine.bonusBet and NoExploitTest.)
+ * Do not edit pays/reels/features without re-running tools/reaper_model.py and the tests in
+ * reaper/src/test/.../engine, and pasting the new numbers here.
  */
 object ReaperConfig {
     const val WILD = 0
@@ -27,7 +30,7 @@ object ReaperConfig {
     const val REELS = 5
     const val ROWS = 3
 
-    const val TARGET_RTP = 0.87
+    const val TARGET_RTP = 0.94
     const val MAX_WIN_TOKENS = 25 * Money.TOKENS_PER_BOOK // 2000 tokens = 25 books
 
     val SYMBOL_NAMES = arrayOf("Grim Reaper Wild", "Hooded Watcher", "Laughing Skull", "Blood Raven", "Jack-o'-Lantern",
@@ -56,8 +59,8 @@ object ReaperConfig {
         intArrayOf(1, 1, 2, 1, 1), intArrayOf(0, 0, 2, 0, 0), intArrayOf(2, 2, 0, 2, 2), intArrayOf(0, 2, 2, 2, 0),
     )
 
-    //                          W  HD SK RV PK GH A  K  Q  J  10
-    private val COUNTS = intArrayOf(1, 3, 3, 4, 5, 5, 7, 7, 8, 8, 9)
+    //                          W  HD SK RV PK GH A  K  Q  J  10   (same on all 5 reels; characters = 33 % of a strip)
+    private val COUNTS = intArrayOf(1, 3, 3, 5, 5, 5, 6, 6, 8, 9, 12)
     val STRIPS: Array<IntArray> = Array(REELS) { buildStrip(COUNTS, it) }
 
     // ---- mini features: a character floats out and changes this one spin ----
@@ -80,15 +83,22 @@ object ReaperConfig {
 
     val STAKES = intArrayOf(1, 2, 3, 4, 5, 8, 10, 15, 20, 25, 30, 40)
 
-    /** Per-stake chance a spin gets a mini feature (from CalibrationTest). */
-    val FEATURE_RATE = doubleArrayOf(
-        0.0110, 0.0110, 0.0110, 0.0110, 0.0110, 0.0110, 0.0110, 0.0114, 0.0117, 0.0121, 0.0126, 0.0138
-    )
+    /** Chance a spin gets a mini feature (about 1 spin in 100), the same at every stake. Solved so RTP at stake 1 is exactly 94 %. */
+    const val FEATURE_RATE = 0.009924
+
+    /**
+     * Theoretical RTP at each stake in STAKES (exact means, 25-book cap measured with millions of samples;
+     * tools/reaper_model.py, checked by CalibrationTest). Identical to 94.00 % up to stake 5; the cap trims the top stakes.
+     */
+    val RTP_BY_STAKE = doubleArrayOf(0.9400, 0.9400, 0.9400, 0.9399, 0.9399, 0.9397, 0.9393, 0.9355, 0.9316, 0.9274, 0.9224, 0.9092)
+
+    /** Published figures (verified by FullGameTest): base-game win frequency; every win returns at least the stake. */
+    const val HIT_FREQUENCY_TEXT = "about 1 in 3"
 
     // ---- relics & Soul Vault bonus ----
     const val RELIC_COUNT = 5
-    /** Chance per spin to collect the next relic: a relic about every 28 spins, bonus about every 140. */
-    const val RELIC_CHANCE = 5.0 / 140.0
+    /** Chance per spin to collect the next relic: a relic about every 25 spins, a Soul Vault bonus about every 125. */
+    const val RELIC_CHANCE = 5.0 / 125.0
     val RELIC_NAMES = arrayOf("Scythe", "Hourglass", "Skull Candle", "Raven Feather", "Cursed Tome")
 
     const val VAULT_COLS = 5

@@ -38,7 +38,9 @@ Work queue (tick as you go):
 - [x] `tools/checkpoint.sh`, resume protocol (this block)
 - [x] Dragon's Hoard: Kotlin config/engine (pair pays, FS by scatter count, new reels) + RtpTest at 94 % + UI text/chime
       (exact 93.996 %, sim 94.05 %, any-win 1 in 2.28, win>=stake 1 in 6.1, FS every ~109 spins, SD 5.45) — still TODO: screenshot check of dialogs
-- [ ] Neon Reaper: exact analytic model `tools/reaper_model.py`, rebudget (base/mini/vault), per-stake FEATURE_RATE, tests, UI text
+- [x] Neon Reaper: exact model `tools/reaper_model.py`, rebudget, uniform FEATURE_RATE 0.009924, bonusBet=floor, tests (RtpExactTest, CalibrationTest,
+      FullGameTest, NoExploitTest all green: stake1 94.00 %, 10 93.93 %, 25 92.74 %, 40 90.92 %; hit 1 in 2.95; vault every 125 spins)
+      — still TODO: run whole :reaper suite + screenshot review of the Help/Stats text
 - [ ] docs/MATH.md, README, CLAUDE.md numbers (94 %), CI test list
 - [ ] Full test run both modules, independent review of the math, APK build + release (SHIP=1) — ask/announce before publishing
 
@@ -48,7 +50,7 @@ calibration): reels [1,3,3,5,5,5,6,6,8,9,12], relic chance 5/125 (bonus ~every 1
 = 94.000 %; base hit 32.8 % (1 in 3.05). The 25-book cap only lowers RTP at high stakes (stake 10 93.94, 25 92.76, 40 90.95).
 WHY uniform rate + floor: the OLD rule (roundToInt average stake + per-stake rate) is EXPLOITABLE by mixing stakes — at 94 % the worst
 mix (30 % stake 1 / 70 % stake 2) pays 98.0 % RTP; with floor + uniform rate the worst strategy found is 93.9 %.
-NEXT: Kotlin for :reaper (ReaperConfig, ReaperEngine.bonusBet, Wallet.averageStake, Dialogs text, tests RtpExactTest/CalibrationTest/FullGameTest).
+Kotlin for :reaper DONE and green (engine tests). NEXT: full-suite runs + screenshots, docs/MATH.md, README, independent math review, release build.
 
 ---
 # HANDOFF — Casino repo (two apps)
