@@ -1,3 +1,49 @@
+# >>> LIVE STATUS — READ THIS FIRST (updated every milestone; newest session on top) <<<
+
+**Resume protocol (cold start, nothing else needed):**
+1. `git fetch origin && git branch --show-current` — work on the branch you were assigned (this task: `ccr-5cf48990-4m3710`).
+   Never push to another branch without the user's OK. `main` is not used.
+2. Read this block, then `git log --oneline -12`, then continue at the first unchecked box below.
+3. Build/test: `echo "sdk.dir=/opt/android-sdk" > local.properties` then
+   `gradle :app:testDebugUnitTest --tests '*RtpTest*'` and `gradle :reaper:testDebugUnitTest --tests '*Rtp*'`
+   (Robolectric screenshot tests need `~/robolectric-deps`, see the Dragon's Hoard section).
+4. **Checkpoint ladder** (assume you can be cut off at any second):
+   - Rung 1 — after every meaningful step: `tools/checkpoint.sh "what you just did"` (commit + push with retries).
+   - Rung 2 — after every milestone: tick the box below and update the status line (keep this block true).
+   - Rung 3 — when a unit passes its tests: normal descriptive commit via the script.
+   - Rung 4 — shipping: `SHIP=1 tools/checkpoint.sh "release vX"` after copying APKs into `release/` and bumping
+     versionName/versionCode. **Pushing `release/*.apk` publishes a public GitHub Release** (release.yml) — only on purpose.
+
+## Task (session 6): "Change the RTP math for the entire app to 94 %, research how online slots (BetMGM etc.) work, make it fun with frequent wins, keep a verified house edge"
+Target for BOTH apps: **theoretical RTP 94.00 % (house edge 6.00 % of every token wagered), verified three independent ways**
+(exact closed form in `tools/*.py`, brute-force enumeration/analytic means in unit tests, Monte-Carlo of the real engine).
+
+Design decisions (with reasons):
+- Industry methods adopted: weighted virtual reel strips, separate base/feature reel sets, RTP "budget" split between
+  base game / features / bonus, hit-frequency + volatility tuning, count-dependent free spins (3/4/5 scatters = 10/15/25),
+  pair pays on the top symbols (classic IGT/Aristocrat hit-frequency tool), Hold & Spin with fixed jackpot tiers,
+  SecureRandom outcome RNG decided before the animation, published RTP + "actual RTP" session stats.
+  See `docs/MATH.md` for the write-up and sources.
+- Honest presentation: pair/low pays that return LESS than the stake are "partial returns" — they play a quiet chime and
+  docs/in-app info report BOTH "any win" frequency and "win >= stake" frequency. Neon Reaper has no partial wins at all
+  (every win >= stake).
+- Dragon's Hoard keeps its pay table except new 1x pair pays on TIGER/KOI; reels re-weighted (see GameConfig).
+- Real progressive jackpots were NOT added: a growing pool makes theoretical RTP depend on pool state; the Soul Vault
+  keeps fixed MINI/MINOR/MAJOR/GRAND tiers so RTP is exact.
+
+Work queue (tick as you go):
+- [x] Merge app branch into session branch; baseline tests run in the sandbox (Gradle OK, ~1 min)
+- [x] Web research done (summarised in docs/MATH.md once written)
+- [x] `tools/dragon_model.py` exact model + simulator + tuner (reproduces Kotlin 80 % numbers to 5 decimals)
+- [x] `tools/checkpoint.sh`, resume protocol (this block)
+- [ ] Dragon's Hoard: Kotlin config/engine (pair pays, FS by scatter count, new reels) + RtpTest at 94 % + UI text/chime
+- [ ] Neon Reaper: exact analytic model `tools/reaper_model.py`, rebudget (base/mini/vault), per-stake FEATURE_RATE, tests, UI text
+- [ ] docs/MATH.md, README, CLAUDE.md numbers (94 %), CI test list
+- [ ] Full test run both modules, independent review of the math, APK build + release (SHIP=1) — ask/announce before publishing
+
+Status line: session 6 started; Python model for Dragon's Hoard finished and validated; Kotlin changes next.
+
+---
 # HANDOFF — Casino repo (two apps)
 
 | App | Module | Status |
