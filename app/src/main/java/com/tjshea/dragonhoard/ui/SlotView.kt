@@ -79,6 +79,7 @@ class SlotView(context: Context, private val host: Host) : View(context) {
     private var nextAutoAt = 0.0
     private var bigTier = 0
     private var retriggerBanner = 0.0
+    private var retriggerAward = 0
     private var message: String? = null
     private var messageUntil = 0.0
     private var creditFlashUntil = 0.0
@@ -515,6 +516,7 @@ class SlotView(context: Context, private val host: Host) : View(context) {
         }
         if (res.freeSpin && res.freeSpinsAwarded > 0) {
             retriggerBanner = now() + 2.2
+            retriggerAward = res.freeSpinsAwarded
             sfx.play(Sfx.FEATURE, 0.8f)
         }
         if (win > 0) {
@@ -525,7 +527,9 @@ class SlotView(context: Context, private val host: Host) : View(context) {
                 enterPhase(Phase.BIG_WIN)
                 return
             }
-            sfx.play(Sfx.WIN, 0.8f, if (x >= 3) 1.0f else 1.15f)
+            // Honest presentation: a win that returns less than the whole stake (a "partial return",
+            // common with pair pays on many lines) gets only a quiet chime; real wins get the full one.
+            sfx.play(Sfx.WIN, if (x < 1.0) 0.4f else 0.8f, if (x >= 3) 1.0f else 1.15f)
             if (x >= 5) coinRate = 25f
         } else {
             pendingWin = 0
@@ -1256,7 +1260,7 @@ class SlotView(context: Context, private val host: Host) : View(context) {
             pText.textSize = bh * 0.32f
             c.drawText("🐉", width / 2f, tmpRect.top + bh * 0.66f, pText)
             pText.textSize = bh * 0.085f; pText.color = Color.WHITE
-            val n = if (featureBanner == "resume") wallet.freeSpinsLeft else GameConfig.FREE_SPINS_AWARD
+            val n = if (featureBanner == "resume") wallet.freeSpinsLeft else wallet.freeSpinsTotal
             c.drawText("$n FREE SPINS  •  ALL WINS ×${GameConfig.FREE_SPIN_MULTIPLIER}", width / 2f, tmpRect.top + bh * 0.82f, pText)
         }
         pText.textSize = bh * 0.055f; pText.color = 0xAAFFFFFF.toInt()
@@ -1277,7 +1281,7 @@ class SlotView(context: Context, private val host: Host) : View(context) {
         pTitle.color = 0xFFFFD54F.toInt()
         pTitle.alpha = (255 * a).toInt()
         pTitle.setShadowLayer(25 * u, 0f, 0f, 0xFFAA00FF.toInt())
-        c.drawText("+${GameConfig.FREE_SPINS_AWARD} FREE SPINS", width / 2f, reelRect.centerY(), pTitle)
+        c.drawText("+$retriggerAward FREE SPINS", width / 2f, reelRect.centerY(), pTitle)
         pTitle.clearShadowLayer()
         pTitle.alpha = 255
     }

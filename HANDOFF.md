@@ -36,12 +36,13 @@ Work queue (tick as you go):
 - [x] Web research done (summarised in docs/MATH.md once written)
 - [x] `tools/dragon_model.py` exact model + simulator + tuner (reproduces Kotlin 80 % numbers to 5 decimals)
 - [x] `tools/checkpoint.sh`, resume protocol (this block)
-- [ ] Dragon's Hoard: Kotlin config/engine (pair pays, FS by scatter count, new reels) + RtpTest at 94 % + UI text/chime
+- [x] Dragon's Hoard: Kotlin config/engine (pair pays, FS by scatter count, new reels) + RtpTest at 94 % + UI text/chime
+      (exact 93.996 %, sim 94.05 %, any-win 1 in 2.28, win>=stake 1 in 6.1, FS every ~109 spins, SD 5.45) — still TODO: screenshot check of dialogs
 - [ ] Neon Reaper: exact analytic model `tools/reaper_model.py`, rebudget (base/mini/vault), per-stake FEATURE_RATE, tests, UI text
 - [ ] docs/MATH.md, README, CLAUDE.md numbers (94 %), CI test list
 - [ ] Full test run both modules, independent review of the math, APK build + release (SHIP=1) — ask/announce before publishing
 
-Status line: session 6 started; Python model for Dragon's Hoard finished and validated; Kotlin changes next.
+Status line: Dragon's Hoard DONE at 94 % (tests green). `tools/reaper_model.py` written (untested) — next: run it, design Neon Reaper's 94 % budget.
 
 ---
 # HANDOFF — Casino repo (two apps)

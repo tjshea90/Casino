@@ -1,7 +1,7 @@
 package com.tjshea.dragonhoard.engine
 
 import com.tjshea.dragonhoard.engine.GameConfig.PAYLINES
-import com.tjshea.dragonhoard.engine.GameConfig.PAYS
+import com.tjshea.dragonhoard.engine.GameConfig.pay
 import com.tjshea.dragonhoard.engine.GameConfig.REELS
 import com.tjshea.dragonhoard.engine.GameConfig.ROWS
 import com.tjshea.dragonhoard.engine.GameConfig.SCATTER
@@ -41,18 +41,22 @@ class SpinResult(
 
 object SlotEngine {
 
-    /** Evaluates one line of 5 symbols. Returns symbol/count/pay or null. */
+    /**
+     * Evaluates one line of 5 symbols (left to right, wild substitutes for everything but the
+     * scatter). The better of "the leading wilds" and "the first symbol's run" is paid.
+     * Returns symbol/count/pay or null.
+     */
     fun evaluateLine(s: IntArray): Triple<Int, Int, Int>? {
         var w = 0
         while (w < REELS && s[w] == WILD) w++
-        val wildPay = if (w >= 3) PAYS[WILD][w - 3] else 0
+        val wildPay = pay(WILD, w)
         if (w == REELS) return Triple(WILD, 5, wildPay)
         val target = s[w]
         var symPay = 0
         var n = w
         if (target != SCATTER) {
             while (n < REELS && (s[n] == target || s[n] == WILD)) n++
-            symPay = if (n >= 3) PAYS[target][n - 3] else 0
+            symPay = pay(target, n)
         }
         return when {
             symPay == 0 && wildPay == 0 -> null
@@ -86,7 +90,7 @@ object SlotEngine {
         }
         var scatters = 0
         for (r in 0 until REELS) for (row in 0 until ROWS) if (grid[r][row] == SCATTER) scatters++
-        val awarded = if (scatters >= GameConfig.MIN_SCATTERS_FOR_FEATURE) GameConfig.FREE_SPINS_AWARD else 0
+        val awarded = if (scatters >= GameConfig.MIN_SCATTERS_FOR_FEATURE) GameConfig.FREE_SPINS_BY_SCATTERS[scatters] else 0
         return SpinResult(
             stops, freeSpin, grid, wins, scatters, lineBetMacks, lines,
             if (freeSpin) GameConfig.FREE_SPIN_MULTIPLIER else 1, awarded

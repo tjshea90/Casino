@@ -323,11 +323,12 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
             val img = ImageView(act).apply { setImageBitmap(art.sharp[s]) }
             val desc = if (s == GameConfig.SCATTER) {
                 val tb = lineBet * 10
-                "GOLD COIN SCATTER — pays anywhere, × total bet\n3: ${GameConfig.SCATTER_PAYS[3]}×   4: ${GameConfig.SCATTER_PAYS[4]}×   5: ${GameConfig.SCATTER_PAYS[5]}×  (at 10 lines: ${GameConfig.SCATTER_PAYS[3] * tb} / ${GameConfig.SCATTER_PAYS[4] * tb} / ${GameConfig.SCATTER_PAYS[5] * tb} macks)\n3 or more trigger ${GameConfig.FREE_SPINS_AWARD} FREE SPINS with all wins ×${GameConfig.FREE_SPIN_MULTIPLIER}. Can retrigger!"
+                "GOLD COIN SCATTER — pays anywhere, × total bet\n3: ${GameConfig.SCATTER_PAYS[3]}×   4: ${GameConfig.SCATTER_PAYS[4]}×   5: ${GameConfig.SCATTER_PAYS[5]}×  (at 10 lines: ${GameConfig.SCATTER_PAYS[3] * tb} / ${GameConfig.SCATTER_PAYS[4] * tb} / ${GameConfig.SCATTER_PAYS[5] * tb} macks)\n3 or more trigger FREE SPINS — 3 scatters: ${GameConfig.FREE_SPINS_BY_SCATTERS[3]}, 4: ${GameConfig.FREE_SPINS_BY_SCATTERS[4]}, 5: ${GameConfig.FREE_SPINS_BY_SCATTERS[5]} — with all wins ×${GameConfig.FREE_SPIN_MULTIPLIER}. Can retrigger!"
             } else {
                 val p = GameConfig.PAYS[s]
                 val name = GameConfig.SYMBOL_NAMES[s].uppercase() + if (s == GameConfig.WILD) " — substitutes for all symbols except the scatter" else ""
-                "$name\n5×: ${p[2] * lineBet}    4×: ${p[1] * lineBet}    3×: ${p[0] * lineBet}"
+                val pair = if (p[0] > 0) "    2×: ${p[0] * lineBet}" else ""
+                "$name\n5×: ${p[3] * lineBet}    4×: ${p[2] * lineBet}    3×: ${p[1] * lineBet}$pair"
             }
             val nl = desc.indexOf('\n')
             val styled = android.text.SpannableString(desc).apply {
@@ -350,7 +351,10 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
             "• Total bet = lines × bet per line. Wins are whole macks; any uneven amount is rounded down to the mack.\n" +
             "• Five Dragon Wilds on a line pays 1,000× the line bet — ×3 during free spins!\n" +
             "• Free spins use the bet that triggered them and special reels with extra wilds.\n" +
-            "• Return to player: 80.0% theoretical (medium volatility). Each spin is independent and random (SecureRandom).\n" +
+            "• Return to player: %.2f%% theoretical (medium volatility), so over time the machine keeps %.2f%% of every token wagered. ".format(GameConfig.THEORETICAL_RTP * 100, 100 - GameConfig.THEORETICAL_RTP * 100) +
+            "Any win lands ${GameConfig.HIT_FREQUENCY_TEXT} spins; a win of at least your whole stake ${GameConfig.STAKE_WIN_FREQUENCY_TEXT} spins " +
+            "(small pair and low pays can return less than you bet — they get a quiet chime).\n" +
+            "• Each spin is decided by a secure random number (SecureRandom) the instant you press spin; the animation is only for show.\n" +
             "• Tap the reels while spinning to slam-stop. TURBO speeds up spins.", 14f))
         lateinit var dlg: Dialog
         list.addView(button("Close") { dlg.dismiss() })
@@ -367,7 +371,7 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
             .append("Total withdrawn:    %,d tokens\n".format(wallet.totalWithdrawn))
             .append("Total wagered:      %,d tokens\n".format(wallet.totalWagered))
             .append("Total won:          %,d tokens\n".format(wallet.totalWon))
-            .append("Your actual RTP:    $rtp (theory 80.0%)\n")
+            .append("Your actual RTP:    $rtp (theory ${"%.1f".format(GameConfig.THEORETICAL_RTP * 100)}%)\n")
             .append("Spins played:       %,d\n".format(wallet.spins))
             .append("Free-spin features: %,d\n".format(wallet.features))
             .append("Biggest win:        %,d tokens".format(wallet.biggestWin))
