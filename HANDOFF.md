@@ -56,9 +56,12 @@ Work queue (tick as you go):
       Engine tests with RelicMeter green: adaptive exploit policies now 92.6/92.7/92.4/91.1 % (old rule 101-105 %). TODO: full suites, rebuild APKs, ship.
       Known pre-existing limits noted by the audit (not changed): password lockout uses wall-clock time; signed wallet file has no rollback counter.
 - [x] Version bump committed (app 1.1.0/code 2, reaper 2.1.0/code 5); release builds verified (same signing cert 1bc61b76… as old APKs => in-place upgrade)
-- [ ] Copy `app/build/outputs/apk/release/app-release.apk` -> `release/DragonsHoard.apk` and `reaper/build/outputs/apk/release/reaper-release.apk` -> `release/NeonReaper.apk`, then `SHIP=1 tools/checkpoint.sh "release ..."` (publishes a GitHub Release!)
+- [x] Release APKs rebuilt from final source (Dragon's Hoard 1.1.0/code 2, Neon Reaper 2.1.0/code 5, same signing cert 1bc61b76… => in-place upgrade,
+      new strings verified inside the dex) and copied to `release/`; shipped with `SHIP=1 tools/checkpoint.sh` => GitHub Release "build-6".
+      NOTE: the very first checkpoint push of this branch ALREADY published a stray release "Casino build 5" (old, unchanged APKs) because the merge
+      brought release/*.apk into the diff vs the previous remote tip. Harmless but unannounced; user may delete it.
 
-Status line: Dragon's Hoard DONE at 94 % (tests green). Neon Reaper DESIGN FINAL (in tools/reaper_model.py, validated vs old Kotlin
+Status line (final, session 6): everything DONE and shipped. History: Dragon's Hoard DONE at 94 % (tests green). Neon Reaper DESIGN FINAL (in tools/reaper_model.py, validated vs old Kotlin
 calibration): reels [1,3,3,5,5,5,6,6,8,9,12], relic chance 5/125 (bonus ~every 125 spins), ONE stake-independent mini-feature rate
 0.00992, bonus bet = FLOOR(average stake), vault + minis unchanged. Exact budget at stake 1: base 59.34 % + minis 11.98 % + vault 22.68 %
 = 94.000 %; base hit 32.8 % (1 in 3.05). The 25-book cap only lowers RTP at high stakes (stake 10 93.94, 25 92.76, 40 90.95).

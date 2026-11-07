@@ -10,3 +10,10 @@
   (94 % at every stake). Python references: `tools/dragon_model.py`, `tools/reaper_model.py`.
 - To ship: copy release APKs into `release/` and bump versionName/versionCode, then `SHIP=1 tools/checkpoint.sh "release vX"`.
   **Pushing `release/*.apk` on any branch publishes a public GitHub Release** (release.yml) — do it deliberately.
+- **Release trap (happened once):** `release.yml` fires on any push whose diff against the branch's PREVIOUS remote tip touches
+  `release/*.apk` — including the first push after merging another branch that already contains the APKs. That published a
+  stray "Casino build 5" (unchanged APKs). Before a first push of a branch, check `git diff --stat origin/<branch>..HEAD -- release/`.
+- **Math changes are not done until adversarially checked:** an independent audit found a staking exploit (101–104 % RTP) that
+  the author's own tests missed. When touching bonus/relic/stake logic run `python3 tools/reaper_model.py exploit` and
+  `NoExploitTest`, and have a separate agent try to beat the house with adaptive policies.
+
