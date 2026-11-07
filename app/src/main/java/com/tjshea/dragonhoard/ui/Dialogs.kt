@@ -347,7 +347,7 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
         }
         list.addView(text(
             "RULES\n" +
-            "• ${GameConfig.PAYLINES.size} paylines; choose 1–10 lines and 1–40 macks per line.\n" +
+            "• ${GameConfig.PAYLINES.size} paylines; choose 1, 3, 5, 7, 9 or 10 lines and 1–40 macks per line.\n" +
             "• Total bet = lines × bet per line. Wins are whole macks; any uneven amount is rounded down to the mack.\n" +
             "• Five Dragon Wilds on a line pays 1,000× the line bet — ×3 during free spins!\n" +
             "• Free spins use the bet that triggered them and special reels with extra wilds.\n" +

@@ -22,8 +22,10 @@ where the second term is a small tail quantity measured with millions of samples
 Calibration: the chance f(stake) that a spin gets a mini feature is solved per stake so that
     (1-f) R_base + f R_mini + (relic_p / 5) R_vault  =  TARGET_RTP   exactly at every stake.
 
-Usage:  python3 tools/reaper_model.py                # report on the config in CFG (budget, hit rate, calibration)
+Usage:  python3 tools/reaper_model.py                # report on the config in CFG (budget, hit rate, per-stake RTP)
         python3 tools/reaper_model.py exact          # exact means only (instant)
+        python3 tools/reaper_model.py exploit        # adaptive staking policies vs the three bonus-bet rules
+        python3 tools/reaper_model.py check          # verify this file still equals ReaperConfig.kt
 Kotlin mirror: ReaperConfig.kt (tests: RtpExactTest checks the exact means, CalibrationTest/FullGameTest simulate).
 """
 import sys
@@ -390,7 +392,8 @@ def report(cfg=CFG, n_base=8_000_000, n_mini=2_000_000, n_vault=4_000_000, seed=
 
     Design rule (strategy-proofness): the mini-feature rate f is the SAME at every stake and is solved at the
     cap-free stake (stakes[0]) so that RTP(stake 1) = target exactly.  The 25-book cap then only ever *lowers*
-    RTP at high stakes, so no staking pattern can push RTP above the target (see strategy_rtp).  The per-stake
+    RTP at high stakes (and the relic-spin bonus bet makes the vault stake-neutral, see policy_rtp), so no staking
+    pattern can push RTP above the target.  The per-stake
     f that would force exactly `target` everywhere is printed for reference -- and is NOT used, because it
     over-compensates the cap and can be exploited by mixing stakes."""
     rng = np.random.default_rng(seed)
@@ -436,6 +439,113 @@ def report(cfg=CFG, n_base=8_000_000, n_mini=2_000_000, n_vault=4_000_000, seed=
     return ex, rows, dict(hit_base=hit_base, xb=xb, xm=xm, xv=xv, f=f)
 
 
+# ----------------------------------------------------------------------------------------------
+# Strategy-proofness: can a player beat the advertised RTP by choosing stakes cleverly?
+#
+# The Soul Vault pays on a "bonus bet" derived from the stakes played while collecting relics.  Two rules were beaten:
+#   "round"  = round(average stake of every spin in the collection window): mixing stakes 1/2 reached ~98 %.
+#   "window" = floor(average stake of every spin in the window): an ADAPTIVE policy (bet big only when relics arrive
+#              quickly; the window length is random and E[1/N] > 1/E[N]) reaches 101-104 % (found by an independent audit).
+# Shipped rule "relic" = floor(mean stake of the five spins that REVEALED the relics) (RelicMeter.kt).  A relic spin is a
+# random sample of the player's stakes (the relic chance does not depend on the stake), so by Wald's identity
+# E[sum of relic-spin stakes] = p * E[tokens wagered]: the expected bonus per token is identical for every policy.
+# ----------------------------------------------------------------------------------------------
+def vault_bet_table(cfg, xv, max_bet=40):
+    """t[b] = E[min(V*b, cap)] (tokens) for bonus bet b = 0..max_bet."""
+    t = np.zeros(max_bet + 1)
+    for b in range(1, max_bet + 1):
+        t[b] = np.minimum(xv * b, CAP_TOKENS).mean()
+    return t
+
+
+def policy_rtp(cfg, rows, vtab, policy, n_cycles=300_000, seed=5):
+    """Expected RTP of an adaptive staking policy under the three bonus-bet rules.
+    policy(relics_held, spin_index_in_window) -> stake (numpy arrays).  rows: report() rows (non-vault part A per stake)."""
+    rng = np.random.default_rng(seed)
+    a_by_stake = np.zeros(max(STAKES) + 1)
+    for r in rows:
+        a_by_stake[r['stake']] = r['A']
+    n = n_cycles
+    k = np.zeros(n, int)
+    relics = np.zeros(n, int)
+    wagered = np.zeros(n)
+    relic_sum = np.zeros(n)
+    nonvault = np.zeros(n)
+    alive = np.ones(n, bool)
+    while alive.any():
+        idx = np.nonzero(alive)[0]
+        s = policy(relics[idx], k[idx] + 1).astype(int)
+        wagered[idx] += s
+        k[idx] += 1
+        nonvault[idx] += s * a_by_stake[s]
+        got = rng.random(len(idx)) < cfg.relic_chance
+        relic_sum[idx[got]] += s[got]
+        relics[idx[got]] += 1
+        alive[idx[relics[idx] >= cfg.relic_count]] = False
+    bet = {
+        "round": np.floor(wagered / k + 0.5),
+        "window": np.floor(wagered / k + 1e-9),
+        "relic": np.floor(relic_sum / cfg.relic_count + 1e-9),
+    }
+    out = {}
+    for rule, b in bet.items():
+        b = np.clip(b, 1, max(STAKES)).astype(int)
+        out[rule] = (nonvault.sum() + vtab[b].sum()) / wagered.sum()
+    return out
+
+
+POLICIES = {
+    "constant stake 10": lambda r, k: np.full(len(r), 10),
+    "bet 1; bet 40 with 4 relics and <=60 spins in window": lambda r, k: np.where((r == 4) & (k <= 60), 40, 1),
+    "40 while spins<=20/40/60 holding 2/3/4 relics, else 1": lambda r, k: np.where(
+        ((r == 2) & (k <= 20)) | ((r == 3) & (k <= 40)) | ((r == 4) & (k <= 60)), 40, 1),
+    "first 45 spins of each window at 25, else 1": lambda r, k: np.where(k <= 45, 25, 1),
+    "bet 40 only once 4 relics are held": lambda r, k: np.where(r == 4, 40, 1),
+}
+
+
+def exploit_report(cfg=CFG):
+    ex, rows, extra = report(cfg, quiet=True, n_base=2_000_000, n_mini=800_000, n_vault=3_000_000)
+    vtab = vault_bet_table(cfg, extra['xv'])
+    print("%-56s %10s %10s %10s" % ("staking policy (adaptive)", "round-avg", "floor-avg", "SHIPPED"))
+    worst = 0.0
+    for name, pol in POLICIES.items():
+        r = policy_rtp(cfg, rows, vtab, pol)
+        worst = max(worst, r["relic"])
+        print("%-56s %10.4f %10.4f %10.4f" % (name, r["round"], r["window"], r["relic"]))
+    print("shipped rule (floor of the mean stake on the relic-revealing spins): worst policy above %.4f (target %.2f)" % (worst, cfg.target))
+
+
+def check_against_kotlin(cfg=CFG):
+    """Fail loudly if this file's reels / pays / feature + relic parameters differ from ReaperConfig.kt (the shipped game)."""
+    import os
+    import re
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "reaper", "src", "main", "java", "com",
+                        "tjshea", "neonreaper", "engine", "ReaperConfig.kt")
+    src = open(path).read()
+    ok = True
+
+    def report_line(name, same):
+        nonlocal ok
+        ok &= same
+        print("%-14s %s" % (name, "matches ReaperConfig.kt" if same else "DIFFERS from ReaperConfig.kt !!!"))
+
+    counts = [int(x) for x in re.search(r"private val COUNTS = intArrayOf\(([^)]*)\)", src).group(1).split(",")]
+    report_line("COUNTS", counts == cfg.counts)
+    body = re.search(r"val PAYS: Array<IntArray> = arrayOf\((.*?)\n    \)", src, re.S).group(1)
+    pays = [tuple(int(x) for x in r.split(",")) for r in re.findall(r"intArrayOf\(([^)]*)\)", body)]
+    report_line("PAYS", pays == [tuple(p) for p in cfg.pays])
+    f = float(re.search(r"const val FEATURE_RATE = ([0-9.]+)", src).group(1))
+    ex = exact_means(cfg)
+    trig = cfg.relic_chance / cfg.relic_count
+    f_exact = (cfg.target - trig * ex['vault'] - ex['base']) / (ex['mini'] - ex['base'])
+    report_line("FEATURE_RATE", abs(f - f_exact) < 2e-6)
+    print("                 (Kotlin %.6f, exact solution %.6f)" % (f, f_exact))
+    rc = re.search(r"const val RELIC_CHANCE = ([0-9.]+) / ([0-9.]+)", src)
+    report_line("RELIC_CHANCE", abs(float(rc.group(1)) / float(rc.group(2)) - cfg.relic_chance) < 1e-12)
+    return ok
+
+
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else "report"
     if cmd == "exact":
@@ -444,45 +554,9 @@ if __name__ == "__main__":
             if k != "vault_detail":
                 print(k, v)
         print(ex['vault_detail'])
+    elif cmd == "exploit":
+        exploit_report()
+    elif cmd == "check":
+        raise SystemExit(0 if check_against_kotlin() else 1)
     else:
         report()
-
-
-# ----------------------------------------------------------------------------------------------
-# Strategy-proofness: can a player beat the advertised RTP by choosing stakes cleverly?
-# The vault pays on the AVERAGE stake of the relic-collecting window, so mixing stakes could
-# matter.  `strategy_rtp` computes the expected RTP of a staking pattern exactly (expectation
-# over the random cycle length via simulation of cycle lengths only; vault/base values are exact
-# per-bet tables), for a given bonus-bet rule and feature-rate table.
-# ----------------------------------------------------------------------------------------------
-def vault_bet_table(cfg, xv, max_bet=40):
-    """R_v(b)*b = E[min(V*b, cap)] for b = 0..max_bet (index = bet)."""
-    t = np.zeros(max_bet + 1)
-    for b in range(1, max_bet + 1):
-        t[b] = np.minimum(xv * b, CAP_TOKENS).mean()
-    return t
-
-
-def strategy_rtp(cfg, ex, rows_by_stake, vtab, s_lo, s_hi, pi=0.0, rule="round", phase=False, n_cycles=400_000, seed=3):
-    """Expected RTP when the player bets s_hi with probability pi per spin (or, if phase=True, bets s_hi only
-    once 4 relics are collected) and s_lo otherwise.  rows_by_stake: {stake: dict(A=non-vault RTP part)}"""
-    rng = np.random.default_rng(seed)
-    p = cfg.relic_chance
-    if phase:
-        n_first = rng.negative_binomial(cfg.relic_count - 1, p, n_cycles) + (cfg.relic_count - 1)   # spins to get 4 relics
-        n_last = rng.geometric(p, n_cycles)                                                      # spins for the 5th
-        n_lo, n_hi = n_first, n_last
-    else:
-        n = rng.negative_binomial(cfg.relic_count, p, n_cycles) + cfg.relic_count
-        n_hi = rng.binomial(n, pi)
-        n_lo = n - n_hi
-    wager = s_lo * n_lo + s_hi * n_hi
-    avg = wager / (n_lo + n_hi)
-    if rule == "round":                      # the OLD rule (Kotlin roundToInt: ties up) -- kept to show the exploit
-        bet = np.floor(avg + 0.5)
-    else:                                    # the NEW rule: floor, so the bet never exceeds the average actually wagered
-        bet = np.floor(avg + 1e-9)
-    bet = np.clip(bet, 1, 40).astype(int)
-    vault_pay = vtab[bet]
-    nonvault = n_lo * s_lo * rows_by_stake[s_lo]['A'] + n_hi * s_hi * rows_by_stake[s_hi]['A']
-    return (nonvault.sum() + vault_pay.sum()) / wager.sum()

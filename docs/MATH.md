@@ -68,34 +68,52 @@ Budget at stakes 1–5: **base 59.34 % + mini features 11.98 % + Soul Vault 22.6
   strip so the 3D cast keeps appearing.
 * Mini features (one every ~101 spins, mean 12.07×): Reaper's Touch 9.44×, Raven's Flock 11.43×, Pumpkin's Treats 16.86×,
   Skull's Curse 8.18× — each mean is computed exactly (wild reels, hypergeometric random wild cells, coin counts × values).
-* Soul Vault (every ~125 spins, mean 28.35× the bonus bet, SD 22): exact Markov DP over (filled cells, respins left).
+* Soul Vault (every ~125 spins, mean 28.35× the bonus bet, SD 22; bonus bet = average stake of the 5 relic-revealing spins, rounded down): exact Markov DP over (filled cells, respins left).
   P(GRAND, full board) = 1 in 111,643 vaults.
 * **The 25-book cap** (2,000 tokens per spin and per bonus) only affects tails, so it is measured as
   `E[(X − 2000/stake)⁺]` with millions of samples of the *real* engine and subtracted from the exact mean (accuracy ≈ ±0.02 %).
   The result is the per-stake table above; it can only be ≤ 94 %.
 
-### The exploit found and fixed while raising 87 → 94 %
+### House-edge audit: two exploits found and fixed while raising 87 → 94 %
 
-The Soul Vault pays on the **average stake while collecting relics**. The old code rounded that average (ties up) and used a
-mini-feature rate that grew with the stake to "refill" the cap loss. At 87 % this was invisible; at 94 % it matters:
+The Soul Vault is paid `V × bonus bet`, so *how the bonus bet is derived from the stakes you played* decides whether a smart
+player can beat the headline RTP. Three rules were tried (`tools/reaper_model.py exploit`, `NoExploitTest`):
 
-| Staking pattern | Old rules at 94 % | New rules |
-|---|---|---|
-| 70 % of spins at stake 2, 30 % at stake 1 | **98.0 % RTP** (house edge 2 %) | 84.6 % |
-| alternate stakes 1, 2 | up to +33 % bonus bet | 86.5 % |
-| 20 % stake 40 / 80 % stake 2 | — | 92.2 % |
-| constant stake 1 / 10 / 40 | 94.0 / 93.9 / 90.9 % | same |
+| Staking policy (uses only what the HUD shows) | v1 `round(avg stake of every spin)` | v2 `floor(avg stake of every spin)` | **shipped: `floor(mean stake of the 5 relic-revealing spins)`** |
+|---|---|---|---|
+| constant stake 1 / 10 / 40 | 94.0 / 93.9 / 90.9 % | same | same |
+| 70 % of spins at stake 2, 30 % at stake 1 | **98.0 %** | — | 86.9 % |
+| bet 1; bet 40 with 4 relics held and ≤ 60 spins since the last bonus | **102.7 %** | **101.3 %** | 92.6 % |
+| bet 40 while spins ≤ 20/40/60 holding 2/3/4 relics, else 1 | **105.3 %** | **104.0 %** (optimal policy: 104.4 %) | 92.5 % |
+| first 45 spins of each collection at stake 25, then 1 (no relic info) | 97.7 % | 96.7 % | 92.3 % |
 
-Fix: `ReaperEngine.bonusBet` = **floor** of the average (never above what was really wagered) and **one** stake-independent
-mini-feature rate. Worst strategy found by a grid search over mixes and phase strategies: 93.9 %. `NoExploitTest` replays
-those patterns on the real engine and fails if any beats 94 %. Trade-off: mixing stakes gives a smaller bonus bet than a steady
-stake — the in-app help says so.
+* **v1** rounded the average up: stakes 1 and 2 averaging 1.5 were paid as a 2 (+33 % bonus).
+* **v2** (floor) was still beaten by an *adaptive* player. The collection window has a random length N and the bonus bet is
+  `W/N`, so betting big only while relics are arriving quickly (short window) gives a large average for a cheap wager
+  (E[1/N] > 1/E[N]). An independent audit by a separate agent found this, solved the optimal policy exactly (104.4 %), and I
+  reproduced it (101.28 % / 103.96 %).
+* **Shipped rule** (`RelicMeter`): a spin reveals a relic with the same probability whatever the stake, so the stake on a
+  relic-revealing spin is a random sample of the player's stakes. By Wald's identity
+  `E[Σ relic-spin stakes] = p · E[tokens wagered]`, hence `E[bonus bet] ≤ p·E[wagered]/5` for **every** adaptive policy (the
+  floor and the concave 25-book cap only lower it). The expected bonus per token wagered can therefore never exceed the
+  vault's 22.68 % share, and the rest of the return is also capped at 71.32 % (uniform mini-feature rate) — so
+  **no staking policy can exceed 94.00 %**; the best any player can do is play a constant low stake. Trade-off: mixing
+  stakes costs a little (the bet is rounded down) — e.g. the 70/30 mix above returns 86.9 %.
+
+The audit also independently recomputed both games from the Kotlin rules (exhaustive enumeration of ~10⁸–10⁹ stop
+combinations plus 10⁹-sample simulations): Dragon's Hoard **93.9955 %** (claimed 93.996 %), Neon Reaper **93.9995 %**
+uncapped (claimed 94.000 %), and constant-stake Neon Reaper 93.999 / 93.932 / 92.748 / 90.939 % at stakes 1 / 10 / 25 / 40
+(table above: within 0.0002). It found no way to beat Dragon's Hoard (every spin returns the same fraction of its bet; free
+spins pay in proportion to the triggering bet).
 
 ## 4. Re-verify everything
 
 ```bash
+python3 tools/dragon_model.py check           # the Python model still equals GameConfig.kt (reels, pays, free spins)
 python3 tools/dragon_model.py sim 3000000     # exact RTP, brute-force check, Monte-Carlo cross-check
-python3 tools/reaper_model.py                 # exact budget, cap table, uniform feature rate
+python3 tools/reaper_model.py check           # the Python model still equals ReaperConfig.kt
+python3 tools/reaper_model.py                 # exact budget, per-stake RTP table, uniform feature rate
+python3 tools/reaper_model.py exploit         # adaptive staking policies under the three bonus-bet rules
 echo "sdk.dir=/opt/android-sdk" > local.properties
 gradle :app:testDebugUnitTest --tests '*RtpTest*'
 gradle :reaper:testDebugUnitTest --tests 'com.tjshea.neonreaper.engine.*'

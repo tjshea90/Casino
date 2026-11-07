@@ -27,6 +27,7 @@ Model
 Usage:  python3 tools/dragon_model.py                 # report on the config below
         python3 tools/dragon_model.py sim [spins]     # + Monte-Carlo cross-check
         python3 tools/dragon_model.py tune [seed]     # search for new reel weights
+        python3 tools/dragon_model.py check           # verify this file still equals GameConfig.kt (reels/pays/free spins)
 """
 import itertools
 import random
@@ -50,20 +51,20 @@ FS_AWARD = {3: 10, 4: 15, 5: 25}                         # free spins by scatter
 FS_MULT = 3
 LINES = 10
 
-#            W  S TIG KOI LAN ENV A  K  Q  J  T
+#            W  S TIG KOI LAN ENV A  K  Q  J  T      (== GameConfig.BASE_COUNTS / FREE_COUNTS; `check` verifies)
 BASE = [
-    [3, 2, 4, 3, 4, 3, 5, 3, 4, 7, 6],
+    [3, 2, 4, 3, 3, 3, 4, 3, 4, 6, 6],
     [2, 1, 3, 3, 4, 4, 3, 3, 5, 5, 7],
-    [4, 1, 3, 3, 3, 3, 3, 4, 4, 4, 4],
-    [6, 1, 4, 4, 4, 4, 4, 4, 5, 5, 6],
-    [5, 2, 3, 3, 3, 2, 5, 5, 3, 7, 5],
+    [4, 1, 3, 3, 3, 3, 3, 4, 4, 4, 3],
+    [5, 1, 3, 4, 4, 4, 3, 4, 5, 5, 6],
+    [6, 2, 3, 3, 3, 2, 3, 4, 3, 6, 5],
 ]
 FREE = [
-    [5, 1, 3, 2, 4, 4, 4, 5, 4, 5, 8],
-    [7, 2, 3, 3, 3, 3, 3, 4, 5, 7, 7],
-    [6, 1, 4, 3, 4, 4, 5, 5, 7, 4, 7],
-    [5, 2, 3, 2, 1, 4, 4, 6, 6, 6, 6],
-    [6, 1, 2, 3, 4, 3, 2, 4, 5, 6, 5],
+    [5, 2, 4, 3, 4, 3, 4, 5, 4, 4, 8],
+    [7, 2, 3, 3, 4, 3, 3, 4, 5, 7, 7],
+    [6, 1, 4, 3, 4, 4, 5, 5, 6, 4, 7],
+    [5, 2, 3, 2, 1, 4, 4, 6, 6, 6, 5],
+    [6, 1, 2, 3, 4, 3, 2, 3, 5, 6, 4],
 ]
 
 
@@ -373,8 +374,38 @@ def polish(B, F, pays=None, fs_award=FS_AWARD, lo=0.93990, hi=0.94000, min_prem=
     return best
 
 
+def check_against_kotlin():
+    """Fail loudly if this file's reels / pays / free-spin table differ from GameConfig.kt (the shipped game)."""
+    import os
+    import re
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "app", "src", "main", "java", "com", "tjshea",
+                        "dragonhoard", "engine", "GameConfig.kt")
+    src = open(path).read()
+
+    def rows(name):
+        body = re.search(r"val %s: Array<IntArray> = arrayOf\((.*?)\n    \)" % name, src, re.S).group(1)
+        return [[int(x) for x in r.split(",")] for r in re.findall(r"intArrayOf\(([^)]*)\)", body)]
+
+    ok = True
+    for name, mine in (("BASE_COUNTS", BASE), ("FREE_COUNTS", FREE)):
+        same = rows(name) == mine
+        ok &= same
+        print("%-12s %s" % (name, "matches GameConfig.kt" if same else "DIFFERS from GameConfig.kt !!!"))
+    pays_kt = rows("PAYS")
+    same = all(tuple(pays_kt[s]) == p for s, p in PAYS.items())
+    ok &= same
+    print("%-12s %s" % ("PAYS", "matches GameConfig.kt" if same else "DIFFERS from GameConfig.kt !!!"))
+    fs = [int(x) for x in re.search(r"FREE_SPINS_BY_SCATTERS = intArrayOf\(([^)]*)\)", src).group(1).split(",")]
+    same = all(fs[k] == v for k, v in FS_AWARD.items())
+    ok &= same
+    print("%-12s %s" % ("FS_AWARD", "matches GameConfig.kt" if same else "DIFFERS from GameConfig.kt !!!"))
+    return ok
+
+
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else "report"
+    if cmd == "check":
+        raise SystemExit(0 if check_against_kotlin() else 1)
     if cmd == "polish":
         sd = int(sys.argv[2]) if len(sys.argv) > 2 else 3
         B, F, _ = tune(sd)

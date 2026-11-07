@@ -351,14 +351,14 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
             "5 soul orbs start in a 5×4 vault and you get 3 respins — press SPIN for each one. Every orb that lands sticks and resets the respins to 3. " +
             "Orbs pay 1×–25× the bonus bet; MINI ${ReaperConfig.MINI}×, MINOR ${ReaperConfig.MINOR}×, MAJOR ${ReaperConfig.MAJOR}× jackpot orbs; " +
             "the Reaper orb harvests the value of every soul on the board; fill all 20 niches for the GRAND (${ReaperConfig.GRAND}×). " +
-            "The bonus bet is your average stake while collecting the relics, rounded down (now: ${wallet.averageStake}) — so keep your stake steady for the biggest bonus. Relics are kept between sessions.\n\n" +
+            "The bonus bet is the average stake of the five spins that revealed your relics, rounded down (if the missing relics came at your current stake: ${wallet.projectedBonusBet}). Relics are kept between sessions.\n\n" +
             "MONEY RULES\n" +
             "• Stake 1–40 tokens (10 tokens = 1 mack, 80 tokens = 1 book).\n" +
             "• Every win pays exact tokens. Rounding down to a whole mack only happens when you cash out (odd tokens stay on the machine).\n" +
             "• Maximum win: 25 books (2,000 tokens) per spin and per Soul Vault.\n" +
-            "• Return to player: ${"%.0f".format(ReaperConfig.TARGET_RTP * 100)}% at stakes 1–10 — over time the machine keeps ${"%.0f".format(100 - ReaperConfig.TARGET_RTP * 100)}% of every token wagered. " +
-            "The 25-book win cap trims it a little at higher stakes (this stake: ${"%.1f".format(ReaperConfig.RTP_BY_STAKE[ReaperConfig.stakeIndex(wallet.stake)] * 100)}%). " +
-            "About 1 spin in 3 is a winner (${ReaperConfig.HIT_FREQUENCY_TEXT}) and every win pays at least your stake back.\n" +
+            "• Return to player: up to ${"%.0f".format(ReaperConfig.TARGET_RTP * 100)}% — exactly ${"%.1f".format(ReaperConfig.TARGET_RTP * 100)}% at stakes 1–5, a little less at higher stakes because of the 25-book win cap (this stake: ${"%.1f".format(ReaperConfig.RTP_BY_STAKE[ReaperConfig.stakeIndex(wallet.stake)] * 100)}%). " +
+            "However you vary your stakes, the machine keeps at least ${"%.0f".format(100 - ReaperConfig.TARGET_RTP * 100)}% of every token wagered over time. " +
+            "Wins land ${ReaperConfig.HIT_FREQUENCY_TEXT} spins and every win pays at least your stake back.\n" +
             "• Each spin is decided by a secure random number (SecureRandom) the instant you press spin; the animation is only for show.\n" +
             "• Tap the reels to slam-stop; tap during the Soul Vault to fast-forward.", 14f))
         lateinit var dlg: Dialog

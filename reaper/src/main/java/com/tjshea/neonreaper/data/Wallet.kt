@@ -4,6 +4,7 @@ import android.content.Context
 import com.tjshea.neonreaper.engine.Money
 import com.tjshea.neonreaper.engine.ReaperConfig
 import com.tjshea.neonreaper.engine.ReaperEngine
+import com.tjshea.neonreaper.engine.RelicMeter
 import com.tjshea.neonreaper.engine.SoulVault
 import com.tjshea.neonreaper.engine.SpinOutcome
 import com.tjshea.neonreaper.engine.VaultResult
@@ -44,9 +45,9 @@ class Wallet(private val context: Context) {
     var soundOn = true
     var musicOn = true
     var turbo = false
-    var relics = 0; private set
-    var collectSpins = 0L; private set
-    var collectWagered = 0L; private set
+    /** Relic progress and the stakes of the spins that revealed them (decides the Soul Vault bonus bet). */
+    private val meter = RelicMeter()
+    val relics: Int get() = meter.relics
     var pendingVaultSeed = 0L; private set
     var pendingVaultBet = 0; private set
     var vaultUnseen = false; private set
@@ -70,9 +71,12 @@ class Wallet(private val context: Context) {
     val hasPassword: Boolean get() = pwHash != null
     val stake: Int get() = ReaperConfig.STAKES[stakeIndex.coerceIn(0, ReaperConfig.STAKES.size - 1)]
 
-    /** Bonus bet the Soul Vault would use right now: average stake while collecting relics, rounded down. */
-    val averageStake: Int
-        get() = ReaperEngine.bonusBet(collectWagered, collectSpins, stake)
+    /**
+     * Bonus bet the Soul Vault would get if the relics still missing were revealed at the current stake: the average stake
+     * of the five relic-revealing spins, rounded down (see RelicMeter for why it is not the average of every spin).
+     */
+    val projectedBonusBet: Int
+        get() = meter.projectedBet(stake)
 
     @Synchronized
     fun load(): LoadStatus {
@@ -94,7 +98,12 @@ class Wallet(private val context: Context) {
         balance = o.getLong("balance")
         stakeIndex = o.optInt("stakeIdx", 6)
         soundOn = o.optBoolean("sound", true); musicOn = o.optBoolean("music", true); turbo = o.optBoolean("turbo")
-        relics = o.optInt("relics"); collectSpins = o.optLong("cSpins"); collectWagered = o.optLong("cWag")
+        meter.relics = o.optInt("relics")
+        meter.stakeSum = if (o.has("rSum")) o.getLong("rSum") else {
+            // wallet saved by an older version: it tracked the average stake of the whole collection window
+            val oldSpins = o.optLong("cSpins"); val oldWagered = o.optLong("cWag")
+            meter.relics * (if (oldSpins > 0) oldWagered / oldSpins else stake.toLong())
+        }
         pendingVaultSeed = o.optLong("vSeed"); pendingVaultBet = o.optInt("vBet"); vaultUnseen = o.optBoolean("vUnseen")
         totalDeposited = o.optLong("dep"); totalWithdrawn = o.optLong("wd")
         totalWagered = o.optLong("wag"); totalWon = o.optLong("won")
@@ -116,7 +125,7 @@ class Wallet(private val context: Context) {
     private fun toJson(): JSONObject = JSONObject().apply {
         put("v", 1); put("balance", balance); put("stakeIdx", stakeIndex)
         put("sound", soundOn); put("music", musicOn); put("turbo", turbo)
-        put("relics", relics); put("cSpins", collectSpins); put("cWag", collectWagered)
+        put("relics", meter.relics); put("rSum", meter.stakeSum)
         put("vSeed", pendingVaultSeed); put("vBet", pendingVaultBet); put("vUnseen", vaultUnseen)
         put("dep", totalDeposited); put("wd", totalWithdrawn); put("wag", totalWagered); put("won", totalWon)
         put("spins", spins); put("features", features); put("bonuses", bonuses); put("bonusWon", bonusWon)
@@ -225,7 +234,7 @@ class Wallet(private val context: Context) {
             if (r !is AuthResult.Ok) return r
         }
         file.delete()
-        balance = 0; relics = 0; collectSpins = 0; collectWagered = 0; vaultUnseen = false
+        balance = 0; meter.relics = 0; meter.stakeSum = 0; vaultUnseen = false
         totalDeposited = 0; totalWithdrawn = 0; totalWagered = 0; totalWon = 0
         spins = 0; features = 0; bonuses = 0; bonusWon = 0; biggestWin = 0; ledger.clear()
         pwSalt = null; pwHash = null; failedAttempts = 0; lockUntil = 0
@@ -253,8 +262,6 @@ class Wallet(private val context: Context) {
         if (stake !in ReaperConfig.STAKES || balance < stake) return null
         balance -= stake
         totalWagered += stake
-        collectSpins++
-        collectWagered += stake
         val outcome = ReaperEngine.spin(rng, stake)
         val win = outcome.payTokens
         balance += win
@@ -264,10 +271,9 @@ class Wallet(private val context: Context) {
         var relicIndex = -1
         var vault: VaultResult? = null
         if (rng.nextDouble() < ReaperConfig.RELIC_CHANCE) {
-            relicIndex = relics
-            relics++
-            if (relics >= ReaperConfig.RELIC_COUNT) {
-                val bet = averageStake
+            relicIndex = meter.relics
+            val bet = meter.collect(stake)      // > 0 when this was the fifth relic
+            if (bet > 0) {
                 val seed = rng.nextLong()
                 vault = SoulVault.play(seed, bet)
                 balance += vault.payTokens
@@ -276,7 +282,6 @@ class Wallet(private val context: Context) {
                 bonuses++
                 if (vault.payTokens > biggestWin) biggestWin = vault.payTokens
                 pendingVaultSeed = seed; pendingVaultBet = bet; vaultUnseen = true
-                relics = 0; collectSpins = 0; collectWagered = 0
             }
         }
         if (win > biggestWin) biggestWin = win

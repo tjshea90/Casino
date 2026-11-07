@@ -1022,7 +1022,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         val lx = relicSlots[4].right + 14 * u
         c.drawText("SOUL VAULT", lx, relicRect.centerY() - 2 * u, pText)
         pText.color = 0xFF8A9A80.toInt(); pText.textSize = relicRect.height() * 0.2f
-        c.drawText("BONUS BET ${wallet.averageStake}", lx, relicRect.centerY() + relicRect.height() * 0.26f, pText)
+        c.drawText("BONUS BET ${wallet.projectedBonusBet}", lx, relicRect.centerY() + relicRect.height() * 0.26f, pText)
         pText.textAlign = Paint.Align.RIGHT
         pText.color = 0xFF9CCC65.toInt(); pText.textSize = relicRect.height() * 0.24f
         c.drawText("RELICS", relicSlots[0].left - 14 * u, relicRect.centerY() - 2 * u, pText)

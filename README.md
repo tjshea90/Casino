@@ -29,7 +29,7 @@ Both run on Android 10 (Go) and up (MT8168 / armv7 tested target), share the sam
 - **Reaper's Touch:** the Grim Reaper swoops in and slashes 1–3 middle reels fully wild.
 - **Relics → Soul Vault bonus:** about 1 spin in 25 reveals one of 5 relics (kept between sessions). Collect all 5 (≈ every 125 spins) to open the **Soul Vault**, a separate hold-and-spin screen:
   its own epic soundtrack, 5 starting orbs, 3 respins (press SPIN for each) that reset whenever an orb lands; orbs worth 1×–25× the bonus bet; MINI 15×, MINOR 40×, MAJOR 150× jackpot orbs;
-  the Reaper orb harvests every soul on the board; fill all 20 niches for the GRAND (1000×). Averages ~28× the bonus bet. The bonus bet is your **average stake while collecting, rounded down**, so switching to a big stake at the last relic doesn't game it — and keep your stake steady for the biggest bonus.
+  the Reaper orb harvests every soul on the board; fill all 20 niches for the GRAND (1000×). Averages ~28× the bonus bet. The bonus bet is the **average stake of the five spins that revealed your relics, rounded down** — no pattern of stakes (big bets at the last relic, bets timed to relic count, mixing stakes) can earn a bigger bonus than the tokens you actually wagered.
 - Big/Huge/Massive/Deadly win celebrations with the reaper rising, characters looming out of the reels on 5-of-a-kind, lightning, bats, fog, soul particles, synthesized horror music (separate bonus track) and sound effects.
 
 | Reaper's Touch | Big win | Soul Vault |
@@ -43,8 +43,8 @@ Both run on Android 10 (Go) and up (MT8168 / armv7 tested target), share the sam
 **Math verification** (`reaper/src/test/.../engine`): the RTP budget is *calculated exactly* — base game 59.34 % + mini features 11.98 % +
 Soul Vault 22.68 % = **94.00 %** (`RtpExactTest`, `tools/reaper_model.py`) — and cross-checked against simulations of the real engine code
 (`FullGameTest`: 4 M spins at each of 5 stakes, 94.05 / 93.99 / 93.89 / 92.84 / 90.87 % at stakes 1 / 5 / 10 / 25 / 40, hit rate 34 %).
-`CalibrationTest` measures the 25-book cap per stake; `NoExploitTest` plays mixed-stake strategies and fails if any beats 94 %
-(the old rounding rule leaked up to ~98 % — fixed, see `docs/MATH.md`).
+`CalibrationTest` measures the 25-book cap per stake; `NoExploitTest` replays adaptive staking policies on the real engine and fails if
+any beats 94 % (two earlier bonus-bet rules leaked 98 % and 101–104 % — found by testing and an independent audit, fixed, see `docs/MATH.md`).
 
 ---
 

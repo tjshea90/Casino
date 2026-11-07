@@ -6,11 +6,13 @@ package com.tjshea.neonreaper.engine
  * happens at cash-out). Wins are capped at 25 books (2000 tokens) per spin and per bonus.
  *
  * RTP design (94.00 %, house edge 6 %):
- *   base game 59.34 % + mini features 11.98 % + Soul Vault 22.68 % = 94.000 % at stakes 1-10 (exact, see
+ *   base game 59.34 % + mini features 11.98 % + Soul Vault 22.68 % = 94.000 % at stakes 1-5 (exact, see
  *   tools/reaper_model.py and RtpExactTest). The mini-feature rate is the SAME at every stake on purpose: the
- *   25-book cap can then only ever LOWER the return at high stakes (RTP_BY_STAKE), so no staking pattern can
- *   beat 94 %. (A per-stake rate that "refills" the cap loss, plus rounding the bonus bet up, let a player who
- *   mixes stakes reach ~98 % in testing -- see ReaperEngine.bonusBet and NoExploitTest.)
+ *   25-book cap can then only ever LOWER the return at high stakes (RTP_BY_STAKE).
+ *   The Soul Vault bet is the average stake of the five spins that revealed the relics, rounded down (RelicMeter):
+ *   that makes the expected bonus per token wagered identical for EVERY staking policy, so no pattern of stakes can beat
+ *   the headline RTP. Two earlier rules were beaten in testing: rounding the average of the whole collection window up
+ *   (mixing stakes 1 and 2 reached ~98 %), and flooring it (betting big only when relics arrive fast reached 101-104 %).
  * Do not edit pays/reels/features without re-running tools/reaper_model.py and the tests in
  * reaper/src/test/.../engine, and pasting the new numbers here.
  */

@@ -43,7 +43,18 @@ Work queue (tick as you go):
       — whole :reaper suite green (29/29, incl. GL tests after `apt-get install libegl1 libegl-mesa0 libgles2 libgbm1`, run with EGL_PLATFORM=surfaceless)
 - [x] docs/MATH.md, README, CLAUDE.md numbers (94 %), CI test list (build.yml runs the fast exact tests)
 - [x] Full test run both modules (green)
-- [ ] Independent audit of the math by a separate agent (running/ran in session 6) — apply any findings
+- [x] Independent audit by a separate agent (it recomputed both RTPs from scratch: DH 93.9955 %, NR 93.9995 % uncapped — all match) found
+      4 issues, status:
+      1. **REAL EXPLOIT (fixed in code, tests being updated):** NR bonus bet = floor(average stake of ALL spins in the cycle) is beaten by an
+         ADAPTIVE policy (bet big only when relics arrive fast): "bet 1; with 4 relics and <=60 spins since the last vault bet 40" = 101.3 %,
+         threshold policy 104.0 %, optimal 104.4 % (I reproduced 101.28 / 103.96). Fix = `RelicMeter`: bonus bet = floor(mean stake of the FIVE
+         RELIC-REVEALING SPINS) — neutral for every policy by Wald's identity (a relic spin is a random sample of the player's stakes);
+         same policies now give 92.6 / 92.5 %. `Wallet` uses `RelicMeter`; HUD shows `projectedBonusBet`.
+      2. NR help text overclaimed — reworded ("up to 94 %", "at least 6 % however you vary stakes"). [x]
+      3. `tools/dragon_model.py` still had the OLD 80 % reel counts (printed 0.83886) — fixed; both models now have a `check` command that compares with the Kotlin config. [x]
+      4. Dragon's help said "choose 1–10 lines" but only 1,3,5,7,9,10 exist — fixed. [x]
+      Engine tests with RelicMeter green: adaptive exploit policies now 92.6/92.7/92.4/91.1 % (old rule 101-105 %). TODO: full suites, rebuild APKs, ship.
+      Known pre-existing limits noted by the audit (not changed): password lockout uses wall-clock time; signed wallet file has no rollback counter.
 - [x] Version bump committed (app 1.1.0/code 2, reaper 2.1.0/code 5); release builds verified (same signing cert 1bc61b76… as old APKs => in-place upgrade)
 - [ ] Copy `app/build/outputs/apk/release/app-release.apk` -> `release/DragonsHoard.apk` and `reaper/build/outputs/apk/release/reaper-release.apk` -> `release/NeonReaper.apk`, then `SHIP=1 tools/checkpoint.sh "release ..."` (publishes a GitHub Release!)
 
