@@ -44,7 +44,8 @@ Work queue (tick as you go):
 - [x] docs/MATH.md, README, CLAUDE.md numbers (94 %), CI test list (build.yml runs the fast exact tests)
 - [x] Full test run both modules (green)
 - [ ] Independent audit of the math by a separate agent (running/ran in session 6) — apply any findings
-- [ ] Version bump (app 1.1.0/code 2, reaper 2.1.0/code 5), build release APKs into release/, `SHIP=1 tools/checkpoint.sh` (publishes GitHub Release!)
+- [x] Version bump committed (app 1.1.0/code 2, reaper 2.1.0/code 5); release builds verified (same signing cert 1bc61b76… as old APKs => in-place upgrade)
+- [ ] Copy `app/build/outputs/apk/release/app-release.apk` -> `release/DragonsHoard.apk` and `reaper/build/outputs/apk/release/reaper-release.apk` -> `release/NeonReaper.apk`, then `SHIP=1 tools/checkpoint.sh "release ..."` (publishes a GitHub Release!)
 
 Status line: Dragon's Hoard DONE at 94 % (tests green). Neon Reaper DESIGN FINAL (in tools/reaper_model.py, validated vs old Kotlin
 calibration): reels [1,3,3,5,5,5,6,6,8,9,12], relic chance 5/125 (bonus ~every 125 spins), ONE stake-independent mini-feature rate
