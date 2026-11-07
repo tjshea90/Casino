@@ -529,7 +529,8 @@ class SlotView(context: Context, private val host: Host) : View(context) {
             }
             // Honest presentation: a win that returns less than the whole stake (a "partial return",
             // common with pair pays on many lines) gets only a quiet chime; real wins get the full one.
-            sfx.play(Sfx.WIN, if (x < 1.0) 0.4f else 0.8f, if (x >= 3) 1.0f else 1.15f)
+            val partialReturn = !res.freeSpin && x < 1.0   // free spins cost nothing, so any free-spin win is real profit
+            sfx.play(Sfx.WIN, if (partialReturn) 0.4f else 0.8f, if (x >= 3) 1.0f else 1.15f)
             if (x >= 5) coinRate = 25f
         } else {
             pendingWin = 0

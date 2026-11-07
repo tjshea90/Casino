@@ -352,7 +352,7 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
             "• Five Dragon Wilds on a line pays 1,000× the line bet — ×3 during free spins!\n" +
             "• Free spins use the bet that triggered them and special reels with extra wilds.\n" +
             "• Return to player: %.2f%% theoretical (medium volatility), so over time the machine keeps %.2f%% of every token wagered. ".format(GameConfig.THEORETICAL_RTP * 100, 100 - GameConfig.THEORETICAL_RTP * 100) +
-            "Any win lands ${GameConfig.HIT_FREQUENCY_TEXT} spins; a win of at least your whole stake ${GameConfig.STAKE_WIN_FREQUENCY_TEXT} spins " +
+            "At 10 lines, any win lands ${GameConfig.HIT_FREQUENCY_TEXT} spins and a win of at least your whole stake ${GameConfig.STAKE_WIN_FREQUENCY_TEXT} spins (fewer lines win less often but return the same share of your bet over time) " +
             "(small pair and low pays can return less than you bet — they get a quiet chime).\n" +
             "• Each spin is decided by a secure random number (SecureRandom) the instant you press spin; the animation is only for show.\n" +
             "• Tap the reels while spinning to slam-stop. TURBO speeds up spins.", 14f))

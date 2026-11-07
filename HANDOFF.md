@@ -37,12 +37,14 @@ Work queue (tick as you go):
 - [x] `tools/dragon_model.py` exact model + simulator + tuner (reproduces Kotlin 80 % numbers to 5 decimals)
 - [x] `tools/checkpoint.sh`, resume protocol (this block)
 - [x] Dragon's Hoard: Kotlin config/engine (pair pays, FS by scatter count, new reels) + RtpTest at 94 % + UI text/chime
-      (exact 93.996 %, sim 94.05 %, any-win 1 in 2.28, win>=stake 1 in 6.1, FS every ~109 spins, SD 5.45) — still TODO: screenshot check of dialogs
+      (exact 93.996 %, sim 94.05 %, any-win 1 in 2.28, win>=stake 1 in 6.1, FS every ~109 spins, SD 5.45); screenshots of paytable/stats checked
 - [x] Neon Reaper: exact model `tools/reaper_model.py`, rebudget, uniform FEATURE_RATE 0.009924, bonusBet=floor, tests (RtpExactTest, CalibrationTest,
       FullGameTest, NoExploitTest all green: stake1 94.00 %, 10 93.93 %, 25 92.74 %, 40 90.92 %; hit 1 in 2.95; vault every 125 spins)
-      — still TODO: run whole :reaper suite + screenshot review of the Help/Stats text
-- [ ] docs/MATH.md, README, CLAUDE.md numbers (94 %), CI test list
-- [ ] Full test run both modules, independent review of the math, APK build + release (SHIP=1) — ask/announce before publishing
+      — whole :reaper suite green (29/29, incl. GL tests after `apt-get install libegl1 libegl-mesa0 libgles2 libgbm1`, run with EGL_PLATFORM=surfaceless)
+- [x] docs/MATH.md, README, CLAUDE.md numbers (94 %), CI test list (build.yml runs the fast exact tests)
+- [x] Full test run both modules (green)
+- [ ] Independent audit of the math by a separate agent (running/ran in session 6) — apply any findings
+- [ ] Version bump (app 1.1.0/code 2, reaper 2.1.0/code 5), build release APKs into release/, `SHIP=1 tools/checkpoint.sh` (publishes GitHub Release!)
 
 Status line: Dragon's Hoard DONE at 94 % (tests green). Neon Reaper DESIGN FINAL (in tools/reaper_model.py, validated vs old Kotlin
 calibration): reels [1,3,3,5,5,5,6,6,8,9,12], relic chance 5/125 (bonus ~every 125 spins), ONE stake-independent mini-feature rate
