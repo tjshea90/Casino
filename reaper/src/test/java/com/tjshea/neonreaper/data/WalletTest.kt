@@ -70,4 +70,24 @@ class WalletTest {
         }
         assertTrue("expected some vaults in 6000 spins", vaults > 5)
     }
+
+    /** A wallet saved by the previous version (relics + whole-window average, no relic-stake sum) loads and keeps working. */
+    @Test fun migratesAnOldCollectionWindowWallet() {
+        val w = fresh(); w.deposit(pw("grim"), 100)
+        val f = File(ctx.filesDir, "wallet.dat")
+        val json = org.json.JSONObject(f.readText().substringBeforeLast('\n'))
+        json.put("relics", 3); json.remove("rSum"); json.put("cSpins", 70); json.put("cWag", 700)   // old average stake: 10
+        val text = json.toString()
+        f.writeText(text + "\n" + Security.b64(Security.sign(ctx, text.toByteArray())))
+        val l = Wallet(ctx)
+        assertEquals(Wallet.LoadStatus.OK, l.load())
+        assertEquals(3, l.relics)
+        // 3 banked relics at the old average of 10, 2 missing ones at the current stake (10) -> bonus bet 10
+        assertEquals(10, l.projectedBonusBet)
+        l.deposit(pw("grim"), 10)                       // saves in the new format ...
+        assertTrue(f.readText().contains("\"rSum\":30"))
+        val again = Wallet(ctx); again.load()           // ... and reloads identically
+        assertEquals(3, again.relics)
+        assertEquals(10, again.projectedBonusBet)
+    }
 }
