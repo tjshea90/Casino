@@ -51,11 +51,10 @@ internal class Ledger(private val ui: Ui, private val wallet: Wallet) {
             addView(ui.figure("${signed(net)} tokens", 34f, netColor(net)), ui.lp(t = 4))
             addView(ui.text("Won minus wagered since you started playing.", 12.5f, Dread.BONE_DIM), ui.lp(t = 2))
         }, ui.lp())
-        session.addView(ui.hbox().apply {
-            addView(ui.stat("Time played", minutes(wallet.sessionMillis), maxSp = 20f), ui.lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f, r = 4))
-            addView(ui.stat("Wagered", fmt(wallet.sessionWagered), maxSp = 20f), ui.lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f, l = 4, r = 4))
-            addView(ui.stat("Won", fmt(wallet.sessionWon), maxSp = 20f), ui.lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f, l = 4))
-        }, ui.lp(t = 8))
+        session.addView(ui.tiles(
+            ui.stat("Time played", minutes(wallet.sessionMillis), maxSp = 20f),
+            ui.stat("Wagered", fmt(wallet.sessionWagered), maxSp = 20f),
+            ui.stat("Won", fmt(wallet.sessionWon), maxSp = 20f)), ui.lp(t = 8))
         val back = if (wallet.sessionWagered > 0) "%.1f %%".format(wallet.sessionWon * 100.0 / wallet.sessionWagered) else "-"
         session.addView(ui.kv("Returned this session", back), ui.lp(t = 6))
         cols.addView(session)
@@ -87,11 +86,10 @@ internal class Ledger(private val ui: Ui, private val wallet: Wallet) {
         // ---- credit
         val credit = ui.vbox()
         credit.addView(ui.section("Machine credit"), ui.lp(b = 8))
-        credit.addView(ui.hbox().apply {
-            addView(ui.stat("Balance", fmt(wallet.balance), Money.describe(wallet.balance), maxSp = 22f), ui.lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.3f, r = 4))
-            addView(ui.stat("Deposited", fmt(wallet.totalDeposited), maxSp = 22f), ui.lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f, l = 4, r = 4))
-            addView(ui.stat("Withdrawn", fmt(wallet.totalWithdrawn), maxSp = 22f), ui.lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f, l = 4))
-        }, ui.lp())
+        credit.addView(ui.tiles(
+            ui.stat("Balance", fmt(wallet.balance), Money.describe(wallet.balance), maxSp = 22f),
+            ui.stat("Deposited", fmt(wallet.totalDeposited), maxSp = 22f),
+            ui.stat("Withdrawn", fmt(wallet.totalWithdrawn), maxSp = 22f), weights = floatArrayOf(1.3f, 1f, 1f)), ui.lp())
         cols.addView(credit)
         page.addView(cols, ui.lp())
 

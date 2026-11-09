@@ -51,6 +51,19 @@ class ActivityTest {
     @Test @Config(qualifiers = "w800dp-h1280dp-port-mdpi") fun portrait() = tour("port")
     @Test @Config(qualifiers = "w640dp-h360dp-land-xhdpi") fun phoneLandscape() = tour("phone_land")
     @Test @Config(qualifiers = "w360dp-h740dp-port-xhdpi") fun phonePortrait() = tour("phone_port")
+    /** A landscape phone with the keyboard up leaves ~170 dp: the title goes, the field and the buttons stay. */
+    @Test @Config(qualifiers = "w640dp-h170dp-land-xhdpi") fun keyboardUp() {
+        val act = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+        val shots = Shots("keyboard", act)
+        shots.snap("setup")
+        val w = act.wallet; w.setInitialPassword(pw)
+        act.openDeposit(); shots.snap("deposit")
+        act.openWithdraw(); shots.snap("withdraw")
+        Dialogs(act, w) {}.changePassword(); shots.snap("changepw")
+        Dialogs(act, w) {}.reset(); shots.snap("reset")
+        shots.finish()
+    }
+    @Test @Config(qualifiers = "w800dp-h1280dp-port-mdpi") fun largeFonts() { RuntimeEnvironment.setFontScale(1.5f); tour("port_font15") }
 
     // ------------------------------------------------------------------ every dialog, one screen size
     private fun tour(tag: String) {
@@ -393,7 +406,7 @@ class ActivityTest {
             val r = Rect(); panel.getHitRect(r)
             if (r.left < 0 || r.top < 0 || r.right > w || r.bottom > h) problems += "$name: sheet $r leaves the ${w}x$h screen"
             overflow(dlg.window!!.decorView, name)
-            val minTouch = (44 * dm.density).toInt() - 2
+            val minTouch = (48 * dm.density).toInt() - 2
             for (b in views(dlg) { it is Button && it.visibility == View.VISIBLE })
                 if (b.measuredHeight < minTouch) problems += "$name: touch target '${(b as Button).text}' is only ${b.measuredHeight}px tall"
         }

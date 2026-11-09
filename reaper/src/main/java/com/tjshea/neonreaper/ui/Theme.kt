@@ -504,6 +504,10 @@ internal class ButtonBar(context: Context, private val gap: Int) : LinearLayout(
  * screen while the middle scrolls. It re-measures on its own after a rotation or an IME resize.
  */
 internal class SheetLayout(context: Context, private val maxWidth: Int, private val margin: Int) : LinearLayout(context) {
+    /** Title, subtitle and rules: hidden when the sheet is squeezed (landscape phone with the keyboard up) so the field stays visible. */
+    val chrome = ArrayList<View>()
+    private val tinyBelow = (270 * context.resources.displayMetrics.density).toInt()
+
     init { orientation = VERTICAL }
 
     override fun onMeasure(wSpec: Int, hSpec: Int) {
@@ -511,6 +515,8 @@ internal class SheetLayout(context: Context, private val maxWidth: Int, private 
         val availH = if (MeasureSpec.getMode(hSpec) == MeasureSpec.UNSPECIFIED) Int.MAX_VALUE / 2 else MeasureSpec.getSize(hSpec)
         val w = min(maxWidth, availW - 2 * margin).coerceAtLeast(0)
         val h = (availH - 2 * margin).coerceAtLeast(0)
+        val vis = if (h < tinyBelow) View.GONE else View.VISIBLE
+        for (v in chrome) if (v.visibility != vis) v.visibility = vis
         super.onMeasure(MeasureSpec.makeMeasureSpec(w, MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(h, MeasureSpec.AT_MOST))
     }
 }
@@ -591,9 +597,14 @@ internal class Ui(val ctx: Context) {
            l: Number = 0, t: Number = 0, r: Number = 0, b: Number = 0) =
         LinearLayout.LayoutParams(w, h, weight).apply { setMargins(dp(l), dp(t), dp(r), dp(b)) }
 
+    /** Children keep a LinearLayout.LayoutParams they already carry (fixed icon sizes, gravity); the others stretch to the full width. */
     fun vbox(vararg views: View, gap: Number = 0): LinearLayout = LinearLayout(ctx).apply {
         orientation = LinearLayout.VERTICAL
-        views.forEachIndexed { i, v -> addView(v, lp(t = if (i > 0) gap else 0)) }
+        views.forEachIndexed { i, v ->
+            val own = v.layoutParams as? LinearLayout.LayoutParams
+            val top = if (i > 0) dp(gap) else 0
+            addView(v, if (own != null) LinearLayout.LayoutParams(own).apply { topMargin = top } else lp(t = if (i > 0) gap else 0))
+        }
     }
 
     fun hbox(gravity: Int = Gravity.CENTER_VERTICAL): LinearLayout = LinearLayout(ctx).apply {
@@ -701,6 +712,16 @@ internal class Ui(val ctx: Context) {
             if (sub != null) addView(text(sub, 12f, Dread.BONE_DIM), lp(t = 2))
         }
 
+    /** Equal-height tiles side by side ([weights] share the width). */
+    fun tiles(vararg views: View, weights: FloatArray = FloatArray(views.size) { 1f }, gap: Number = 8): LinearLayout = LinearLayout(ctx).apply {
+        orientation = LinearLayout.HORIZONTAL
+        views.forEachIndexed { i, v ->
+            addView(v, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, weights[i]).apply {
+                setMargins(if (i > 0) dp(gap) / 2 else 0, 0, if (i < views.size - 1) dp(gap) / 2 else 0, 0)
+            })
+        }
+    }
+
     // ---- controls
     fun button(label: CharSequence, kind: Dread.Kind = Dread.Kind.PRIMARY, small: Boolean = false, onClick: (View) -> Unit): Button =
         Button(ctx).apply {
@@ -711,7 +732,7 @@ internal class Ui(val ctx: Context) {
             background = Dread.buttonBg(kind, d)
             stateListAnimator = null
             minWidth = 0; minimumWidth = 0
-            val mh = dp(if (small) 44 else if (short) 48 else 52)
+            val mh = dp(if (small || short) 48 else 52)   // never below the 48 dp touch-target minimum
             minHeight = mh; minimumHeight = mh
             setPadding(dp(14), dp(6), dp(14), dp(6))
             setOnClickListener(onClick)

@@ -44,9 +44,9 @@ internal class Guide(private val ui: Ui, private val wallet: Wallet) {
     fun pays(stake: Int): View {
         val page = ui.vbox()
         page.addView(ui.text(ui.rich(
-            "**${ReaperConfig.PAYLINES.size} paylines**, paid left to right from the first reel. Wins on different lines add up. " +
-                "Figures are tokens at your stake of **$stake**; the grey ×N is the multiple of your stake. " +
-                "A win never pays more than **$maxBooks books (${fmt(ReaperConfig.MAX_WIN_TOKENS)} tokens)**."), 14f, Dread.BONE_DIM), ui.lp(b = 12))
+            "**${ReaperConfig.PAYLINES.size} paylines**, paid left to right from reel 1; wins on different lines add up. " +
+                "Tokens at your stake of **$stake** (grey: \u00D7 your stake). Maximum win **$maxBooks books (${fmt(ReaperConfig.MAX_WIN_TOKENS)} tokens)**."),
+            14f, Dread.BONE_DIM), ui.lp(b = 12))
 
         val cols = Columns(ctx, ui.dp(640), ui.dp(20))
         val left = ui.vbox(); val right = ui.vbox()

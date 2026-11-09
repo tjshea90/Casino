@@ -90,9 +90,15 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
             isClickable = true   // taps on the sheet never count as "outside"
             setPadding(padH, dp(if (short) 12 else if (tight) 16 else 22), padH, dp(if (short) 10 else if (tight) 14 else 20))
         }
-        panel.addView(ui.heading(title, if (short) 20f else if (tight) 21f else 26f), ui.lp())
-        if (subtitle != null) panel.addView(ui.text(subtitle, if (short) 12.5f else 13.5f, Dread.BONE_DIM, center = true), ui.lp(t = if (short) 1 else 4))
-        panel.addView(ui.rule(), ui.lp(t = if (short) 2 else 6, b = if (short) 2 else 6))
+        val head = ui.heading(title, if (short) 20f else if (tight) 21f else 26f)
+        panel.addView(head, ui.lp())
+        panel.chrome += head
+        if (subtitle != null) {
+            val sub = ui.text(subtitle, if (short) 12.5f else 13.5f, Dread.BONE_DIM, center = true)
+            panel.addView(sub, ui.lp(t = if (short) 1 else 4)); panel.chrome += sub
+        }
+        val headRule = ui.rule()
+        panel.addView(headRule, ui.lp(t = if (short) 2 else 6, b = if (short) 2 else 6)); panel.chrome += headRule
         if (tabs != null) panel.addView(tabs, ui.lp(b = if (short) 4 else 8))
         val scroll = ui.scroll()
         scroll.addView(FrameLayout(act).apply { setPadding(0, dp(4), 0, dp(8)); addView(body) })
@@ -360,7 +366,7 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
         fun showPage(i: Int) { host.removeAllViews(); host.addView(page(i)); sh.scroll.scrollTo(0, 0) }   // (only called by a tab tap, after the sheet exists)
         host.addView(page(0))
         val tabs = ui.choice(listOf("Pays", "Features", "Rules"), 0, "Section") { showPage(it) }
-        sheet(sh, "PAYTABLE & RULES", subtitle = "Pays shown for your stake of $stake token${if (stake == 1) "" else "s"}", widthDp = 900,
+        sheet(sh, "PAYTABLE & RULES", subtitle = if (ui.short) null else "Pays shown for your stake of $stake token${if (stake == 1) "" else "s"}", widthDp = 900,
             body = host, tabs = tabs, footer = ui.button("Close") { sh.close() })
     }
 
@@ -488,22 +494,28 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
             val can = wallet.canBuy(f, stake)
             val seance = f == Feature.SEANCE
             val c = ui.card(highlight = picked == f, pad = 16)
-            val icon = if (seance) Art.symbol(ReaperConfig.SCATTER, dp(64)) else Art.orbBitmap(dp(64), Neon.GREEN)
+            val iconDp = if (ui.short) 48 else 64
+            val icon = if (seance) Art.symbol(ReaperConfig.SCATTER, dp(iconDp)) else Art.orbBitmap(dp(iconDp), Neon.GREEN)
             c.addView(ui.hbox().apply {
-                addView(ui.icon(icon, 64, title(f)))
+                addView(ui.icon(icon, iconDp, title(f)))
                 addView(ui.vbox(
                     ui.heading(title(f), 21f, center = false).apply { setShadowLayer(0f, 0f, 0f, 0) },
                     ui.caps(if (seance) "Free spins · rising multiplier" else "Hold & Spin · jackpot orbs", 11f)),
                     ui.lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f, l = 12))
             }, ui.lp())
-            c.addView(ui.figure("${fmt(price(f))} tokens", 30f, if (can) Dread.BONE_HI else Dread.BONE_DIM), ui.lp(t = 12))
-            c.addView(ui.text("${if (seance) ReaperConfig.BUY_SEANCE_X else ReaperConfig.BUY_VAULT_X}× your stake of $stake", 13f, Dread.BONE_DIM), ui.lp())
+            val compact = ui.short
+            c.addView(ui.figure("${fmt(price(f))} tokens", if (compact) 24f else 30f, if (can) Dread.BONE_HI else Dread.BONE_DIM), ui.lp(t = if (compact) 8 else 12))
+            c.addView(ui.text("${if (seance) ReaperConfig.BUY_SEANCE_X else ReaperConfig.BUY_VAULT_X}\u00D7 your stake of $stake", 13f, Dread.BONE_DIM), ui.lp())
+            val buy = ui.button(if (picked == f) "Selected" else "Buy for ${fmt(price(f))}", if (seance) Dread.Kind.PRIMARY else Dread.Kind.SECONDARY) {
+                picked = f; render()
+            }.also { it.isEnabled = can && picked != f }
+            if (compact) c.addView(buy, ui.lp(t = 8, b = 4))   // a small screen scrolls: keep the button next to the price
             if (seance) {
                 c.addView(ui.bullet("**${ReaperConfig.FS_SPINS[3]} free spins** on richer reels with extra wilds."), ui.lp(t = 10))
-                c.addView(ui.bullet("The multiplier climbs from ×1 to **×${ReaperConfig.FS_RAMP_CAP}**; more coffins add spins."), ui.lp(t = 6))
+                c.addView(ui.bullet("The multiplier climbs from \u00D71 to **\u00D7${ReaperConfig.FS_RAMP_CAP}**; more coffins add spins."), ui.lp(t = 6))
             } else {
-                c.addView(ui.bullet("**${ReaperConfig.VAULT_START_ORBS} soul orbs** on a ${ReaperConfig.VAULT_COLS}×${ReaperConfig.VAULT_ROWS} board, **${ReaperConfig.VAULT_RESPINS} respins**."), ui.lp(t = 10))
-                c.addView(ui.bullet("Orbs pay up to **${ReaperConfig.ORB_VALUES.max()}×**; jackpots **MINI ${ReaperConfig.MINI}×, MINOR ${ReaperConfig.MINOR}×, MAJOR ${ReaperConfig.MAJOR}×**, GRAND ${ReaperConfig.GRAND}× for a full board."), ui.lp(t = 6))
+                c.addView(ui.bullet("**${ReaperConfig.VAULT_START_ORBS} soul orbs** on a ${ReaperConfig.VAULT_COLS}\u00D7${ReaperConfig.VAULT_ROWS} board, **${ReaperConfig.VAULT_RESPINS} respins**."), ui.lp(t = 10))
+                c.addView(ui.bullet("Orbs pay up to **${ReaperConfig.ORB_VALUES.max()}\u00D7**; jackpots **MINI ${ReaperConfig.MINI}\u00D7, MINOR ${ReaperConfig.MINOR}\u00D7, MAJOR ${ReaperConfig.MAJOR}\u00D7**, GRAND ${ReaperConfig.GRAND}\u00D7 for a full board."), ui.lp(t = 6))
                 c.addView(ui.bullet("Your stake (**$stake**) is the bonus bet."), ui.lp(t = 6))
             }
             c.addView(ui.text(ui.rich("Returns **about 92 %** on average, a little less than the ${"%.0f".format(ReaperConfig.TARGET_RTP * 100)} % of normal play."), 13f, Dread.BONE_DIM), ui.lp(t = 10))
@@ -511,10 +523,10 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
                 val need = price(f) - wallet.balance
                 c.addView(ui.text(if (need > 0) "Not enough credit: ${fmt(need)} more tokens needed." else "Not available right now.", 13.5f, Dread.ERROR), ui.lp(t = 8))
             }
-            c.addView(View(act), LinearLayout.LayoutParams(1, 0, 1f))   // pushes the button to the bottom of the (equal-height) card
-            c.addView(ui.button(if (picked == f) "Selected" else "Buy for ${fmt(price(f))}", if (seance) Dread.Kind.PRIMARY else Dread.Kind.SECONDARY) {
-                picked = f; render()
-            }.also { it.isEnabled = can && picked != f }, ui.lp(t = 12))
+            if (!compact) {
+                c.addView(View(act), LinearLayout.LayoutParams(1, 0, 1f))   // pushes the button to the bottom of the (equal-height) card
+                c.addView(buy, ui.lp(t = 12))
+            }
             return c
         }
 
@@ -599,7 +611,7 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
                 link("Statistics & history", "Session and lifetime figures") { if (!gate()) stats() },
                 link("How to play", "Pay table, features, rules") { info(wallet.stake) }, gap = 8),
             gap = 20)
-        val cols = Columns(act, dp(620), dp(22)).apply { addView(left); addView(right) }
+        val cols = Columns(act, dp(540), dp(22)).apply { addView(left); addView(right) }
         sheet(sh, "SETTINGS", widthDp = 860, body = cols, footer = ui.button("Done") { sh.close() },
             onDismiss = { handler.removeCallbacks(flush); flush.run() })
     }
@@ -632,11 +644,10 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
             body = ui.vbox(
                 hourglass,
                 ui.text(ui.rich(if (mins < 1) "You have been playing for **less than a minute**." else "You have been playing for **$mins minute${if (mins == 1L) "" else "s"}**."), 16f, Dread.BONE, center = true),
-                ui.hbox().apply {
-                    addView(ui.stat("Wagered", fmt(wallet.sessionWagered), maxSp = 22f), ui.lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f, r = 5))
-                    addView(ui.stat("Won", fmt(wallet.sessionWon), maxSp = 22f), ui.lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f, l = 5, r = 5))
-                    addView(ui.stat("Net result", netText, valueColor = netColor, maxSp = 22f), ui.lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f, l = 5))
-                },
+                ui.tiles(
+                    ui.stat("Wagered", fmt(wallet.sessionWagered), maxSp = 22f),
+                    ui.stat("Won", fmt(wallet.sessionWon), maxSp = 22f),
+                    ui.stat("Net result", netText, valueColor = netColor, maxSp = 22f)),
                 ui.text("Net result = won minus wagered, in tokens, for this session. Play should be fun: take a break whenever you like.", 13f, Dread.BONE_DIM, center = true),
                 gap = 12),
             footer = bar(ui.button("Take a break") { sh.close(); onStop() }, ui.button("Keep playing", Dread.Kind.SECONDARY) { sh.close(); onContinue() }))
