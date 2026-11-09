@@ -1,19 +1,23 @@
 package com.tjshea.neonreaper.engine
 
 import com.tjshea.neonreaper.engine.ReaperConfig.REELS
+import com.tjshea.neonreaper.engine.ReaperConfig.ROWS
 
 /**
  * Exact expectations (multiples of the stake, before the 25-book cap) of every Neon Reaper component,
  * derived from the REAL engine rules and config -- this is the Kotlin twin of tools/reaper_model.py and the
  * Neon Reaper equivalent of a casino PAR sheet.
  *
- *  - base game: every one of the 11^5 symbol combinations of a payline is enumerated through
- *    ReaperEngine.evaluateLine with its exact probability (a uniform stop on a strip gives every row the
- *    strip's symbol frequencies, and all 20 lines see the same frequencies, so E[spin] = 20 x E[line]);
+ *  - base game: every one of the 12^5 symbol combinations of a payline is enumerated through
+ *    ReaperEngine.evaluateLine with its exact probability (a uniform stop on a strip gives every
+ *    row the strip's symbol frequencies, and all 20 lines see the same frequencies, so E[spin] = 20 x E[line]);
  *  - Reaper's Touch: whole reels are wild (every payline crosses every reel);
- *  - Raven's Flock / Skull's Curse: k random wild cells out of 15 -- for one payline the chance that exactly
+ *  - Murder of Crows / Skull's Curse: k random wild cells out of 15 -- for one payline the chance that exactly
  *    the cells in S (a subset of its 5) are wild is C(10, k-|S|) / C(15, k);
- *  - Pumpkin's Treats: base game + E[coins] x E[coin value];
+ *  - Demon's Bargain: base game + E[coins] x E[coin value];
+ *  - coffins: at most one per reel window (asserted), so the count is Poisson-binomial over the reels; reels that turn wild
+ *    lose their coffin, k random wild cells thin the coffins hypergeometrically;
+ *  - THE SÉANCE: backward DP over (spin number, spins left) for E[sum of multipliers];
  *  - Soul Vault: Markov DP over (filled cells, respins left).
  */
 object ExactMath {
@@ -28,10 +32,10 @@ object ExactMath {
     }
 
     /** Symbol probabilities per reel from the real strips; reels in [wildReels] always show the wild. */
-    fun marginals(wildReels: Set<Int> = emptySet()): Array<DoubleArray> = Array(REELS) { r ->
+    fun marginals(strips: Array<IntArray> = ReaperConfig.STRIPS, wildReels: Set<Int> = emptySet()): Array<DoubleArray> = Array(REELS) { r ->
         DoubleArray(SYMS).also { f ->
             if (r in wildReels) f[ReaperConfig.WILD] = 1.0
-            else ReaperConfig.STRIPS[r].forEach { f[it] += 1.0 / ReaperConfig.STRIPS[r].size }
+            else strips[r].forEach { f[it] += 1.0 / strips[r].size }
         }
     }
 
@@ -56,13 +60,112 @@ object ExactMath {
     private fun mean(values: IntArray, weights: DoubleArray) =
         values.indices.sumOf { values[it] * weights[it] } / weights.sum()
 
+    // ---------------------------------------------------------------- coffins
+    /** P(a reel window of 3 consecutive strip positions shows a coffin); fails if two coffins ever share a window. */
+    fun presence(strip: IntArray): Double {
+        var hit = 0
+        for (s in strip.indices) {
+            val c = (0 until ROWS).count { strip[(s + it) % strip.size] == ReaperConfig.SCATTER }
+            check(c <= 1) { "two coffins share a reel window" }
+            hit += c
+        }
+        return hit.toDouble() / strip.size
+    }
+
+    fun pbDist(ps: List<Double>): DoubleArray {
+        var d = DoubleArray(ps.size + 1).also { it[0] = 1.0 }
+        for (p in ps) {
+            val nd = DoubleArray(d.size) { d[it] * (1 - p) }
+            for (i in 1 until d.size) nd[i] += d[i - 1] * p
+            d = nd
+        }
+        return d
+    }
+
+    /** pre[n] = P(n coffins); k wild cells uniformly among [cells] erase some of them. */
+    fun thinHyper(pre: DoubleArray, cells: Int, k: Int): DoubleArray {
+        val out = DoubleArray(pre.size)
+        for (n in pre.indices) for (j in 0..minOf(n, k)) {
+            if (k - j > cells - n) continue
+            out[n - j] += pre[n] * comb(n, j) * comb(cells - n, k - j) / comb(cells, k)
+        }
+        return out
+    }
+
+    /** Coffin-count distribution on the FINAL grid, per spin type (plain, and each mini feature). */
+    class ScatterDists(val base: DoubleArray, val reaper: DoubleArray, val raven: DoubleArray, val demon: DoubleArray, val skull: DoubleArray)
+
+    fun scatterDists(): ScatterDists {
+        val ps = ReaperConfig.STRIPS.map { presence(it) }
+        val pre = pbDist(ps)
+        val rs = ReaperConfig.FEATURE_WEIGHTS.sum()
+        val reaper = DoubleArray(REELS + 1)
+        for ((i, pat) in ReaperConfig.FEATURE_PATTERNS.withIndex()) {
+            val d = pbDist(ps.mapIndexed { r, p -> if (r in pat) 0.0 else p })
+            for (k in d.indices) reaper[k] += ReaperConfig.FEATURE_WEIGHTS[i] / rs * d[k]
+        }
+        val raven = DoubleArray(REELS + 1)
+        val ws = ReaperConfig.RAVEN_WILD_WEIGHTS.sum()
+        for ((i, k) in ReaperConfig.RAVEN_WILDS.withIndex()) {
+            val d = thinHyper(pre, REELS * ROWS, k)
+            for (n in d.indices) raven[n] += ReaperConfig.RAVEN_WILD_WEIGHTS[i] / ws * d[n]
+        }
+        return ScatterDists(pre, reaper, raven, pre, thinHyper(pre, REELS * ROWS, ReaperConfig.SKULL_WILDS))
+    }
+
+    // ---------------------------------------------------------------- THE SÉANCE
+    class SeanceMeans(val mu: Double, val hitPerLine: Double, val pk: DoubleArray, val value: DoubleArray, val spins: DoubleArray)
+
+    /** E[sum of multipliers] of a Séance that starts with [n0] spins (m_t = min(cap, t), retriggers add spins). */
+    fun seanceSumMult(n0: Int, pk: DoubleArray, tmax: Int = Seance.MAX_SPINS, rmax: Int = 300): Double {
+        var nxt = DoubleArray(rmax + 1)
+        for (t in tmax downTo 1) {
+            val cur = DoubleArray(rmax + 1)
+            val m = minOf(ReaperConfig.FS_RAMP_CAP, t).toDouble()
+            for (r in 1..rmax) {
+                var acc = m
+                for (k in pk.indices) {
+                    val r2 = minOf(rmax, r - 1 + ReaperConfig.FS_EXTRA[k])
+                    if (r2 >= 1) acc += pk[k] * nxt[r2]
+                }
+                cur[r] = acc
+            }
+            nxt = cur
+        }
+        return nxt[n0]
+    }
+
+    fun seance(): SeanceMeans {
+        val (ev, hit) = lineStats(marginals(ReaperConfig.FS_STRIPS))
+        val pk = pbDist(ReaperConfig.FS_STRIPS.map { presence(it) })
+        val mu = LINES * ev
+        val value = DoubleArray(6)
+        val spins = DoubleArray(6)
+        for (k in 3..5) {
+            value[k] = mu * seanceSumMult(ReaperConfig.FS_SPINS[k], pk)
+            val rho = (3..5).sumOf { pk[it] * ReaperConfig.FS_EXTRA[it] }
+            spins[k] = ReaperConfig.FS_SPINS[k] / (1 - rho)
+        }
+        return SeanceMeans(mu, hit, pk, value, spins)
+    }
+
+    // ---------------------------------------------------------------- everything
     class Means(
-        val base: Double, val hitPerLine: Double, val reaper: Double, val raven: Double, val pumpkin: Double,
-        val skull: Double, val mini: Double, val vault: Double, val vaultFullBoard: Double,
+        val base: Double, val hitPerLine: Double, val reaper: Double, val raven: Double, val demon: Double,
+        val skull: Double, val miniLines: Double, val vault: Double, val vaultFullBoard: Double,
+        val scatPayBase: Double, val scatPayMini: Double, val trigBase: Double, val trigMini: Double,
+        val seanceBase: Double, val seanceMini: Double, val seance: SeanceMeans, val scat: ScatterDists,
     ) {
-        val trig = ReaperConfig.RELIC_CHANCE / ReaperConfig.RELIC_COUNT
+        val trigVault = ReaperConfig.RELIC_CHANCE / ReaperConfig.RELIC_COUNT
+        /** Expected non-vault payout of a plain spin: lines + coffin pay + Séance (x stake, uncapped). */
+        val aBase get() = base + scatPayBase + seanceBase
+        /** Same for a spin that got a mini feature. */
+        val aMini get() = miniLines + scatPayMini + seanceMini
         /** Theoretical RTP with no win cap (equals the real RTP at the lowest stakes). */
-        val uncappedRtp get() = (1 - ReaperConfig.FEATURE_RATE) * base + ReaperConfig.FEATURE_RATE * mini + trig * vault
+        val uncappedRtp get() = (1 - ReaperConfig.FEATURE_RATE) * aBase + ReaperConfig.FEATURE_RATE * aMini + trigVault * vault
+        /** The mini-feature rate that would give exactly TARGET_RTP. */
+        val exactFeatureRate get() = (ReaperConfig.TARGET_RTP - trigVault * vault - aBase) / (aMini - aBase)
+        val seanceEvery get() = 1 / ((1 - ReaperConfig.FEATURE_RATE) * trigBase + ReaperConfig.FEATURE_RATE * trigMini)
     }
 
     fun means(): Means {
@@ -71,12 +174,12 @@ object ExactMath {
 
         var reaper = 0.0
         for (i in ReaperConfig.FEATURE_PATTERNS.indices)
-            reaper += ReaperConfig.FEATURE_WEIGHTS[i] * LINES * lineStats(marginals(ReaperConfig.FEATURE_PATTERNS[i].toSet())).first
+            reaper += ReaperConfig.FEATURE_WEIGHTS[i] * LINES * lineStats(marginals(wildReels = ReaperConfig.FEATURE_PATTERNS[i].toSet())).first
         reaper /= ReaperConfig.FEATURE_WEIGHTS.sum()
 
         // expected pay of a line when exactly the line cells in `mask` (bit r = reel r) are wild
         val evMask = DoubleArray(1 shl REELS) { mask ->
-            lineStats(marginals((0 until REELS).filter { mask shr it and 1 == 1 }.toSet())).first
+            lineStats(marginals(wildReels = (0 until REELS).filter { mask shr it and 1 == 1 }.toSet())).first
         }
         fun randomWildLineEv(k: Int): Double {
             var t = 0.0
@@ -93,15 +196,24 @@ object ExactMath {
 
         val coins = mean(ReaperConfig.COIN_COUNTS, ReaperConfig.COIN_COUNT_WEIGHTS) *
             mean(ReaperConfig.COIN_VALUES, ReaperConfig.COIN_WEIGHTS)
-        val pumpkin = base + coins
+        val demon = base + coins
         val skull = mean(ReaperConfig.SKULL_MULTS, ReaperConfig.SKULL_MULT_WEIGHTS) * LINES * randomWildLineEv(ReaperConfig.SKULL_WILDS)
 
         val w = ReaperConfig.MINI_WEIGHTS   // index = MINI_* constant (0 = none)
-        val mini = (w[ReaperConfig.MINI_REAPER] * reaper + w[ReaperConfig.MINI_RAVEN] * raven +
-            w[ReaperConfig.MINI_PUMPKIN] * pumpkin + w[ReaperConfig.MINI_SKULL] * skull) / w.sum()
+        val miniLines = (w[ReaperConfig.MINI_REAPER] * reaper + w[ReaperConfig.MINI_RAVEN] * raven +
+            w[ReaperConfig.MINI_DEMON] * demon + w[ReaperConfig.MINI_SKULL] * skull) / w.sum()
+
+        val sc = scatterDists()
+        val se = seance()
+        fun pay(d: DoubleArray) = (3..5).sumOf { d[it] * ReaperConfig.SCATTER_PAY[it] }
+        fun fs(d: DoubleArray) = (3..5).sumOf { d[it] * se.value[it] }
+        fun trig(d: DoubleArray) = (3..5).sumOf { d[it] }
+        fun mix(f: (DoubleArray) -> Double) = (w[ReaperConfig.MINI_REAPER] * f(sc.reaper) + w[ReaperConfig.MINI_RAVEN] * f(sc.raven) +
+            w[ReaperConfig.MINI_DEMON] * f(sc.demon) + w[ReaperConfig.MINI_SKULL] * f(sc.skull)) / w.sum()
 
         val (vaultMean, pFull) = vault()
-        return Means(base, hitLine, reaper, raven, pumpkin, skull, mini, vaultMean, pFull)
+        return Means(base, hitLine, reaper, raven, demon, skull, miniLines, vaultMean, pFull,
+            pay(sc.base), mix(::pay), trig(sc.base), mix(::trig), fs(sc.base), mix(::fs), se, sc)
     }
 
     /**

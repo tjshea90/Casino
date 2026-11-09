@@ -1,14 +1,14 @@
 package com.tjshea.neonreaper.engine
 
 /**
- * Neon Reaper math. Stake is in TOKENS (1..40). Line pays are whole multiples of
+ * Neon Reaper 3.0 math. Stake is in TOKENS (1..40). Line pays are whole multiples of
  * the stake, so every win is an exact number of tokens (rounding to the mack only
- * happens at cash-out). Wins are capped at 25 books (2000 tokens) per spin and per bonus.
+ * happens at cash-out). Wins are capped at 25 books (2000 tokens) per spin and per bonus (Séance, Soul Vault).
  *
- * RTP design (94.00 %, house edge 6 %):
- *   base game 59.34 % + mini features 11.98 % + Soul Vault 22.68 % = 94.000 % at stakes 1-5 (exact, see
- *   tools/reaper_model.py and RtpExactTest). The mini-feature rate is the SAME at every stake on purpose: the
- *   25-book cap can then only ever LOWER the return at high stakes (RTP_BY_STAKE).
+ * RTP design (94.00 %, house edge 6 %) -- BUDGET_PLACEHOLDER (exact, see tools/reaper_model.py and RtpExactTest).
+ * The mini-feature rate is the SAME at every stake on purpose: the 25-book cap can then only ever LOWER the
+ * return at high stakes (RTP_BY_STAKE). THE SÉANCE (3+ coffins) and the feature buys pay in proportion to the stake that
+ * started them, so they cannot be gamed either; buys are priced above their exact expected payout.
  *   The Soul Vault bet is the average stake of the five spins that revealed the relics, rounded down (RelicMeter):
  *   that makes the expected bonus per token wagered identical for EVERY staking policy, so no pattern of stakes can beat
  *   the headline RTP. Two earlier rules were beaten in testing: rounding the average of the whole collection window up
@@ -17,26 +17,31 @@ package com.tjshea.neonreaper.engine
  * reaper/src/test/.../engine, and pasting the new numbers here.
  */
 object ReaperConfig {
-    const val WILD = 0
-    const val HOODED = 1
-    const val SKULL = 2
-    const val RAVEN = 3
-    const val PUMPKIN = 4
-    const val GHOST = 5
+    const val WILD = 0       // Grim Reaper
+    const val DOCTOR = 1     // Plague Doctor
+    const val SKULL = 2      // Cursed Skull
+    const val RAVEN = 3      // Blood Raven
+    const val DEMON = 4      // Demon
+    const val WRAITH = 5     // Wraith (a wailing banshee)
     const val ACE = 6
     const val KING = 7
     const val QUEEN = 8
     const val JACK = 9
     const val TEN = 10
-    const val SYMBOL_COUNT = 11
+    const val SCATTER = 11   // Coffin: pays 2x / 10x / 50x for 3 / 4 / 5 anywhere and starts THE SÉANCE
+    const val SYMBOL_COUNT = 12
+    // transitional aliases for code that still uses the pre-3.0 names (removed once the UI migration is done)
+    const val HOODED = DOCTOR
+    const val PUMPKIN = DEMON
+    const val GHOST = WRAITH
     const val REELS = 5
     const val ROWS = 3
 
     const val TARGET_RTP = 0.94
     const val MAX_WIN_TOKENS = 25 * Money.TOKENS_PER_BOOK // 2000 tokens = 25 books
 
-    val SYMBOL_NAMES = arrayOf("Grim Reaper Wild", "Hooded Watcher", "Laughing Skull", "Blood Raven", "Jack-o'-Lantern",
-        "Grinning Ghost", "Ace", "King", "Queen", "Jack", "Ten")
+    val SYMBOL_NAMES = arrayOf("Grim Reaper Wild", "Plague Doctor", "Cursed Skull", "Blood Raven", "Demon",
+        "Wraith", "Ace", "King", "Queen", "Jack", "Ten", "Coffin Scatter")
 
     /** PAYS[symbol] = multiples of the STAKE for 3, 4, 5 of a kind on a line. */
     val PAYS: Array<IntArray> = arrayOf(
@@ -51,6 +56,7 @@ object ReaperConfig {
         intArrayOf(1, 2, 4),     // QUEEN
         intArrayOf(1, 2, 4),     // JACK
         intArrayOf(1, 2, 3),     // TEN
+        intArrayOf(0, 0, 0),     // SCATTER: no line pay (coffins pay anywhere, see SCATTER_PAY)
     )
 
     val PAYLINES: Array<IntArray> = arrayOf(
@@ -61,17 +67,33 @@ object ReaperConfig {
         intArrayOf(1, 1, 2, 1, 1), intArrayOf(0, 0, 2, 0, 0), intArrayOf(2, 2, 0, 2, 2), intArrayOf(0, 2, 2, 2, 0),
     )
 
-    //                          W  HD SK RV PK GH A  K  Q  J  10   (same on all 5 reels; characters = 33 % of a strip)
-    private val COUNTS = intArrayOf(1, 3, 3, 5, 5, 5, 6, 6, 8, 9, 12)
+    //                          W  DC SK RV DE WR A  K  Q  J  10 SC  (same on all 5 reels)
+    private val COUNTS = intArrayOf(1, 3, 3, 5, 5, 5, 6, 6, 8, 9, 12, 2)
     val STRIPS: Array<IntArray> = Array(REELS) { buildStrip(COUNTS, it) }
+
+    // ---- scatter coffins + THE SÉANCE (free spins) ----
+    /** Coffin pay in multiples of the stake, indexed by the number of coffins on the final grid (3, 4, 5). */
+    val SCATTER_PAY = intArrayOf(0, 0, 0, 2, 10, 50)
+    /** Free spins started by 3 / 4 / 5 coffins. */
+    val FS_SPINS = intArrayOf(0, 0, 0, 8, 12, 20)
+    /** Extra spins when a Séance spin itself shows 3 / 4 / 5 coffins (indexed by coffin count). */
+    val FS_EXTRA = intArrayOf(0, 0, 0, 4, 8, 12)
+    /** The multiplier of Séance spin number t is min(FS_RAMP_CAP, t): x1, x2, x3 ... Retrigger spins continue the climb. */
+    const val FS_RAMP_CAP = 10
+    //                              W  DC SK RV DE WR A  K  Q  J  10 SC  (richer reels: more wilds and characters)
+    private val FS_COUNTS = intArrayOf(2, 3, 3, 4, 4, 4, 5, 5, 6, 6, 7, 2)
+    val FS_STRIPS: Array<IntArray> = Array(REELS) { buildStrip(FS_COUNTS, it) }
+    /** Feature buy prices in multiples of the stake: just above the exact expected payout / 0.93 (a buy returns <= 93 %). */
+    const val BUY_SEANCE_X = 35
+    const val BUY_VAULT_X = 31
 
     // ---- mini features: a character floats out and changes this one spin ----
     const val MINI_NONE = 0
     const val MINI_REAPER = 1   // Reaper's Touch: 1-3 middle reels turn fully wild
-    const val MINI_RAVEN = 2    // Raven's Flock: 3-6 random symbols become wild
-    const val MINI_PUMPKIN = 3  // Pumpkin's Treats: 3-6 soul coins land, each paying 1x-50x the stake
+    const val MINI_RAVEN = 2    // Murder of Crows: 3-6 random symbols become wild
+    const val MINI_DEMON = 3    // Demon's Bargain: 3-6 soul coins land, each paying 1x-50x the stake
     const val MINI_SKULL = 4    // Skull's Curse: 2 wilds plus a x2 / x3 / x5 multiplier on line wins
-    val MINI_NAMES = arrayOf("", "REAPER'S TOUCH", "RAVEN'S FLOCK", "PUMPKIN'S TREATS", "SKULL'S CURSE")
+    val MINI_NAMES = arrayOf("", "REAPER'S TOUCH", "MURDER OF CROWS", "DEMON'S BARGAIN", "SKULL'S CURSE")
     val MINI_WEIGHTS = doubleArrayOf(0.0, 0.25, 0.30, 0.30, 0.15)
     val RAVEN_WILDS = intArrayOf(3, 4, 5, 6); val RAVEN_WILD_WEIGHTS = doubleArrayOf(0.5, 0.3, 0.15, 0.05)
     val COIN_COUNTS = intArrayOf(3, 4, 5, 6); val COIN_COUNT_WEIGHTS = doubleArrayOf(0.45, 0.3, 0.17, 0.08)

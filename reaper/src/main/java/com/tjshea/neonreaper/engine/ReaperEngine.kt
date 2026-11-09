@@ -24,19 +24,28 @@ class Mini(
 class SpinOutcome(
     val stake: Int,
     val stops: IntArray,
-    /** grid[reel][row] after the mini feature's wilds are applied. */
+    /** grid[reel][row] after the mini feature's wilds are applied (this FINAL grid decides lines AND coffins). */
     val grid: Array<IntArray>,
     /** grid before any wilds (what the reels physically landed on). */
     val landed: Array<IntArray>,
     val mini: Mini,
     val lineWins: List<LineWin>,
+    /** true on a free spin of THE SÉANCE: coffins pay nothing there, they add spins instead. */
+    val inSeance: Boolean = false,
 ) {
     val wildReels: IntArray get() = mini.wildReels
     val feature: Boolean get() = mini.type != ReaperConfig.MINI_NONE
     val lineMult: Int = lineWins.sumOf { it.mult }
     val coinMult: Int = mini.coins.sum()
-    /** Total in multiples of the stake: line wins × multiplier + soul coins. */
-    val totalMult: Int = lineMult * mini.multiplier + coinMult
+    /** Cells (reel * ROWS + row) showing a coffin on the FINAL grid; a mini feature that turns cells wild can erase them. */
+    val scatterCells: IntArray = (0 until REELS * ROWS).filter { grid[it / ROWS][it % ROWS] == ReaperConfig.SCATTER }.toIntArray()
+    val scatterCount: Int get() = scatterCells.size
+    /** Coffin pay in multiples of the stake (3 / 4 / 5 coffins = 2x / 10x / 50x); none inside the Séance. */
+    val scatterMult: Int = if (inSeance) 0 else ReaperConfig.SCATTER_PAY[scatterCells.size.coerceAtMost(5)]
+    /** Free spins THE SÉANCE starts: 8 / 12 / 20 for 3 / 4 / 5 coffins, 0 otherwise (and 0 inside a Séance). */
+    val seanceSpins: Int get() = if (!inSeance && scatterCells.size >= 3) Seance.spinsFor(scatterCells.size) else 0
+    /** Total in multiples of the stake: line wins × multiplier + soul coins + coffin pay (the Séance itself is a separate bonus). */
+    val totalMult: Int = lineMult * mini.multiplier + coinMult + scatterMult
     val rawTokens: Long get() = totalMult.toLong() * stake
     /** Paid amount in exact tokens, capped at 25 books. */
     val payTokens: Long get() = ReaperEngine.settle(rawTokens)
@@ -77,17 +86,18 @@ object ReaperEngine {
         return wins
     }
 
-    fun gridFor(stops: IntArray): Array<IntArray> = Array(REELS) { r ->
-        val strip = ReaperConfig.STRIPS[r]
+    fun gridFor(stops: IntArray, strips: Array<IntArray> = ReaperConfig.STRIPS): Array<IntArray> = Array(REELS) { r ->
+        val strip = strips[r]
         IntArray(ROWS) { row -> strip[(stops[r] + row) % strip.size] }
     }
 
-    fun outcome(stake: Int, stops: IntArray, mini: Mini = Mini.NONE): SpinOutcome {
-        val landed = gridFor(stops)
+    fun outcome(stake: Int, stops: IntArray, mini: Mini = Mini.NONE, strips: Array<IntArray> = ReaperConfig.STRIPS,
+                inSeance: Boolean = false): SpinOutcome {
+        val landed = gridFor(stops, strips)
         val grid = Array(REELS) { landed[it].clone() }
         for (r in mini.wildReels) for (row in 0 until ROWS) grid[r][row] = WILD
         for (cell in mini.wildCells) grid[cell / ROWS][cell % ROWS] = WILD
-        return SpinOutcome(stake, stops, grid, landed, mini, evaluate(grid))
+        return SpinOutcome(stake, stops, grid, landed, mini, evaluate(grid), inSeance)
     }
 
     private fun pick(rng: Random, weights: DoubleArray): Int {
@@ -107,7 +117,7 @@ object ReaperEngine {
     fun rollMini(rng: Random, type: Int = pick(rng, ReaperConfig.MINI_WEIGHTS)): Mini = when (type) {
         ReaperConfig.MINI_REAPER -> Mini(type, wildReels = pickFeature(rng))
         ReaperConfig.MINI_RAVEN -> Mini(type, wildCells = randomCells(rng, ReaperConfig.RAVEN_WILDS[pick(rng, ReaperConfig.RAVEN_WILD_WEIGHTS)]))
-        ReaperConfig.MINI_PUMPKIN -> {
+        ReaperConfig.MINI_DEMON -> {
             val coins = IntArray(REELS * ROWS)
             for (c in randomCells(rng, ReaperConfig.COIN_COUNTS[pick(rng, ReaperConfig.COIN_COUNT_WEIGHTS)]))
                 coins[c] = ReaperConfig.COIN_VALUES[pick(rng, ReaperConfig.COIN_WEIGHTS)]

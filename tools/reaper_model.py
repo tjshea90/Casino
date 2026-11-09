@@ -54,7 +54,7 @@ PAYLINES = np.array([
 NLINES = len(PAYLINES)
 CAP_TOKENS = 2000            # 25 books x 80 tokens
 STAKES = [1, 2, 3, 4, 5, 8, 10, 15, 20, 25, 30, 40]
-MAX_FS_SPINS = 250           # hard stop of a Seance (the chance of ever reaching it is ~1e-30)
+MAX_FS_SPINS = 150           # hard stop of a Seance (the chance of ever reaching it is below 1e-25)
 BUY_RTP = 0.93               # feature buys are priced so that RTP(buy) <= this at the cap-free stake
 
 # ----------------------------------------------------------------------------------------------
@@ -233,22 +233,19 @@ def fs_unit(cfg):
     return NLINES * ev0, hit0, pk
 
 
-def fs_sum_mult(cfg, n0, pk, tmax=MAX_FS_SPINS, rmax=600):
+def fs_sum_mult(cfg, n0, pk, tmax=MAX_FS_SPINS, rmax=300):
     """E[sum over all Seance spins of the multiplier m_t = min(cap, t)] when the session starts with n0 spins.
-    State (t = number of the spin about to be played, r = spins left incl. this one); every spin may add extra spins."""
+    State (t = number of the spin about to be played, r = spins left incl. this one); every spin may add extra spins.
+    Backward induction over t, vectorised over r (the truncation at rmax / tmax drops probabilities below 1e-25)."""
     extra = [0, 0, 0, cfg.fs_extra[3], cfg.fs_extra[4], cfg.fs_extra[5]]
-    nxt = np.zeros(rmax + 1)                                   # f(t+1, r)
+    r = np.arange(1, rmax + 1)
+    nxt = np.zeros(rmax + 1)                                   # f(t+1, r), index 0 unused (= 0: no spins left)
     for t in range(tmax, 0, -1):
-        cur = np.zeros(rmax + 1)
-        m_t = min(cfg.fs_ramp_cap, t)
-        for r in range(1, rmax + 1):
-            acc = m_t
-            for k, pr in enumerate(pk):
-                r2 = min(rmax, r - 1 + extra[k])
-                if r2 >= 1:
-                    acc += pr * nxt[r2]
-            cur[r] = acc
-        nxt = cur
+        cur = np.full(rmax, float(min(cfg.fs_ramp_cap, t)))
+        for k, pr in enumerate(pk):
+            r2 = np.minimum(rmax, r - 1 + extra[k])
+            cur += pr * np.where(r2 >= 1, nxt[r2], 0.0)
+        nxt = np.concatenate(([0.0], cur))
     return nxt[n0]
 
 
@@ -263,6 +260,9 @@ def seance_values(cfg):
     mu, hit, pk = fs_unit(cfg)
     vals = {k: mu * fs_sum_mult(cfg, cfg.fs_spins[k], pk) for k in (3, 4, 5)}
     return mu, hit, pk, vals
+
+
+_VAULT_CACHE = {}
 
 
 def exact_means(cfg=CFG):
@@ -298,7 +298,9 @@ def exact_means(cfg=CFG):
     mu_skull = e_mult * NLINES * random_wild_line_ev(cfg.skull_wilds)
     mw = cfg.mini_weights
     mu_mini_lines = (mw[0] * mu_reaper + mw[1] * mu_raven + mw[2] * mu_demon + mw[3] * mu_skull) / sum(mw)
-    vault = vault_exact(cfg)
+    vkey = (cfg.vault_cols, cfg.vault_rows, cfg.vault_start, cfg.vault_respins, cfg.vault_orb_chance, tuple(cfg.orb_values),
+            tuple(cfg.orb_weights), cfg.p_major, cfg.p_minor, cfg.p_mini, cfg.p_reaper, cfg.v_mini, cfg.v_minor, cfg.v_major, cfg.grand)
+    vault = _VAULT_CACHE.setdefault(vkey, vault_exact(cfg))
 
     # coffins: scatter pays and Seance triggers, per spin type (final grid)
     sd = scatter_dists(cfg)
@@ -641,8 +643,8 @@ def report(cfg=CFG, n_base=8_000_000, n_mini=2_000_000, n_vault=4_000_000, n_fs=
 # tuning: find reel counts that hit the RTP budget targets
 # ----------------------------------------------------------------------------------------------
 TUNE = SimpleNamespace(
-    base_len=(66, 76), fs_len=(48, 60), char_share=0.30,
-    seance_share=0.16, vault_share=None, hit_min=0.300,   # share of RTP at stake 1; hit = P(any win on a plain spin)
+    base_len=(68, 76), fs_len=(48, 60), cast_share=0.33,   # share of every base strip that is a 3D model (wild, 5 characters, coffin)
+    seance_share=0.16, f_target=0.0065, hit_min=0.300,     # share of RTP at stake 1; mini-feature rate; P(any win on a plain spin)
 )
 
 
@@ -659,20 +661,19 @@ def tune(cfg=CFG, iters=4000, seed=3):
         except AssertionError:
             return 1e9, None
         f = solve_feature_rate(c, ex)
-        if not (0.002 < f < 0.02):
-            return 1e9, None
         trig_v = c.relic_chance / c.relic_count
         seance = (1 - f) * ex['fs_base'] + f * ex['fs_mini']
         trig_all = (1 - f) * ex['trig_base'] + f * ex['trig_mini']
         lines = (1 - f) * ex['base'] + f * ex['mini_lines']
         # plain spin hit rate from the per-line probabilities is not additive; approximate with 1-(1-h)^NLINES / overlap: use sim-free proxy
         hit_proxy = 1 - np.exp(-NLINES * ex['hit_line'] * 0.93)
-        ch_share = sum(c.counts[1:6]) / sum(c.counts)
+        cast = (c.counts[0] + sum(c.counts[1:6]) + c.counts[11]) / sum(c.counts)
         pen = 0.0
         pen += 400 * abs(seance - TUNE.seance_share)
         pen += 2.0 * max(0.0, TUNE.hit_min - hit_proxy) * 100
         pen += 0.02 * abs(1 / trig_all - 190)
-        pen += 100 * max(0.0, TUNE.char_share - ch_share)
+        pen += 60000 * abs(f - TUNE.f_target)
+        pen += 100 * max(0.0, TUNE.cast_share - cast)
         L = sum(c.counts)
         pen += 50 * (L < TUNE.base_len[0] or L > TUNE.base_len[1]) + 50 * (sum(c.fs_counts) < TUNE.fs_len[0] or sum(c.fs_counts) > TUNE.fs_len[1])
         return pen, dict(seance=seance, trig=1 / trig_all, lines=lines, f=f, hit=hit_proxy)
