@@ -11,8 +11,9 @@ Steps (strictly sequential, one process at a time):
   3. enum_grid base <wild reels>         exhaustive enumeration for each Reaper's Touch pattern (exact)
   4. audit_mc mini 1..4                  Monte-Carlo of the four mini features (types 1 and 3 are also known exactly: self-test of the MC)
   5. audit_mc seance 3/4/5               THE SEANCE, free spins drawn from the exact free-spin pmf
-  6. audit_mc vault                      Soul Vault
-  7. audit_rtp.py                        combines everything into the per-stake RTP table with confidence intervals
+  6. audit_mc vault                      Soul Vault Monte-Carlo (3x10^8 vaults; a cross-check of step 7)
+  7. vault_exact.py                      the EXACT distribution of the vault total (no sampling at all, 15 s)
+  8. audit_rtp.py                        combines everything into the per-stake RTP table with confidence intervals
 The reel strips, pay table, paylines and feature weights are read from tools/audit/config_snapshot.txt, a dump of the REAL
 ReaperConfig.kt (kept current by AuditTest.configSnapshotIsCurrent).
 """
@@ -74,6 +75,8 @@ def main():
             once("seance5_%d.hist" % chunk, [mc_bin, CFG, "seance", fs, "5", n(2e8), str(700 + chunk)])
         for chunk in range(3):
             once("vault_%d.hist" % chunk, [mc_bin, CFG, "vault", n(1e8), str(800 + chunk)])
+    if not os.path.exists(os.path.join(out, "vault_exact.npy")):
+        sh([sys.executable, os.path.join(HERE, "vault_exact.py"), out])      # exact Soul Vault distribution (15 s)
     sh([sys.executable, os.path.join(HERE, "audit_rtp.py"), out])
 
 

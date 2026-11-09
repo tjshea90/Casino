@@ -255,6 +255,10 @@ class AuditTest {
 /**
  * Reference values measured by tools/audit (python3 tools/audit/run_audit.py): exhaustive enumeration of every base-game
  * (74^5) and free-spin (58^5) reel combination, 10^8..10^9-sample C Monte-Carlo for the rest. See docs/AUDIT_v3.md section 1.
+ *
+ * These numbers belong to the config in tools/audit/config_snapshot.txt. When [AuditTest.configSnapshotIsCurrent] fails (pays, reels or
+ * feature weights were edited) the money maths changed: copy reaper/build/audit/config_snapshot.txt over the snapshot, run
+ * `python3 tools/audit/run_audit.py --out build/audit`, `python3 tools/audit/policy_mdp.py build/audit` and paste the new figures here.
  */
 object AuditReference {
     /** Plain spin (lines + coffin pay), x stake: EXACT, from the enumeration of all 2,219,006,624 stop combinations. */
@@ -267,19 +271,19 @@ object AuditReference {
     /** Mean total multiple (x stake, uncapped) of THE SEANCE started by 3 / 4 / 5 coffins (10^9 / 6x10^8 / 4x10^8 sessions). */
     val SEANCE_MEAN = doubleArrayOf(0.0, 0.0, 0.0, 28.7649, 58.620, 119.689)
     val SEANCE_SE = doubleArrayOf(0.0, 0.0, 0.0, 0.00093, 0.0019, 0.0035)
-    /** Mean total multiple (x bonus bet, uncapped) of the Soul Vault (3x10^8 vaults). */
-    const val VAULT_MEAN = 28.3489
-    const val VAULT_SE = 0.0013
+    /** Mean total multiple (x bonus bet, uncapped) of the Soul Vault: EXACT (tools/audit/vault_exact.py propagates the whole distribution). */
+    const val VAULT_MEAN = 28.351329
+    const val VAULT_SE = 0.0
     /** Chance per paid spin (plain and mini-feature spins mixed) that THE SEANCE starts: one per 213.16 spins. */
     const val SEANCE_PER_SPIN = 0.0046913204
-    /** Measured RTP of a constant stake at each ReaperConfig.STAKES entry, 25-book cap included (SE <= 0.0011 percentage points). */
-    val RTP_BY_STAKE = doubleArrayOf(0.93998, 0.93997, 0.93994, 0.93990, 0.93982, 0.93915, 0.93828, 0.93275, 0.92616, 0.91863, 0.90994, 0.88931)
-    const val RTP_SE = 0.00002
+    /** Measured RTP of a constant stake at each ReaperConfig.STAKES entry, 25-book cap included (SE <= 0.0004 percentage points). */
+    val RTP_BY_STAKE = doubleArrayOf(0.94000, 0.93999, 0.93996, 0.93992, 0.93984, 0.93917, 0.93830, 0.93276, 0.92617, 0.91864, 0.90995, 0.88931)
+    const val RTP_SE = 0.00001
     /** Per token wagered at each stake: lines + minis + coins + coffin pays + THE SEANCE, cap included, without the Soul Vault. */
     val NON_VAULT_BY_STAKE = doubleArrayOf(0.729990, 0.729989, 0.729980, 0.729951, 0.729878, 0.729269, 0.728585, 0.725918, 0.721809, 0.716805, 0.711288, 0.699165)
     /** Tokens a Soul Vault pays on average for bonus bet 0..40, cap included: E[min(2000, V * bet)]. */
-    val VAULT_TOKENS_BY_BET = doubleArrayOf(0.0000, 28.3489, 56.6961, 85.0350, 113.3739, 141.7121, 170.0471, 198.3676, 226.6767, 254.9465,
-        283.0916, 310.9496, 338.3047, 365.2170, 392.0431, 418.8330, 445.5752, 472.2548, 498.8554, 525.3580, 551.7437, 577.9896, 604.0773,
-        629.9848, 655.6883, 681.1708, 706.4028, 731.3725, 756.0557, 780.4521, 804.5297, 828.2910, 851.7224, 874.8164, 897.5715, 919.9761,
-        942.0203, 963.7381, 985.0734, 1006.0803, 1026.7633)
+    val VAULT_TOKENS_BY_BET = doubleArrayOf(0.0000, 28.3513, 56.7010, 85.0425, 113.3839, 141.7247, 170.0623, 198.3856, 226.6972, 254.9695,
+        283.1165, 310.9759, 338.3317, 365.2450, 392.0722, 418.8634, 445.6068, 472.2875, 498.8891, 525.3926, 551.7792, 578.0259, 604.1144,
+        630.0223, 655.7262, 681.2094, 706.4422, 731.4123, 756.0959, 780.4926, 804.5703, 828.3312, 851.7620, 874.8553, 897.6099, 920.0139,
+        942.0574, 963.7746, 985.1091, 1006.1154, 1026.7979)
 }

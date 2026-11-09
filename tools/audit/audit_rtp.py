@@ -151,7 +151,16 @@ def load_components(out):
     if not files:
         raise SystemExit("missing vault files")
     cp.n_v, cells_v, _ = merged_y(files)
-    cp.V = Dist.from_y(cells_v)
+    cp.V_mc = Dist.from_y(cells_v)
+    exact_path = os.path.join(out, "vault_exact.npy")                 # tools/audit/vault_exact.py: the whole distribution, exactly
+    if os.path.exists(exact_path):
+        h = np.load(exact_path)
+        nz = np.nonzero(h)[0]
+        cp.V = Dist(nz, h[nz] * 1e18, exact=True)
+        cp.vault_is_exact = True
+    else:
+        cp.V = cp.V_mc
+        cp.vault_is_exact = False
 
     cp.T_dist = {1: cp.Xreaper, 2: cp.mini[2]["dist"], 3: cp.Xdemon, 4: cp.mini[4]["dist"]}
     cp.T_k = {1: cp.reaper_k, 2: cp.mini[2]["k"], 3: cp.Pp, 4: cp.mini[4]["k"]}
@@ -207,6 +216,10 @@ def report(cp):
             kz = max(abs(pk_mc[k] - exact_k[k]) / math.sqrt(max(exact_k[k] * (1 - exact_k[k]), 1e-30) / mini[t]["n"]) for k in (3, 4))
             print("  %-16s exact mean %.5f  MC %.5f +/- %.5f (z %+.2f)   P(3+) exact %.6f MC %.6f (max z over k=3,4: %.2f)   [N=%d]"
                   % (label, exact_d.mean(), m, se, z, exact_k[3:].sum(), pk_mc[3:].sum(), kz, mini[t]["n"]))
+    if cp.vault_is_exact:
+        m, se = cp.V_mc.capped(1e18)
+        print("  Soul Vault: exact distribution E[V] = %.6f vs %d-vault Monte-Carlo %.5f +/- %.5f (z %+.2f); the exact one is used below"
+              % (cp.V.mean(), cp.n_v, m, se, (m - cp.V.mean()) / se))
     print("  plain-spin exhaustive enumeration: %d stop combinations, E[X] = %.12f, P(any win) = %.6f (1 in %.3f), "
           "min positive win = %d x stake, max = %d x stake"
           % (cp.n_base, Xp.mean(), Xp.prob_gt(0), 1 / Xp.prob_gt(0), int(Xp.y[Xp.y > 0].min()), int(Xp.y.max())))
