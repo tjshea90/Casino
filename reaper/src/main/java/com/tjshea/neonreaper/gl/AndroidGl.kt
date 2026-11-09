@@ -55,6 +55,9 @@ class AndroidGl : Gl {
     override fun clear(mask: Int) = GLES30.glClear(mask)
     override fun viewport(x: Int, y: Int, w: Int, h: Int) = GLES30.glViewport(x, y, w, h)
     override fun deleteBuffer(buffer: Int) { tmp[0] = buffer; GLES30.glDeleteBuffers(1, tmp, 0) }
+    override fun genVertexArray(): Int { GLES30.glGenVertexArrays(1, tmp, 0); return tmp[0] }
+    override fun bindVertexArray(vao: Int) = GLES30.glBindVertexArray(vao)
+    override fun deleteVertexArray(vao: Int) { tmp[0] = vao; GLES30.glDeleteVertexArrays(1, tmp, 0) }
     override fun deleteTexture(tex: Int) { tmp[0] = tex; GLES30.glDeleteTextures(1, tmp, 0) }
     override fun deleteProgram(program: Int) = GLES30.glDeleteProgram(program)
     override fun texImage2DEmpty(width: Int, height: Int) =

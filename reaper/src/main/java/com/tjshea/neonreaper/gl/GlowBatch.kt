@@ -15,6 +15,7 @@ internal class GlowBatch(private val gl: Gl, private val maxGlows: Int = 384) {
     private val prog = Program(gl, VS, FS, "glowbatch")
     private val vbo = gl.genBuffer()
     private val ibo = gl.genBuffer()
+    private val vao = gl.genVertexArray()
     private val data = FloatArray(maxGlows * 4 * MeshData.STRIDE)
     private val buf: FloatBuffer = ByteBuffer.allocateDirect(data.size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
     private var n = 0
@@ -28,8 +29,15 @@ internal class GlowBatch(private val gl: Gl, private val maxGlows: Int = 384) {
         }
         val sb: ShortBuffer = ByteBuffer.allocateDirect(idx.size * 2).order(ByteOrder.nativeOrder()).asShortBuffer()
         sb.put(idx).position(0)
+        gl.bindVertexArray(vao)                                    // the batch owns a VAO: index buffer + attribute layout are recorded once
         gl.bindBuffer(Gl.ELEMENT_ARRAY_BUFFER, ibo)
         gl.bufferData(Gl.ELEMENT_ARRAY_BUFFER, sb, Gl.STATIC_DRAW)
+        gl.bindBuffer(Gl.ARRAY_BUFFER, vbo)
+        gl.bufferData(Gl.ARRAY_BUFFER, buf, Gl.DYNAMIC_DRAW)       // allocates the store (re-filled every frame)
+        gl.vertexAttribPointer(0, 3, MeshData.BYTES, 0); gl.enableVertexAttribArray(0)
+        gl.vertexAttribPointer(1, 3, MeshData.BYTES, 12); gl.enableVertexAttribArray(1)
+        gl.vertexAttribPointer(2, 2, MeshData.BYTES, 24); gl.enableVertexAttribArray(2)
+        gl.vertexAttribPointer(3, 4, MeshData.BYTES, 32); gl.enableVertexAttribArray(3)
     }
 
     fun begin() { n = 0 }
@@ -55,13 +63,9 @@ internal class GlowBatch(private val gl: Gl, private val maxGlows: Int = 384) {
         prog.m4("uViewProj", viewProj)
         prog.f3("uCamRight", camRight[0], camRight[1], camRight[2]); prog.f3("uCamUp", camUp[0], camUp[1], camUp[2])
         buf.clear(); buf.put(data, 0, n * 4 * MeshData.STRIDE); buf.position(0)
+        gl.bindVertexArray(vao)
         gl.bindBuffer(Gl.ARRAY_BUFFER, vbo)
         gl.bufferData(Gl.ARRAY_BUFFER, buf, Gl.DYNAMIC_DRAW)
-        gl.bindBuffer(Gl.ELEMENT_ARRAY_BUFFER, ibo)
-        gl.vertexAttribPointer(0, 3, MeshData.BYTES, 0); gl.enableVertexAttribArray(0)
-        gl.vertexAttribPointer(1, 3, MeshData.BYTES, 12); gl.enableVertexAttribArray(1)
-        gl.vertexAttribPointer(2, 2, MeshData.BYTES, 24); gl.enableVertexAttribArray(2)
-        gl.vertexAttribPointer(3, 4, MeshData.BYTES, 32); gl.enableVertexAttribArray(3)
         gl.drawElements(Gl.TRIANGLES, n * 6)
         Mesh.drawCalls++; Mesh.triangles += n * 2L
     }

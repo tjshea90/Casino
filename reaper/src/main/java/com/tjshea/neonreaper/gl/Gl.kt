@@ -57,6 +57,10 @@ interface Gl {
     fun clear(mask: Int)
     fun viewport(x: Int, y: Int, w: Int, h: Int)
     fun deleteBuffer(buffer: Int)
+    /** Vertex array objects (GLES 3): one bind replaces ~11 buffer / attribute calls per draw. */
+    fun genVertexArray(): Int
+    fun bindVertexArray(vao: Int)
+    fun deleteVertexArray(vao: Int)
     fun deleteTexture(tex: Int)
     fun deleteProgram(program: Int)
 

@@ -105,38 +105,49 @@ class Mesh(private val data: MeshData) {
         @JvmField var maxVertices = 0
     }
 
+    private var vao = 0
+    private var pointsVao = 0
+
     fun upload(gl: Gl) {
         if (vbo != 0) return
         val fb: FloatBuffer = ByteBuffer.allocateDirect(data.vn * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
         fb.put(data.v, 0, data.vn).position(0)
         val sb: ShortBuffer = ByteBuffer.allocateDirect(data.inN * 2).order(ByteOrder.nativeOrder()).asShortBuffer()
         sb.put(data.i, 0, data.inN).position(0)
+        // This mesh's vertex array object is bound FIRST: the element-array binding is part of VAO state, so uploading while another
+        // mesh's VAO is bound would silently overwrite that mesh's index buffer.
+        vao = gl.genVertexArray(); gl.bindVertexArray(vao)
         vbo = gl.genBuffer(); gl.bindBuffer(Gl.ARRAY_BUFFER, vbo); gl.bufferData(Gl.ARRAY_BUFFER, fb, Gl.STATIC_DRAW)
         ibo = gl.genBuffer(); gl.bindBuffer(Gl.ELEMENT_ARRAY_BUFFER, ibo); gl.bufferData(Gl.ELEMENT_ARRAY_BUFFER, sb, Gl.STATIC_DRAW)
+        gl.vertexAttribPointer(0, 3, MeshData.BYTES, 0); gl.enableVertexAttribArray(0)
+        gl.vertexAttribPointer(1, 3, MeshData.BYTES, 12); gl.enableVertexAttribArray(1)
+        gl.vertexAttribPointer(2, 2, MeshData.BYTES, 24); gl.enableVertexAttribArray(2)
+        gl.vertexAttribPointer(3, 4, MeshData.BYTES, 32); gl.enableVertexAttribArray(3)
     }
 
     fun draw(gl: Gl) {
         upload(gl)
         drawCalls++; triangles += indexCount / 3
-        gl.bindBuffer(Gl.ARRAY_BUFFER, vbo)
-        gl.bindBuffer(Gl.ELEMENT_ARRAY_BUFFER, ibo)
-        gl.vertexAttribPointer(0, 3, MeshData.BYTES, 0); gl.enableVertexAttribArray(0)
-        gl.vertexAttribPointer(1, 3, MeshData.BYTES, 12); gl.enableVertexAttribArray(1)
-        gl.vertexAttribPointer(2, 2, MeshData.BYTES, 24); gl.enableVertexAttribArray(2)
-        gl.vertexAttribPointer(3, 4, MeshData.BYTES, 32); gl.enableVertexAttribArray(3)
+        gl.bindVertexArray(vao)
         gl.drawElements(Gl.TRIANGLES, indexCount)
     }
 
     /** Binds the vertex buffer and attributes without drawing (for GL_POINTS via drawArrays). */
     fun drawPointsSetup(gl: Gl) {
         upload(gl)
-        gl.bindBuffer(Gl.ARRAY_BUFFER, vbo)
-        gl.vertexAttribPointer(0, 3, MeshData.BYTES, 0); gl.enableVertexAttribArray(0)
-        gl.vertexAttribPointer(1, 3, MeshData.BYTES, 12); gl.enableVertexAttribArray(1)
-        gl.disableVertexAttribArray(2); gl.disableVertexAttribArray(3)
+        if (pointsVao == 0) {
+            // a second VAO with only position + the packed per-particle parameters enabled (attributes 2 and 3 stay disabled)
+            pointsVao = gl.genVertexArray(); gl.bindVertexArray(pointsVao)
+            gl.bindBuffer(Gl.ARRAY_BUFFER, vbo)
+            gl.vertexAttribPointer(0, 3, MeshData.BYTES, 0); gl.enableVertexAttribArray(0)
+            gl.vertexAttribPointer(1, 3, MeshData.BYTES, 12); gl.enableVertexAttribArray(1)
+        }
+        gl.bindVertexArray(pointsVao)
     }
 
-    fun release(gl: Gl) { if (vbo != 0) { gl.deleteBuffer(vbo); gl.deleteBuffer(ibo); vbo = 0; ibo = 0 } }
+    fun release(gl: Gl) {
+        if (vbo != 0) { gl.deleteVertexArray(vao); if (pointsVao != 0) gl.deleteVertexArray(pointsVao); gl.deleteBuffer(vbo); gl.deleteBuffer(ibo); vbo = 0; ibo = 0; vao = 0; pointsVao = 0 }
+    }
 }
 
 /** Procedural geometry. All shapes are centred on the origin unless noted. */

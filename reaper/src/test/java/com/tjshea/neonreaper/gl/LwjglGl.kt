@@ -54,6 +54,9 @@ class LwjglGl : Gl {
     override fun clear(mask: Int) = GLES30.glClear(mask)
     override fun viewport(x: Int, y: Int, w: Int, h: Int) = GLES30.glViewport(x, y, w, h)
     override fun deleteBuffer(buffer: Int) = GLES30.glDeleteBuffers(buffer)
+    override fun genVertexArray(): Int = GLES30.glGenVertexArrays()
+    override fun bindVertexArray(vao: Int) = GLES30.glBindVertexArray(vao)
+    override fun deleteVertexArray(vao: Int) = GLES30.glDeleteVertexArrays(vao)
     override fun deleteTexture(tex: Int) = GLES30.glDeleteTextures(tex)
     override fun deleteProgram(program: Int) = GLES30.glDeleteProgram(program)
     override fun texImage2DEmpty(width: Int, height: Int) =
