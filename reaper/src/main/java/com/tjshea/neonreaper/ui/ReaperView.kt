@@ -117,6 +117,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
     private var tickStep = 0                               // count-up tick pitch step (musical scale)
     private var nextAntPlay = 0.0                          // when the anticipation loop sound is re-triggered
     private var bigHitAt = -1.0                            // when the win stinger "hits": banner slam, shake, flash
+    private var bigHitTime = 0.0                           // (kept after it fired, for the banner animation)
     private var trackSwitchAt = -1.0; private var trackSwitchTo: Audio.Track? = null
     private var lastIntensity = -1f
     /** The score that should be playing now (used by the activity when the app returns from the background). */
@@ -413,9 +414,9 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         p.shader = RadialGradient(w / 2, h / 2, max(w, h) * 0.7f, intArrayOf(0x00000000, 0xCC000000.toInt()), floatArrayOf(0.5f, 1f), Shader.TileMode.CLAMP)
         c.drawRect(0f, 0f, w, h, p); p.shader = null
         // relic bar plate
-        p.color = 0xCC050805.toInt()
+        p.color = 0xE00B0C0F.toInt()
         c.drawRoundRect(relicRect, relicRect.height() / 2, relicRect.height() / 2, p)
-        p.style = Paint.Style.STROKE; p.strokeWidth = 2 * u; p.color = 0x8876FF03.toInt()
+        p.style = Paint.Style.STROKE; p.strokeWidth = 2 * u; p.color = 0x99A8873A.toInt()
         c.drawRoundRect(relicRect, relicRect.height() / 2, relicRect.height() / 2, p)
         p.style = Paint.Style.FILL
         // reel frame: iron + neon tube
@@ -429,7 +430,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         p.color = 0xFF020302.toInt()
         c.drawRoundRect(frameRect, 10 * u, 10 * u, p)
         val tube = Path().apply { addRoundRect(frameRect, 10 * u, 10 * u, Path.Direction.CW) }
-        Art.neonStroke(c, tube, Neon.GREEN, 2.5f * u)
+        Art.neonStroke(c, tube, Neon.BRASS, 2.5f * u)
         // reel backs
         for (r in 0 until REELS) {
             val l = reelRect.left + r * cell
@@ -440,33 +441,46 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         }
         p.shader = null
         // bottom panel
-        p.shader = LinearGradient(0f, panelRect.top, 0f, panelRect.bottom, 0xF0101410.toInt(), 0xF0020302.toInt(), Shader.TileMode.CLAMP)
+        p.shader = LinearGradient(0f, panelRect.top, 0f, panelRect.bottom, 0xF0181A1F.toInt(), 0xF00A0B0E.toInt(), Shader.TileMode.CLAMP)
         c.drawRoundRect(panelRect, 18 * u, 18 * u, p); p.shader = null
-        Art.neonStroke(c, Path().apply { addRoundRect(panelRect, 18 * u, 18 * u, Path.Direction.CW) }, Neon.GREEN_DIM, 1.5f * u)
+        Art.neonStroke(c, Path().apply { addRoundRect(panelRect, 18 * u, 18 * u, Path.Direction.CW) }, Neon.BRASS_DIM, 1.5f * u)
         for (r in listOf(creditRect, winRect)) {
             p.color = 0xFF000000.toInt(); c.drawRoundRect(r, 12 * u, 12 * u, p)
-            p.style = Paint.Style.STROKE; p.strokeWidth = 1.5f * u; p.color = 0xFF2E7D0A.toInt()
+            p.style = Paint.Style.STROKE; p.strokeWidth = 1.5f * u; p.color = 0xFF5C4A1E.toInt()
             c.drawRoundRect(r, 12 * u, 12 * u, p); p.style = Paint.Style.FILL
         }
     }
 
-    /** HUD-only chrome (relic plate, bottom panel, meter boxes) for 3D mode: no scenery. */
+    /** HUD-only chrome (relic plate, bottom panel, meter boxes) for 3D mode: dark iron plates with brass borders, no scenery. */
     private fun paintChrome(c: Canvas, p: Paint) {
-        p.shader = RadialGradient(width / 2f, height / 2f, max(width, height) * 0.75f, intArrayOf(0x00000000, 0x88000000.toInt()), floatArrayOf(0.6f, 1f), Shader.TileMode.CLAMP)
+        p.shader = RadialGradient(width / 2f, height / 2f, max(width, height) * 0.75f, intArrayOf(0x00000000, 0x99000000.toInt()), floatArrayOf(0.6f, 1f), Shader.TileMode.CLAMP)
         c.drawRect(0f, 0f, width.toFloat(), height.toFloat(), p); p.shader = null
-        p.color = 0xCC050805.toInt()
-        c.drawRoundRect(relicRect, relicRect.height() / 2, relicRect.height() / 2, p)
-        p.style = Paint.Style.STROKE; p.strokeWidth = 2 * u; p.color = 0x8876FF03.toInt()
-        c.drawRoundRect(relicRect, relicRect.height() / 2, relicRect.height() / 2, p)
+        val rr = relicRect.height() / 2
+        p.shader = LinearGradient(0f, relicRect.top, 0f, relicRect.bottom, 0xEE1E2026.toInt(), 0xEE0A0B0E.toInt(), Shader.TileMode.CLAMP)
+        c.drawRoundRect(relicRect, rr, rr, p); p.shader = null
+        p.style = Paint.Style.STROKE; p.strokeWidth = 2 * u; p.color = 0xFF6B5524.toInt()
+        c.drawRoundRect(relicRect, rr, rr, p)
+        p.strokeWidth = 1 * u; p.color = 0x88D9B968.toInt(); tmp.set(relicRect); tmp.inset(2.5f * u, 2.5f * u)
+        c.drawRoundRect(tmp, rr, rr, p)
         p.style = Paint.Style.FILL
-        p.shader = LinearGradient(0f, panelRect.top, 0f, panelRect.bottom, 0xE8101410.toInt(), 0xF0020302.toInt(), Shader.TileMode.CLAMP)
+        p.shader = LinearGradient(0f, panelRect.top, 0f, panelRect.bottom, 0xF0202228.toInt(), 0xF00A0B0E.toInt(), Shader.TileMode.CLAMP)
         c.drawRoundRect(panelRect, 18 * u, 18 * u, p); p.shader = null
-        Art.neonStroke(c, Path().apply { addRoundRect(panelRect, 18 * u, 18 * u, Path.Direction.CW) }, Neon.GREEN_DIM, 1.5f * u)
+        p.style = Paint.Style.STROKE; p.strokeWidth = 2.5f * u; p.color = 0xFF6B5524.toInt()
+        c.drawRoundRect(panelRect, 18 * u, 18 * u, p)
+        p.strokeWidth = 1 * u; p.color = 0x88D9B968.toInt(); tmp.set(panelRect); tmp.inset(3.5f * u, 3.5f * u)
+        c.drawRoundRect(tmp, 15 * u, 15 * u, p)
+        // the faint blood-red seam along the top edge of the panel
+        p.strokeWidth = 1.5f * u; p.color = 0x66E0182F.toInt()
+        c.drawLine(panelRect.left + 30 * u, panelRect.top + 6 * u, panelRect.right - 30 * u, panelRect.top + 6 * u, p)
+        p.style = Paint.Style.FILL
         for (r in listOf(creditRect, winRect)) {
-            p.color = 0xFF000000.toInt(); c.drawRoundRect(r, 12 * u, 12 * u, p)
-            p.style = Paint.Style.STROKE; p.strokeWidth = 1.5f * u; p.color = 0xFF2E7D0A.toInt()
+            p.color = 0xFF050507.toInt(); c.drawRoundRect(r, 12 * u, 12 * u, p)
+            p.style = Paint.Style.STROKE; p.strokeWidth = 1.5f * u; p.color = 0xFF5C4A1E.toInt()
             c.drawRoundRect(r, 12 * u, 12 * u, p); p.style = Paint.Style.FILL
         }
+        // brass rivets in the panel corners
+        p.color = 0xFF8A6D2C.toInt()
+        for (cx in floatArrayOf(panelRect.left + 12 * u, panelRect.right - 12 * u)) for (cy in floatArrayOf(panelRect.top + 12 * u, panelRect.bottom - 12 * u)) c.drawCircle(cx, cy, 3 * u, p)
     }
 
     private fun recycleBitmaps() {
@@ -716,7 +730,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
                     // one stinger per tier (build-up, hit, tail); the banner slam / shake / flash are timed to its hit
                     val st = when (tier) { 1 -> Sfx.WIN_BIG; 2 -> Sfx.WIN_MEGA; 3 -> Sfx.WIN_EPIC; else -> Sfx.WIN_APOCALYPSE }
                     audio.play(st)
-                    bigHitAt = t + Audio.hitSeconds(st).toDouble()
+                    bigHitAt = t + Audio.hitSeconds(st).toDouble(); bigHitTime = bigHitAt
                     soulRate = 30f + tier * 20f; sideLaughUntil = t + 3; enter(Phase.BIG_WIN); return
                 }
                 showcaseSym >= 0 -> { audio.play(Sfx.WIN_MED); enter(Phase.SHOWCASE); return }
@@ -1270,16 +1284,16 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
                 c.restore()
             } else c.drawBitmap(dark[i], r.left, r.top, null)
         }
-        pText.typeface = cond; pText.textSize = relicRect.height() * 0.24f; pText.color = 0xFF9CCC65.toInt()
+        pText.typeface = cond; pText.textSize = relicRect.height() * 0.24f; pText.color = 0xFFD9D2BE.toInt()
         pText.textAlign = Paint.Align.LEFT
         val lx = relicSlots[4].right + 14 * u
         c.drawText("SOUL VAULT", lx, relicRect.centerY() - 2 * u, pText)
-        pText.color = 0xFF8A9A80.toInt(); pText.textSize = relicRect.height() * 0.2f
+        pText.color = 0xFF9A927E.toInt(); pText.textSize = relicRect.height() * 0.2f
         c.drawText("BONUS BET ${wallet.projectedBonusBet}", lx, relicRect.centerY() + relicRect.height() * 0.26f, pText)
         pText.textAlign = Paint.Align.RIGHT
-        pText.color = 0xFF9CCC65.toInt(); pText.textSize = relicRect.height() * 0.24f
+        pText.color = 0xFFD9D2BE.toInt(); pText.textSize = relicRect.height() * 0.24f
         c.drawText("RELICS", relicSlots[0].left - 14 * u, relicRect.centerY() - 2 * u, pText)
-        pText.color = 0xFF8A9A80.toInt(); pText.textSize = relicRect.height() * 0.2f
+        pText.color = 0xFF9A927E.toInt(); pText.textSize = relicRect.height() * 0.2f
         c.drawText("${wallet.relics.coerceAtMost(5)} / 5", relicSlots[0].left - 14 * u, relicRect.centerY() + relicRect.height() * 0.26f, pText)
         pText.textAlign = Paint.Align.CENTER
     }
@@ -1520,7 +1534,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
     }
 
     private fun meterLabel(c: Canvas, r: RectF, label: String) {
-        pText.typeface = cond; pText.textSize = r.height() * 0.17f; pText.color = 0xFF9CCC65.toInt()
+        pText.typeface = cond; pText.textSize = r.height() * 0.17f; pText.color = 0xFFB8AE92.toInt()
         c.drawText(label, r.centerX(), r.top + r.height() * 0.22f, pText)
     }
 
@@ -1535,7 +1549,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         pText.typeface = serif; pText.color = if (flash) Neon.RED else Color.WHITE
         fit(Money.fmt(shown), creditRect.width() * 0.9f, creditRect.height() * 0.34f)
         c.drawText(Money.fmt(shown), creditRect.centerX(), creditRect.centerY() + creditRect.height() * 0.12f, pText)
-        pText.typeface = cond; pText.color = 0xFF8A9A80.toInt()
+        pText.typeface = cond; pText.color = 0xFF9A927E.toInt()
         val sub = if (shown >= 10) "TOKENS • ${Money.short(shown)}" else "TOKENS"
         fit(sub, creditRect.width() * 0.9f, creditRect.height() * 0.14f)
         c.drawText(sub, creditRect.centerX(), creditRect.bottom - creditRect.height() * 0.1f, pText)
@@ -1558,7 +1572,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         if (wv > 0) pText.setShadowLayer(12 * u, 0f, 0f, Neon.GREEN)
         c.drawText(Money.fmt(wv), winRect.centerX(), winRect.centerY() + winRect.height() * 0.13f, pText)
         pText.clearShadowLayer()
-        pText.typeface = cond; pText.color = 0xFF8A9A80.toInt()
+        pText.typeface = cond; pText.color = 0xFF9A927E.toInt()
         val wsub = when {
             o != null && o.capped && phase != Phase.SPINNING && curFree == null -> "TOKENS • 25-BOOK MAX WIN"
             phase == Phase.SEANCE_END && seanceRevealed >= ReaperConfig.MAX_WIN_TOKENS -> "TOKENS • 25-BOOK MAX WIN"
@@ -1613,7 +1627,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
             b.id == "auto" && autoLeft != 0 -> Neon.CYAN
             b.id == "turbo" && wallet.turbo -> Neon.ORANGE
             b.id == "sound" && !wallet.soundOn -> 0xFF555555.toInt()
-            else -> Neon.PURPLE
+            else -> Neon.BRASS
         }
         val rad = tmp.height() * 0.3f
         pFill.color = 0xE0050505.toInt(); c.drawRoundRect(tmp, rad, rad, pFill)
@@ -1642,10 +1656,10 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         // outer glow + chrome bezel
         pFill.shader = RadialGradient(cx, cy, rad * 1.3f, intArrayOf(col and 0x00FFFFFF or ((70 + 110 * glow).toInt() shl 24), 0x00000000), floatArrayOf(0.7f, 1f), Shader.TileMode.CLAMP)
         c.drawCircle(cx, cy, rad * 1.3f, pFill)
-        pFill.shader = LinearGradient(0f, cy - rad, 0f, cy + rad, intArrayOf(0xFFE0E0E0.toInt(), 0xFF5A5A5A.toInt(), 0xFF1A1A1A.toInt(), 0xFF8A8A8A.toInt()), null, Shader.TileMode.CLAMP)
+        pFill.shader = LinearGradient(0f, cy - rad, 0f, cy + rad, intArrayOf(0xFFD9B968.toInt(), 0xFF6A5420.toInt(), 0xFF1A1408.toInt(), 0xFF9A7B34.toInt()), null, Shader.TileMode.CLAMP)
         c.drawCircle(cx, cy, rad, pFill)
         // dome: lit sphere cap
-        val dome = if (stop) intArrayOf(0xFFFF8A80.toInt(), Neon.RED, 0xFF4A0010.toInt()) else intArrayOf(0xFFCCFF90.toInt(), 0xFF2E9E0A.toInt(), 0xFF0B2A04.toInt())
+        val dome = if (stop) intArrayOf(0xFFFF8A80.toInt(), Neon.RED, 0xFF3A000C.toInt()) else intArrayOf(0xFFB6F27A.toInt(), 0xFF2F7A10.toInt(), 0xFF081A03.toInt())
         pFill.shader = RadialGradient(cx - rad * 0.25f, cy - rad * 0.35f, rad * 1.15f, dome, floatArrayOf(0f, 0.45f, 1f), Shader.TileMode.CLAMP)
         c.drawCircle(cx, cy, rad * (if (down) 0.84f else 0.86f), pFill)
         // specular highlight
@@ -1670,7 +1684,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         tmp.set(reelRect.centerX() - w / 2, cy - 32 * u, reelRect.centerX() + w / 2, cy + 32 * u)
         pFill.color = 0xE8000000.toInt(); c.drawRoundRect(tmp, 30 * u, 30 * u, pFill)
         path.reset(); path.addRoundRect(tmp, 30 * u, 30 * u, Path.Direction.CW)
-        Art.neonStroke(c, path, Neon.GREEN, 1.5f * u)
+        Art.neonStroke(c, path, Neon.BRASS, 1.5f * u)
         pText.color = Color.WHITE
         c.drawText(m, reelRect.centerX(), cy + 10 * u, pText)
     }
@@ -1679,7 +1693,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
 
     private fun drawBigWin(c: Canvas, t: Double) {
         val e = t - phaseStart
-        pFill.color = Color.argb((min(1.0, e * 3) * (if (lay3d != null) 90 else 170)).toInt(), 0, 0, 0)
+        pFill.color = Color.argb((min(1.0, e * 2) * (if (lay3d != null) 110 else 170)).toInt(), 0, 0, 0)
         c.drawRect(0f, 0f, width.toFloat(), height.toFloat(), pFill)
         // the reaper rises, enlarged, behind the text
         val bc = bigChars
@@ -1697,8 +1711,10 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         val q = ((t - rollStart) / rollDur).coerceIn(0.0, 1.0)
         val shownTier = ceil(tier * min(1.0, q * 1.15 + 0.01)).toInt().coerceIn(1, tier)
         val name = tierNames[shownTier]
-        val bounce = (1 + 0.1 * sin(e * 7) * (1 - min(1.0, e / 6))).toFloat() * min(1.0, e * 2.5).toFloat()
-        c.save(); c.scale(bounce, bounce, width / 2f, height * 0.45f)
+        // the tier name slams in on the stinger's hit (huge, then settles) while the amount already counts up in the dark
+        val he = (t - bigHitTime).toFloat()
+        val bounce = if (he < 0f) 0f else min(1f, he * 8f) * (1f + 0.7f * max(0f, 1f - he * 4f)) * (1f + 0.035f * sin(he * 7f))
+        c.save(); c.scale(bounce.coerceAtLeast(0.001f), bounce.coerceAtLeast(0.001f), width / 2f, height * 0.45f)
         pText.typeface = serif; pText.textSize = height * 0.14f
         val col = if (shownTier >= 3) Neon.RED else Neon.GREEN
         pText.color = col; pText.setShadowLayer(30 * u, 0f, 0f, col)
@@ -1760,10 +1776,10 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         pFill.color = Color.argb((a * 0.88f).toInt(), 0, 0, 0)
         c.drawRoundRect(tmp, 28 * u, 28 * u, pFill)
         path.reset(); path.addRoundRect(tmp, 28 * u, 28 * u, Path.Direction.CW)
-        pStroke.color = Neon.GREEN; pStroke.alpha = a; pStroke.strokeWidth = 5 * u
+        pStroke.color = Neon.BRASS; pStroke.alpha = a; pStroke.strokeWidth = 5 * u
         c.drawPath(path, pStroke)
         pText.typeface = serif; pText.textAlign = Paint.Align.CENTER
-        pText.textSize = bh * 0.16f; pText.color = Neon.GREEN; pText.alpha = a
+        pText.textSize = bh * 0.16f; pText.color = Neon.BONE; pText.alpha = a
         c.drawText(curFree?.let { "YOU WIN  ×${it.multiplier}" } ?: "YOU WIN", tmp.centerX(), tmp.top + bh * 0.2f, pText)
         c.save(); c.scale(beat, beat, tmp.centerX(), tmp.top + bh * 0.55f)
         pText.color = Color.WHITE; pText.alpha = a
