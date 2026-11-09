@@ -33,7 +33,9 @@ class GameGLView(context: Context) : GLSurfaceView(context), SceneSink {
             try {
                 val s = Scene3D(AndroidGl())
                 s.init()
-                val atlas = Atlas.build(256)
+                // 192 px symbol cells are plenty for ~150 px faces (45 % cheaper to paint and upload); big screens get 256
+                val dm = context.resources.displayMetrics
+                val atlas = Atlas.build(if (minOf(dm.widthPixels, dm.heightPixels) >= 1100) 256 else 192)
                 s.setAtlas(atlas.width, atlas.height, atlas.rgba, Atlas.COLS, Atlas.ROWS)
                 scene = s
                 applied = null

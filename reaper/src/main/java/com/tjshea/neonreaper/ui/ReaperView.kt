@@ -355,7 +355,8 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         val cs = cell.toInt().coerceAtLeast(16)
         chars = Characters(cs, cs)
         bigChars = Characters(leftChar.width().toInt().coerceAtLeast(8), leftChar.height().toInt().coerceAtLeast(8), plates = false)
-        blurred = Array(ReaperConfig.SYMBOL_COUNT) { motionBlur(chars!!.body(it)) }
+        // the motion-blurred symbol copies are only for the 2D fallback renderer: skip building them when the 3D world draws the reels
+        blurred = if (gl3d == null) Array(ReaperConfig.SYMBOL_COUNT) { motionBlur(chars!!.body(it)) } else null
         bg = Bitmap.createBitmap(w.toInt(), h.toInt(), Bitmap.Config.ARGB_8888).also { paintBackground(Canvas(it), w, h) }
         val g = gl3d
         if (g != null) {
@@ -1874,7 +1875,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         // front-and-centre while the reels spin, then it lifts up over the top row to do its work
         val lift = if (phase == Phase.SPINNING) 0f else ((t - (if (phase == Phase.MINI_ACTION) actionStart else presentStart - 10)) / 0.4).coerceIn(0.0, 1.0).toFloat()
         val hx = reelRect.centerX()
-        val hy = reelRect.centerY() + (reelRect.top + bc.h * 0.12f - reelRect.centerY()) * lift
+        val hy = reelRect.centerY() + (reelRect.top + leftChar.height() * 0.12f - reelRect.centerY()) * lift
         val sx = leftChar.centerX(); val sy = leftChar.centerY()
         val cx = sx + (hx - sx) * ease + sin(t * 2.2).toFloat() * 12 * u
         val cy = sy + (hy - sy) * ease + sin(t * 3.1).toFloat() * 8 * u - leaving * height * 0.6f
