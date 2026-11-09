@@ -48,6 +48,12 @@ class CoffinModel : CharacterModel {
     private val skS = 0.112f; private val skSZ = 0.112f * 0.46f; private val skZ = ZT + 0.044f
 
     private val stud = CharKit.stud(0.016f, 0.012f)
+    private val SIDES = floatArrayOf(-1f, 1f)
+    private val gapX = FloatArray(4) { CharKit.xRange(O, 0.17f + it * 0.27f).second - 0.006f }   // where the light leaks, per gap sprite
+    // scratch matrices (draw runs on the GL thread only): a small ring so nothing is allocated per frame
+    private val pool = Array(8) { FloatArray(16) }
+    private var poolI = 0
+    private fun copy(m: FloatArray): FloatArray { val d = pool[poolI]; poolI = (poolI + 1) and 7; System.arraycopy(m, 0, d, 0, 16); return d }
     private val box: Mesh
     private val lid: Mesh
     private val tail: Mesh
@@ -116,7 +122,7 @@ class CoffinModel : CharacterModel {
 
     // ---------------------------------------------------------------------------------------------- the box
     private fun buildBox(pb: PartBuilder) {
-        pb.add(CharKit.walls(O, ZB, O, ZR), 0x241C17, Mat.WOOD, ao = 0.95f)                         // outer walls
+        pb.add(CharKit.walls(O, ZB, O, ZR), 0x2E221A, Mat.WOOD, ao = 0.95f)                         // outer walls
         pb.add(CharKit.cap(O, ZB, -1f), 0x1A120E, Mat.WOOD, ao = 0.8f)                              // back
         pb.add(CharKit.ring(O, R, ZR, 1f), 0x1E1612, Mat.WOOD, ao = 0.85f)                          // rim the lid rests on
         // interior: an emissive cavity, brightest at the floor, that blazes through the gap when the lid opens
@@ -139,9 +145,9 @@ class CoffinModel : CharacterModel {
 
     // ---------------------------------------------------------------------------------------------- the lid
     private fun buildLid(pb: PartBuilder) {
-        pb.add(CharKit.walls(L0, ZS0, L0, ZS1), 0x2A201A, Mat.WOOD, ao = 0.95f)
-        pb.add(CharKit.walls(L0, ZS1, L1, ZT), 0x3A2D23, Mat.WOOD)                                  // chamfer (catches the light)
-        pb.add(CharKit.cap(L1, ZT, 1f), 0x2A211B, Mat.WOOD)                                         // flat top
+        pb.add(CharKit.walls(L0, ZS0, L0, ZS1), 0x32261D, Mat.WOOD, ao = 0.95f)
+        pb.add(CharKit.walls(L0, ZS1, L1, ZT), 0x46362A, Mat.WOOD)                                  // chamfer (catches the light)
+        pb.add(CharKit.cap(L1, ZT, 1f), 0x362920, Mat.WOOD)                                         // flat top
         pb.add(CharKit.cap(L0, ZS0, -1f), 0x1C140F, Mat.WOOD, ao = 0.6f)                            // underside
         // inlaid iron trim round the panel (a raised flat frame) with a stud in every corner
         val trimO = CharKit.inset(O, 0.074f); val trimI = CharKit.inset(O, 0.088f)
@@ -252,7 +258,7 @@ class CoffinModel : CharacterModel {
         val shake = ex * (sin(t * 41f) * 0.6f + sin(t * 27f + 1f) * 0.4f)
 
         // ---- float and drift, leaning back a little so the lid faces the viewer; shudders when excited
-        val root = mm.copyOf()
+        val root = copy(mm)
         Mat4.translate(root, 0f, 0.05f + 0.022f * sin(t * 1.2f) + ex * 0.010f * sin(t * 33f), 0f)
         Mat4.translate(root, 0f, 0.55f, 0f)
         Mat4.rotate(root, 2.2f * sin(t * 0.55f) + shake * 1.6f, 0f, 0f, 1f)
@@ -263,7 +269,7 @@ class CoffinModel : CharacterModel {
         // ---- the lid creaks open when excited
         val creak = 0.5f + 0.5f * sin(t * 1.9f)
         val open = max(0f, ex * (7f + 11f * creak * creak) + ex * 1.8f * sin(t * 26f) + 0.35f * (0.5f + 0.5f * sin(t * 0.8f)))
-        val lidM = root.copyOf()
+        val lidM = copy(root)
         Mat4.translate(lidM, HX, 0f, HZ); Mat4.rotate(lidM, -open, 0f, 1f, 0f); Mat4.translate(lidM, -HX, 0f, -HZ)
         // ---- green light spilling over the lid (only when it opens: idle stays dark and wicked); must precede the first drawV
         sc.beginLocalLights()
@@ -273,8 +279,8 @@ class CoffinModel : CharacterModel {
         sc.drawV(lid, lidM, emis = glowK, dim = dim, rim = rim, spec = 0.35f)
 
         // ---- loose chains rattle
-        for (sx in floatArrayOf(-1f, 1f)) {
-            val tm = root.copyOf()
+        for (sx in SIDES) {
+            val tm = copy(root)
             Mat4.translate(tm, sx * tailAnchor[0], tailAnchor[1], tailAnchor[2])
             val ph = if (sx < 0f) 0f else 1.7f
             Mat4.rotate(tm, sx * 6f + 4f * sin(t * 1.4f + ph) + ex * 13f * sin(t * 17f + ph), 0f, 0f, 1f)
@@ -283,13 +289,13 @@ class CoffinModel : CharacterModel {
         }
 
         // ---- glow sprites: halo behind, mist at the foot, the eyes / lock / medallion, the leak around the lid
-        sc.glowAt(root, 0f, 0.58f, -0.40f, 1.8f + 0.5f * ex, 0x2FFF6A, (0.15f + 0.07f * pulse + 0.22f * ex) * dim, 0f)
+        sc.glowAt(root, 0f, 0.58f, -0.03f, 1.8f + 0.5f * ex, 0x2FFF6A, (0.15f + 0.07f * pulse + 0.22f * ex) * dim, 0f)
         for (k in 0 until 2) {
             val ph = t * 0.33f + k * 2.9f
             sc.glowAt(root, sin(ph) * 0.24f, 0.08f + 0.04f * sin(ph * 1.3f), 0.18f + 0.1f * cos(ph * 0.8f), 0.80f + 0.2f * k, 0x2DFF6E, (0.15f + 0.04f * pulse + 0.08f * ex) * dim, 0f)
         }
         val eyeA = (0.55f + 0.45f * pulse + 0.8f * ex) * dim
-        for (sx in floatArrayOf(-1f, 1f)) {
+        for (sx in SIDES) {
             val ex0 = mcx + sx * 0.237f * skS; val ey0 = mcy + 0.075f * skS; val ez0 = skZ + (0.607f + 0.30f) * skSZ
             sc.glowAt(lidM, ex0, ey0, ez0, 0.060f + 0.05f * ex, 0x39FF55, 0.85f * eyeA, 0.9f)
         }
@@ -300,8 +306,7 @@ class CoffinModel : CharacterModel {
         val gap = sstep(0f, 9f, open)
         for (k in 0 until 4) {
             val y = 0.17f + k * 0.27f
-            val x = CharKit.xRange(O, y).second - 0.006f
-            sc.glowAt(lidM, x, y, ZS0 + 0.01f, 0.16f + 0.34f * gap, 0xC8FFC0, (0.10f + 0.85f * gap) * dim, 0.6f * gap)
+            sc.glowAt(lidM, gapX[k], y, ZS0 + 0.01f, 0.16f + 0.34f * gap, 0xC8FFC0, (0.10f + 0.85f * gap) * dim, 0.6f * gap)
         }
 
         // ---- souls pouring out of the gap (each one trails a fainter wisp)
