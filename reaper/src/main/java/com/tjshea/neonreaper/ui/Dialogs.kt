@@ -213,19 +213,21 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
             tokens.setText((t % Money.TOKENS_PER_MACK).takeIf { it > 0 }?.toString() ?: "")
         }
 
+        private fun refresh() {
+            val v = value()
+            total.text = "${fmt(v)} tokens"
+            totalText.text = if (v > 0) Money.describe(v) else "Enter books, macks and tokens"
+            onChange?.invoke()
+        }
+
         fun view(quick: List<Pair<String, Long>>, extra: View? = null): View {
             val w = object : TextWatcher {
                 override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
                 override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
-                override fun afterTextChanged(s: Editable?) {
-                    val v = value()
-                    total.text = "${fmt(v)} tokens"
-                    totalText.text = if (v > 0) Money.describe(v) else "Enter books, macks and tokens"
-                    onChange?.invoke()
-                }
+                override fun afterTextChanged(s: Editable?) = refresh()
             }
             books.addTextChangedListener(w); macks.addTextChangedListener(w); tokens.addTextChangedListener(w)
-            totalText.text = "Enter books, macks and tokens"
+            refresh()   // the fields may already be filled in (cash out starts with everything)
             val fields = ui.hbox(Gravity.BOTTOM).apply {
                 addView(ui.labeled("Books", books), ui.lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f, r = 5))
                 addView(ui.labeled("Macks", macks), ui.lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f, l = 5, r = 5))

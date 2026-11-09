@@ -262,6 +262,7 @@ class ActivityTest {
 
         // cash out: rounds down to whole macks and prints a ticket
         d.withdraw(); val wd = latest()
+        assertTrue("the pre-filled amount is totalled", allText(wd).contains("100 tokens"))
         field(wd, "Password").setText("abcd")
         click(wd, "Cash out")
         waitUntil { !wd.isShowing }

@@ -65,7 +65,7 @@ internal object Dread {
     const val ERROR = 0xFFFF7683.toInt()         // error text
     const val GREEN = Neon.GREEN
     const val GREEN_DIM = Neon.GREEN_DIM
-    const val GOOD = 0xFF8FE04A.toInt()          // positive numbers (readable green)
+    const val GOOD = Neon.GREEN                  // positive numbers, ticks, "unlocked"
 
     val SERIF: Typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD)
     val CAPS: Typeface = Typeface.create("sans-serif-condensed", Typeface.BOLD)
@@ -312,7 +312,7 @@ internal class Medallion(context: Context, private val unlocked: Boolean) : View
     override fun onDraw(c: Canvas) {
         val cx = width / 2f; val cy = height / 2f; val r = min(width, height) / 2f - d
         p.style = Paint.Style.FILL
-        p.shader = RadialGradient(cx, cy, r, intArrayOf(if (unlocked) 0xFF1E3A12.toInt() else 0xFF16181D.toInt(), Neon.INK), null, Shader.TileMode.CLAMP)
+        p.shader = RadialGradient(cx, cy, r, intArrayOf(if (unlocked) Dread.mix(Neon.GREEN_DIM, Neon.INK, 0.45f) else 0xFF16181D.toInt(), Neon.INK), null, Shader.TileMode.CLAMP)
         c.drawCircle(cx, cy, r, p); p.shader = null
         p.style = Paint.Style.STROKE; p.strokeWidth = 1.6f * d; p.color = if (unlocked) Neon.BRASS else Neon.IRON_LIGHT
         c.drawCircle(cx, cy, r, p)
