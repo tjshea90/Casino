@@ -76,7 +76,7 @@ class SceneRenderTest {
         s.shake = 0f; s.bigWin = -1f
         // HUD + 3D composites recorded by HudExportTest (run it first)
         File("build/hud").listFiles { f -> f.name.endsWith(".bin") }?.sorted()?.forEachIndexed { i, f ->
-            val fr = SceneStateIO.read(f)
+            val fr = try { SceneStateIO.read(f) } catch (e: java.io.IOException) { println("skipping stale HUD recording ${f.name} (re-run HudExportTest)"); return@forEachIndexed }
             if (fr.w != W || fr.h != H) return@forEachIndexed
             scene.setLayout(Layout3D(W.toFloat(), H.toFloat(), fr.window[0], fr.window[1], fr.window[2], fr.window[3]))
             scene.render(fr.state, 7f + i * 0.37f, W, H)

@@ -975,13 +975,13 @@ class Scene3D(private val gl: Gl) {
             val c = (i - (n - 1) / 2f)
             val x = c * 1.35f
             val r = smooth(0f, 1f, rise * 1.15f - i * 0.04f)
-            val y = -3.4f + r * 3.0f
+            val y = -3.4f + r * 2.55f
             val shake = if (k in 0.28f..0.46f && !S.calm) sin(t * 60f + i * 3f) * 0.03f else 0f
-            val mm = m(); Mat4.translate(mm, x + shake, y, Layout3D.R + 1.3f); Mat4.rotate(mm, c * -7f, 0f, 1f, 0f); Mat4.scale(mm, 2.05f, 2.05f, 2.05f)
+            val mm = m(); Mat4.translate(mm, x + shake, y, Layout3D.R + 1.3f); Mat4.rotate(mm, c * -7f, 0f, 1f, 0f); Mat4.scale(mm, 1.8f, 1.8f, 1.8f)
             drawCharacter(ReaperConfig.SCATTER, mm, t + i * 0.37f, open > 0.3f, 1f, hero = true)
             if (open > 0f) {
-                glow(x, y + 1.7f, Layout3D.R + 1.6f, 3.4f * open, 0xB6FF8A, 0.30f * open, 0.15f)
-                glow(x, y + 3.2f, Layout3D.R + 1.4f, 1.6f * open, 0xFFFFFF, 0.25f * open, 0.4f)
+                glow(x, y + 1.5f, Layout3D.R + 1.6f, 3.0f * open, 0xB6FF8A, 0.30f * open, 0.15f)
+                glow(x, y + 2.7f, Layout3D.R + 1.4f, 1.4f * open, 0xFFFFFF, 0.25f * open, 0.4f)
             }
         }
     }

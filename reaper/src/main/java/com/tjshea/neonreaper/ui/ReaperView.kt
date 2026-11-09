@@ -1148,8 +1148,9 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
             drawFog(canvas, t, reelRect.bottom - (fog?.height ?: 0) * 0.5f, 18.0, 160)
             drawCharacters(canvas, t)
         }
-        drawTitle(canvas, t)
-        if (seance != null) drawSeanceHud(canvas, t) else drawRelics(canvas, t)
+        if (phase != Phase.SEANCE_TRIGGER) drawTitle(canvas, t)
+        if (phase == Phase.SEANCE_TRIGGER) { /* the cinematic owns the top of the screen */ }
+        else if (seance != null) drawSeanceHud(canvas, t) else drawRelics(canvas, t)
         if (!g3) drawReels(canvas, ch, t)
         drawMiniEffects(canvas, t)
         drawWins(canvas, t)
@@ -2208,22 +2209,22 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         // title
         val a = ((e - 0.9f) / 0.4f).coerceIn(0f, 1f)
         if (a > 0f) {
-            pText.typeface = serif; pText.textSize = h * 0.11f; pText.color = Neon.BONE; pText.alpha = (255 * a).toInt()
+            pText.typeface = serif; pText.textSize = h * 0.09f; pText.color = Neon.BONE; pText.alpha = (255 * a).toInt()
             pText.setShadowLayer(30 * u, 0f, 0f, Neon.RED)
-            c.drawText("THE SÉANCE", w / 2, h * 0.2f, pText)
+            c.drawText("THE SÉANCE", w / 2, h * 0.165f, pText)
             pText.clearShadowLayer()
         }
         val b = ((e - 1.6f) / 0.4f).coerceIn(0f, 1f)
         if (b > 0f) {
-            pText.typeface = serif; pText.textSize = h * 0.05f; pText.color = Neon.RED; pText.alpha = (255 * b).toInt()
+            pText.typeface = serif; pText.textSize = h * 0.042f; pText.color = Neon.RED; pText.alpha = (255 * b).toInt()
             pText.setShadowLayer(14 * u, 0f, 0f, Neon.RED)
-            c.drawText("${se.coffins} COFFINS  •  ${se.startSpins} FREE SPINS", w / 2, h * 0.28f, pText)
+            c.drawText("${se.coffins} COFFINS  •  ${se.startSpins} FREE SPINS", w / 2, h * 0.70f, pText)
             pText.clearShadowLayer()
         }
         val d = ((e - 2.1f) / 0.5f).coerceIn(0f, 1f)
         if (d > 0f) {
             pText.typeface = cond; pText.textSize = h * 0.034f; pText.color = Neon.BONE; pText.alpha = (210 * d).toInt()
-            c.drawText("THE MULTIPLIER RISES WITH EVERY SPIN — UP TO ×${ReaperConfig.FS_RAMP_CAP}   •   MORE COFFINS ADD SPINS", w / 2, h * 0.88f, pText)
+            c.drawText("THE MULTIPLIER RISES WITH EVERY SPIN — UP TO ×${ReaperConfig.FS_RAMP_CAP}   •   MORE COFFINS ADD SPINS", w / 2, h * 0.775f, pText)
         }
         pText.alpha = 255
         if (e > 3.2f) { pFill.color = Color.argb(((e - 3.2f) / 0.4f * 255).toInt().coerceIn(0, 255), 0, 0, 0); c.drawRect(0f, 0f, w, h, pFill) }
