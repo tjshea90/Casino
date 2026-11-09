@@ -336,6 +336,9 @@ class Audio internal constructor(context: Context, autoRender: Boolean) {
         } catch (_: Throwable) {}
     }
 
+    /** Track the mixer is currently playing (null before the first layer is available). Test / diagnostics hook. */
+    internal val playingTrack: Track? get() = mixer.currentTrack
+
     /** Test hook: synthesizes everything into [out] (used to inspect audio off-device). */
     internal fun renderAllTo(out: File) { AudioRender.renderAllTo(out) }
 

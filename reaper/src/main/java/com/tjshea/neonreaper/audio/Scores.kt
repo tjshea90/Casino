@@ -51,7 +51,8 @@ internal object Scores {
     private fun loopSine(f: Double, n: Int, phase: Double = 0.0): FloatArray {
         val loopSec = n.toDouble() / SR
         val fs = Math.round(f * loopSec) / loopSec
-        return FloatArray(n) { Tables.cyc(fs * it / SRD + phase) * 0.28f }
+        val o = SineOsc(phase); val inc = SineOsc.incOf(fs)
+        return FloatArray(n) { o.tickI(inc) * 0.28f }
     }
 
     /** Equal-power fold of the overshoot back onto the start: turns a noise texture of length n+x into a seamless loop of n. */
@@ -65,10 +66,14 @@ internal object Scores {
     private fun windBed(n: Int, seed: Long, fLo: Double, fHi: Double, q: Double, cycles: Double, gustCycles: Double): FloatArray {
         val total = n + frames(2.0); val raw = FloatArray(total); val r = Rng(seed); val s = Svf()
         val loopSec = n.toDouble() / SR
+        var gust = 1.0
         for (i in 0 until total) {
-            if (i and 15 == 0) s.set(fLo + (fHi - fLo) * (0.5 + 0.5 * Tables.cyc(cycles * i / SRD / loopSec)), q)
+            if (i and 15 == 0) {
+                s.set(fLo + (fHi - fLo) * (0.5 + 0.5 * Tables.cyc(cycles * i / SRD / loopSec)), q)
+                gust = 0.55 + 0.45 * Tables.cyc(gustCycles * i / SRD / loopSec + 0.25)
+            }
             s.process(r.signed().toDouble())
-            raw[i] = (s.bp * (0.55 + 0.45 * Tables.cyc(gustCycles * i / SRD / loopSec + 0.25))).toFloat()
+            raw[i] = (s.bp * gust).toFloat()
         }
         return foldLoop(raw, n).also { it.scale(0.2 / rmsOf(it)) }
     }
@@ -93,11 +98,11 @@ internal object Scores {
 
     private fun finish(bus: Bus, spec: LayerSpec, hall: ReverbSpec?, room: ReverbSpec? = null, airDb: Double = -3.0): Pcm {
         val st = bus.render(hall, room, (hall?.rt60 ?: 0.0) * 1.2, (room?.rt60 ?: 0.0) * 1.2)
+        if (!spec.stereo) Master.monoize(st)
         Master.removeDc(st)
         eqLoop(st, airDb)
         Master.gain(st, dbGain(spec.rms) / Master.rms(st.l, st.r))
         softLimit(st)
-        if (!spec.stereo) Master.monoize(st)
         return Master.toPcm(st, spec.stereo)
     }
 
@@ -153,13 +158,13 @@ internal object Scores {
 
     private fun baseL2(): Pcm {
         val ts = BASE; val n = ts.loopFrames; val b = bus(ts); val bar = 3.2
-        val on = booleanArrayOf(true, false, true, true, true, false, true, true, false, true)
+        val on = booleanArrayOf(true, true, true, true, true, false, true, true, true, true)
         for (c in 0 until 10) {
             if (!on[c]) continue
             val t0 = c * 2 * bar - 0.6
             val ch = baseChords[c]
-            b.add(choirChord(ch, 7.2, 100L + c, 2.6, 2.6, if (c % 2 == 0) Vowels.O else Vowels.U, Vowels.A), s(t0), 0.5, if (c % 2 == 0) -0.25 else 0.25, 0.7)
-            b.add(choirChord(doubleArrayOf(ch[0] - 12.0, ch[1] - 12.0), 7.2, 120L + c, 2.8, 2.8, Vowels.BASS_O, Vowels.BASS_A, shift = 0.9), s(t0), 0.32, 0.0, 0.6)
+            b.add(choirChord(ch, 7.2, 100L + c, 2.6, 2.6, if (c % 2 == 0) Vowels.O else Vowels.U, Vowels.A, unison = 2), s(t0), 0.5, if (c % 2 == 0) -0.25 else 0.25, 0.7)
+            b.add(choirChord(doubleArrayOf(ch[0] - 12.0, ch[1] - 12.0), 7.2, 120L + c, 2.8, 2.8, Vowels.BASS_O, Vowels.BASS_A, unison = 2, shift = 0.9), s(t0), 0.32, 0.0, 0.6)
         }
         for ((k, t) in doubleArrayOf(3 * bar, 11 * bar, 17 * bar).withIndex())
             b.add(bowed(hz(if (k == 1) N.Eb4 else N.D4), 9.0, 130L + k, 3.4, 3.4, flutter = 0.3), s(t), 0.34, if (k == 1) 0.3 else -0.3, 0.8)
@@ -214,7 +219,7 @@ internal object Scores {
         b.add(windBed(n, 221, 300.0, 1100.0, 1.2, 2.0, 4.0), 0, 0.35, 0.0, 0.3)
         for (c in 0 until 8) {
             val v = seanceChords[c].map { it - 12.0 }.toDoubleArray()
-            b.add(choirChord(v, 6.6, 230L + c, 1.8, 2.0, Vowels.O, Vowels.A, shift = 0.92), s(c * 2 * bar - 0.3), 0.5, (c % 2) * 0.3 - 0.15, 0.7)
+            b.add(choirChord(v, 6.6, 230L + c, 1.8, 2.0, Vowels.O, Vowels.A, unison = 2, shift = 0.92), s(c * 2 * bar - 0.3), 0.5, (c % 2) * 0.3 - 0.15, 0.7)
         }
         b.add(bell(hz(N.D3), 8.0, Bells.CHURCH, bright = 0.55, decay = 0.9, beat = 0.0015), 0, 0.14, 0.0, 0.8)
         b.add(bell(hz(N.A2), 8.0, Bells.CHURCH, bright = 0.55, decay = 0.9, beat = 0.0015), s(8 * bar), 0.12, 0.0, 0.8)

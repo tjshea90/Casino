@@ -52,6 +52,8 @@ internal class MusicMixer {
     // ------------------------------------------------------------------ audio-thread state
     private class Slot(val track: MixTrack) {
         var pos = 0
+        var first = true                                     // true until the first block has been mixed
+        val seen = BooleanArray(track.layers.length())       // layer already started (late arrivals ramp up from silence)
         val gain = FloatArray(track.layers.length())
         val apL = FloatArray(track.layers.length() * 2)     // widener allpass state per layer: x1, y1 (left chain)
         val apR = FloatArray(track.layers.length() * 2)
@@ -138,6 +140,7 @@ internal class MusicMixer {
             val layer = t.layers.get(k) ?: continue
             if (layer.frames != frames) continue
             val tgt = layerTarget(spec, k, inten)
+            if (!s.seen[k]) { s.seen[k] = true; if (s.first) s.gain[k] = tgt }   // layers present when the track starts: the cross-fade does the fading
             val g0 = s.gain[k]
             val a = 1f - exp(-dt / (if (tgt > g0) TAU_UP else TAU_DOWN))
             val g1 = g0 + (tgt - g0) * a
@@ -170,6 +173,7 @@ internal class MusicMixer {
             }
         }
         s.pos = (s.pos + nb) % frames
+        s.first = false
     }
 
     companion object {
