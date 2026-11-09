@@ -21,6 +21,7 @@ class PostFx(private val gl: Gl, private val quad: Mesh) {
         var flash = 0f                          // white-blue lightning / win flash 0..1
         var saturation = 0.86f
         var pulse = 0f                          // heartbeat / anticipation vignette pulse 0..1
+        var shakeX = 0f; var shakeY = 0f        // screen-space jitter in UV units (camera shake)
     }
 
     private val bright = Program(gl, PostShaders.QUAD_VS, PostShaders.BRIGHT_FS, "bright")
@@ -107,7 +108,7 @@ class PostFx(private val gl: Gl, private val quad: Mesh) {
         comp.f2("uRes", w.toFloat(), h.toFloat()); comp.f("uTime", time)
         comp.f("uBloomK", p.bloom); comp.f("uVig", p.vignette + 0.18f * p.pulse); comp.f("uGrain", if (tier >= 2) p.grain else 0f)
         comp.f("uCA", if (tier >= 3) p.aberration else 0f); comp.f("uFlash", p.flash); comp.f("uSat", p.saturation)
-        comp.f3("uTint", p.tint[0], p.tint[1], p.tint[2])
+        comp.f3("uTint", p.tint[0], p.tint[1], p.tint[2]); comp.f2("uShake", p.shakeX, p.shakeY)
         gl.bindTexture(Gl.TEXTURE_2D, sceneTex)
         gl.activeTexture(Gl.TEXTURE1); gl.bindTexture(Gl.TEXTURE_2D, bloomTex[0])
         quad.draw(gl)
@@ -160,16 +161,17 @@ in vec2 vUv; out vec4 frag;
 uniform sampler2D uScene; uniform sampler2D uBloom;
 uniform vec2 uRes; uniform float uTime;
 uniform float uBloomK; uniform float uVig; uniform float uGrain; uniform float uCA; uniform float uFlash; uniform float uSat;
-uniform vec3 uTint;
+uniform vec3 uTint; uniform vec2 uShake;
 float hash12(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
 void main(){
   vec2 c = vUv - 0.5;
   vec2 off = c * dot(c, c) * uCA;
+  vec2 su = vUv + uShake;
   vec3 col;
-  col.r = texture(uScene, vUv + off).r;
-  col.g = texture(uScene, vUv).g;
-  col.b = texture(uScene, vUv - off).b;
-  col += texture(uBloom, vUv).rgb * uBloomK;
+  col.r = texture(uScene, su + off).r;
+  col.g = texture(uScene, su).g;
+  col.b = texture(uScene, su - off).b;
+  col += texture(uBloom, su).rgb * uBloomK;
   // lightning / win flash washes the frame with cold light
   col += vec3(0.55, 0.65, 0.9) * uFlash * (0.35 + 0.65 * smoothstep(1.0, 0.0, length(c) * 1.6));
   // dread grade: gently desaturate, deepen the blacks, add contrast, cool shadows

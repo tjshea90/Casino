@@ -281,7 +281,7 @@ void main(){ vUv = aPos.xy*0.5+0.5; gl_Position = vec4(aPos.xy, 0.9999, 1.0); }"
     val SKY_FS = """#version 300 es
 precision highp float;
 in vec2 vUv; out vec4 frag;
-uniform float uTime; uniform vec2 uRes; uniform vec2 uMoon; uniform float uFlash; uniform float uMoonR;
+uniform float uTime; uniform vec2 uRes; uniform vec2 uMoon; uniform float uFlash; uniform float uMoonR; uniform float uMood;
 $NOISE
 void main(){
   vec2 uv = vUv; float aspect = uRes.x/uRes.y;
@@ -304,6 +304,8 @@ void main(){
   vec3 ccol = mix(vec3(0.03,0.02,0.05), vec3(0.35,0.08,0.1), exp(-r*3.0));
   col = mix(col, ccol, cloud*0.9);
   col += vec3(0.7,0.8,1.0) * uFlash * (0.5 + 0.5*cloud);
+  // the Seance: the whole sky bleeds red and the moon swells
+  col = mix(col, col * vec3(1.9, 0.45, 0.4) + vec3(0.07, 0.0, 0.0) + vec3(0.55, 0.03, 0.03) * exp(-r * 4.0) * 0.5, uMood);
   frag = vec4(col, 1.0);
 }"""
 
