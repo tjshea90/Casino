@@ -43,7 +43,7 @@ internal object GothicWorld {
         Sculpt.shell(listOf(r to h / 2, (r + grow) to h * 0.2f, (r + grow) to -h * 0.2f, r to -h / 2), segs)
 
     private fun studs(pb: PartBuilder, r: Float, y: Float, n: Int, s: Float = 0.026f) {
-        for (k in 0 until n) { val a = TAU * k / n; pb.add(Sculpt.ellipsoid(s, s, s, 4, 6), BRASS, Mat.METAL, x = cos(a) * r, y = y, z = sin(a) * r) }
+        for (k in 0 until n) { val a = TAU * k / n; pb.add(Sculpt.ellipsoid(s, s, s, 3, 5), BRASS, Mat.METAL, x = cos(a) * r, y = y, z = sin(a) * r) }
     }
 
     /** Wax candle with a bright flame core (the flickering halo is a glow sprite drawn by the scene). */
@@ -52,14 +52,27 @@ internal object GothicWorld {
         pb.add(Sculpt.spike(r * 0.6f, r * 3.4f, 6), 0xFFE9B0, Mat.EMISSIVE, x = x, y = y + h, z = z)
     }
 
-    /** A skull in HEAD UNITS (radius ~1) with upper teeth, a slightly open jaw and glowing eye sparks in the sockets. */
-    fun skullHead(open: Float, lat: Int = 16, lon: Int = 24, eyes: Int = BLOOD): MeshData {
+    /** Low-poly chain link (a 4-sided wire loop): decorative chains need no more. */
+    private fun lowLink(len: Float, w: Float, r: Float): MeshData = Sculpt.link(len, w, r, 8, 4)
+
+    /**
+     * A skull in HEAD UNITS (radius ~1) with a slightly open jaw and glowing eye sparks in the sockets, at three levels of detail
+     * (0 = background filler ~250 tris, 1 = near the camera ~1k tris). Teeth are tiny ellipsoids (the anatomy kit's are too heavy here).
+     */
+    fun skullHead(open: Float, detail: Int = 1, eyes: Int = BLOOD): MeshData {
         val pb = PartBuilder()
-        pb.add(Bones.skull(lat, lon), BONE, Mat.BONE)
-        pb.add(Bones.upperTeeth(), 0xDCD2B8, Mat.BONE)
+        val hi = detail >= 1
+        pb.add(if (hi) Bones.skull(12, 18) else Bones.skull(8, 12), BONE, Mat.BONE)
+        if (hi) for (i in -3..3) {
+            val x = i * 0.1f; val fang = if (kotlin.math.abs(i) == 3) 1.9f else 1f
+            val z = 0.93f - 0.40f * (kotlin.math.abs(x) / 0.5f) * (kotlin.math.abs(x) / 0.5f) - 0.05f
+            pb.add(Sculpt.ellipsoid(0.04f, 0.066f * fang, 0.035f, 4, 6), 0xDCD2B8, Mat.BONE, x = x, y = -0.64f - (fang - 1f) * 0.06f, z = z)
+        }
+        // jaw: one flattened ellipsoid hinged at the cheek (origin of the part = hinge)
         val h = Bones.JAW_HINGE
-        pb.add(Bones.jaw(), 0xBFB59C, Mat.BONE, x = h[0], y = h[1], z = h[2], rx = open, ao = 0.95f)
-        for (sx in floatArrayOf(-1f, 1f)) pb.add(Sculpt.ellipsoid(0.1f, 0.085f, 0.085f, 6, 8), eyes, Mat.EMISSIVE, x = sx * 0.235f, y = 0.075f, z = 0.60f)
+        val jaw = MeshData().append(Sculpt.ellipsoid(0.50f, 0.20f, 0.48f, if (hi) 6 else 4, if (hi) 10 else 6), Mat4.translate(Mat4.identity(), 0f, -0.46f, 0.38f))
+        pb.add(jaw, 0xBFB59C, Mat.BONE, x = h[0], y = h[1], z = h[2], rx = open, ao = 0.9f)
+        for (sx in floatArrayOf(-1f, 1f)) pb.add(Sculpt.ellipsoid(0.1f, 0.085f, 0.085f, 4, 6), eyes, Mat.EMISSIVE, x = sx * 0.235f, y = 0.075f, z = 0.60f)
         return pb.data
     }
 
@@ -77,17 +90,17 @@ internal object GothicWorld {
         for (y in floatArrayOf(0.95f, 1.85f, 2.75f)) {
             val r = 0.35f - (y - 0.52f) / 2.68f * 0.065f
             pb.add(band(r + 0.004f, 0.11f), IRON, Mat.METAL, y = y)
-            studs(pb, r + 0.034f, y, 8)
+            studs(pb, r + 0.034f, y, 6)
         }
         // capital + abacus
         pb.add(Sculpt.shell(listOf(0.285f to 3.2f, 0.36f to 3.28f, 0.44f to 3.37f, 0.48f to 3.47f), 24), STONE, Mat.STONE)
         pb.add(Sculpt.box(0.52f, 0.06f, 0.52f), STONE_D, Mat.STONE, y = 3.52f)
         // skull crown
-        pb.addKeep(skullHead(10f), y = 3.86f, z = 0.04f, ry = -side * 22f, s = 0.27f)
+        pb.addKeep(skullHead(10f, 1), y = 3.86f, z = 0.04f, ry = -side * 22f, s = 0.27f)
         pb.add(Sculpt.spike(0.05f, 0.24f, 6), IRON, Mat.METAL, x = -0.3f, y = 3.58f, rz = 30f)
         pb.add(Sculpt.spike(0.05f, 0.24f, 6), IRON, Mat.METAL, x = 0.3f, y = 3.58f, rz = -30f)
         // chain hanging from the outer side of the capital
-        for (k in 0 until 9) pb.add(Sculpt.link(0.10f, 0.062f, 0.011f), IRON, Mat.METAL, x = side * 0.43f, y = 3.38f - 0.082f * k, z = 0.05f, ry = if (k % 2 == 0) 0f else 90f)
+        for (k in 0 until 9) pb.add(lowLink(0.10f, 0.062f, 0.011f), IRON, Mat.METAL, x = side * 0.43f, y = 3.38f - 0.082f * k, z = 0.05f, ry = if (k % 2 == 0) 0f else 90f)
         // candelabra on the front: iron arm, a dish and three candles
         pb.add(Sculpt.tube(6, 6, { t -> p3(0f, 2.15f + 0.05f * sin(t * PI.toFloat()), 0.30f + 0.42f * t) }, { 0.022f }, cap = true), IRON, Mat.METAL)
         pb.add(Sculpt.tube(2, 14, { t -> p3(0f, 2.19f + 0.03f * t, 0.74f) }, { 0.13f - 0.02f * it }, cap = true), IRON, Mat.METAL)
@@ -199,7 +212,7 @@ internal object GothicWorld {
     /** A skull with a melting candle on its crown, wax running down over the bone. Origin = ground. */
     fun skullCandle(): MeshData {
         val pb = PartBuilder()
-        pb.addKeep(skullHead(2f, 12, 18, 0xFF7A20), y = 0.30f, ry = 20f, rz = -4f, s = 0.27f)
+        pb.addKeep(skullHead(2f, 1, 0xFF7A20), y = 0.30f, ry = 20f, rz = -4f, s = 0.27f)
         pb.add(Sculpt.tube(4, 9, { t -> p3(0f, 0.5f + 0.27f * t, 0.0f) }, { 0.062f }, cap = true), WAX, Mat.WAX)
         for (k in 0 until 4) {
             val a = TAU * k / 4 + 0.3f; val len = 0.1f + 0.05f * (k % 3)
@@ -224,9 +237,9 @@ internal object GothicWorld {
     /** Hanging iron cage with a lit skull inside, for chains from the sky. Origin = the hook. */
     fun hangingCage(): MeshData {
         val pb = PartBuilder()
-        for (k in 0 until 6) pb.add(Sculpt.link(0.12f, 0.07f, 0.012f), IRON, Mat.METAL, y = -0.07f * k - 0.05f, ry = if (k % 2 == 0) 0f else 90f)
+        for (k in 0 until 6) pb.add(lowLink(0.12f, 0.07f, 0.012f), IRON, Mat.METAL, y = -0.07f * k - 0.05f, ry = if (k % 2 == 0) 0f else 90f)
         val cy = -0.85f
-        pb.addKeep(skullHead(18f, 10, 14, 0x9CFF57), y = cy, s = 0.2f, ry = 10f)
+        pb.addKeep(skullHead(18f, 0, 0x9CFF57), y = cy, s = 0.2f, ry = 10f)
         for (k in 0 until 6) {
             val a = TAU * k / 6
             pb.add(Sculpt.tube(6, 5, { t -> val ang = (t - 0.5f) * PI.toFloat() * 0.9f; p3(cos(a) * 0.3f * cos(ang).toFloat(), cy + 0.38f * sin(ang).toFloat(), sin(a) * 0.3f * cos(ang).toFloat()) }, { 0.012f }, cap = true), IRON, Mat.METAL)

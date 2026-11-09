@@ -41,9 +41,10 @@ class SceneRenderTest {
         val s = SceneState()
         stopped(s, grid)
         Mesh.drawCalls = 0; Mesh.triangles = 0L
+        scene.collectStats = true
         scene.render(s, 3.0f, W, H); hl.save(File("build/screens/gl_idle.png"))
-        println("BUDGET idle frame: ${Mesh.drawCalls} draw calls (meshes), ${Mesh.triangles} triangles")
-        File("build/screens/budget.txt").writeText("idle frame: ${Mesh.drawCalls} draw calls, ${Mesh.triangles} triangles\n")
+        scene.collectStats = false
+        File("build/screens/budget.txt").writeText("idle frame: ${Mesh.drawCalls} draw calls, ${Mesh.triangles} triangles\n" + scene.statLog)
         // winning cells excited, others dimmed
         for (c in 0 until 15) { s.cellExcited[c] = c % 3 == 1; s.cellDim[c] = if (c % 3 == 1) 1f else 0.45f; s.cellPop[c] = if (c % 3 == 1) 1.06f else 1f }
         s.hoodedExcited = true; s.reaperExcited = true; s.souls = 0.8f

@@ -185,8 +185,8 @@ object Sculpt {
     }
 
     /** A chain link: a flattened torus in the XY plane, [len] long, [w] wide, wire radius [r]. */
-    fun link(len: Float, w: Float, r: Float): MeshData =
-        tube(14, 6, { t -> val a = TAU * t; floatArrayOf((w / 2) * cos(a), (len / 2) * sin(a), 0f) }, { r })
+    fun link(len: Float, w: Float, r: Float, steps: Int = 14, sides: Int = 6): MeshData =
+        tube(steps, sides, { t -> val a = TAU * t; floatArrayOf((w / 2) * cos(a), (len / 2) * sin(a), 0f) }, { r })
 
     // ------------------------------------------------------------------------------------------ simple solids
     /** Box centred on the origin with half-extents (hx, hy, hz); flat shaded. */

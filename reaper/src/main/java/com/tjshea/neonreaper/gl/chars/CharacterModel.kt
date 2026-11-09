@@ -26,10 +26,16 @@ interface CharacterModel {
 object Cast {
     private val cache = HashMap<Int, CharacterModel?>()
 
+    /** The model used in reel cells (many at once: kept light). */
     fun get(sym: Int): CharacterModel? = cache.getOrPut(sym) { create(sym) }
 
+    private val heroCache = HashMap<Int, CharacterModel?>()
+
+    /** The model used when ONE character is shown large (side stage, big win, mini feature, showcase): full detail where it exists. */
+    fun hero(sym: Int): CharacterModel? = heroCache.getOrPut(sym) { if (sym == ReaperConfig.WILD) ReaperModel(low = false) else get(sym) }
+
     private fun create(sym: Int): CharacterModel? = when (sym) {
-        ReaperConfig.WILD -> ReaperModel()
+        ReaperConfig.WILD -> ReaperModel(low = true)
         ReaperConfig.DOCTOR -> DoctorModel()
         ReaperConfig.DEMON -> DemonModel()
         ReaperConfig.WRAITH -> WraithModel()

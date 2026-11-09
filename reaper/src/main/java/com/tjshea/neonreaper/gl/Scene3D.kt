@@ -21,7 +21,7 @@ class Scene3D(private val gl: Gl) {
     private lateinit var lit: Program
     private lateinit var sky: Program
     private lateinit var fog: Program
-    private lateinit var glowP: Program
+    private lateinit var glowBatch: GlowBatch
     private lateinit var part: Program
     private lateinit var blit: Program
     private lateinit var post: PostFx
@@ -90,7 +90,7 @@ class Scene3D(private val gl: Gl) {
         lit = Program(gl, Shaders.LIT_VS, Shaders.LIT_FS, "lit")
         sky = Program(gl, Shaders.SKY_VS, Shaders.SKY_FS, "sky")
         fog = Program(gl, Shaders.FOG_VS, Shaders.FOG_FS, "fog")
-        glowP = Program(gl, Shaders.GLOW_VS, Shaders.GLOW_FS, "glow")
+        glowBatch = GlowBatch(gl)
         part = Program(gl, Shaders.PART_VS, Shaders.PART_FS, "particles")
         blit = Program(gl, PostShaders.QUAD_VS, PostShaders.BLIT_FS, "blit")
         buildMeshes()
@@ -262,16 +262,20 @@ class Scene3D(private val gl: Gl) {
         gl.enable(Gl.BLEND); gl.blendFunc(Gl.SRC_ALPHA, Gl.ONE_MINUS_SRC_ALPHA)
         setupLit()
 
-        drawEnvironment()
-        drawCabinet()
-        drawReels()
-        drawSideCharacters()
+        var c0 = Mesh.drawCalls; var t0 = Mesh.triangles
+        fun mark(name: String) { if (collectStats) { statLog.append("  $name: ${Mesh.drawCalls - c0} draws, ${Mesh.triangles - t0} tris\n"); c0 = Mesh.drawCalls; t0 = Mesh.triangles } }
+        if (collectStats) statLog.setLength(0)
+        mark("sky")
+        drawEnvironment(); mark("environment")
+        drawCabinet(); mark("cabinet")
+        drawReels(); mark("reels")
+        drawSideCharacters(); mark("side characters")
         drawCoins()
         drawMini()
         drawReaperTouch()
         drawBigWin()
         drawShowcase()
-        drawBats()
+        drawBats(); mark("effects")
 
         // translucent: fog banks, particles, glows
         gl.depthMask(false)
@@ -300,6 +304,10 @@ class Scene3D(private val gl: Gl) {
     }
 
     private fun lerp(a: Float, b: Float, k: Float) = a + (b - a) * k
+
+    /** Test hook: when true, [statLog] receives a per-phase draw-call / triangle breakdown of the last frame. */
+    internal var collectStats = false
+    internal val statLog = StringBuilder()
 
     /** Lights shared by the whole frame (braziers, candles): slots 0..plWorld-1; characters add local lights after them. */
     private fun addWorldLights() {
@@ -525,14 +533,9 @@ class Scene3D(private val gl: Gl) {
     }
 
     private fun drawGlows() {
-        glowP.use(); glowP.m4("uViewProj", vp)
-        glowP.f3("uCamRight", camRight[0], camRight[1], camRight[2]); glowP.f3("uCamUp", camUp[0], camUp[1], camUp[2])
-        for (k in 0 until glowUsed) {
-            val g = glows[k]
-            glowP.f3("uCenter", g.x, g.y, g.z); glowP.f2("uSize", g.size, g.size)
-            glowP.rgb("uColor", g.color); glowP.f("uAlpha", g.alpha); glowP.f("uCore", g.core)
-            mQuad.draw(gl)
-        }
+        glowBatch.begin()
+        for (k in 0 until glowUsed) { val g = glows[k]; glowBatch.add(g.x, g.y, g.z, g.size, g.color, g.alpha, g.core) }
+        glowBatch.draw(vp, camRight, camUp)
         lit.use()
     }
 
@@ -631,8 +634,8 @@ class Scene3D(private val gl: Gl) {
         glow(x, 0f, Layout3D.R + 0.25f, 2.6f, 0x4CAF50, 0.25f + 0.1f * sin(t * 8), 0f)
     }
 
-    private fun drawCharacter(sym: Int, mm: FloatArray, tt: Float, ex: Boolean, dim: Float = 1f) {
-        val model = Cast.get(sym)
+    private fun drawCharacter(sym: Int, mm: FloatArray, tt: Float, ex: Boolean, dim: Float = 1f, hero: Boolean = false) {
+        val model = if (hero) Cast.hero(sym) else Cast.get(sym)
         if (model != null) { beginLocalLights(); model.draw(this, mm, tt, if (ex) 1f else 0f, dim); beginLocalLights(); return }
         when (sym) {
             ReaperConfig.WILD -> drawReaper(mm, tt, ex, dim, scythe = true, crimson = false)
@@ -856,7 +859,7 @@ class Scene3D(private val gl: Gl) {
 
     /** Draws a cast member through the registry; falls back to the legacy procedural drawer while a model does not exist yet. */
     private fun castOr(sym: Int, mm: FloatArray, tt: Float, ex: Boolean, dim: Float, legacy: () -> Unit) {
-        if (Cast.get(sym) != null) drawCharacter(sym, mm, tt, ex, dim) else legacy()
+        if (Cast.hero(sym) != null) drawCharacter(sym, mm, tt, ex, dim, hero = true) else legacy()
     }
 
     private fun drawSideCharacters() {
@@ -907,15 +910,15 @@ class Scene3D(private val gl: Gl) {
         val s = S.miniScale
         when (sym) {
             ReaperConfig.RAVEN -> {
-                if (Cast.get(sym) != null) { Mat4.translate(mm, 0f, -0.7f * s, 0f); Mat4.scale(mm, 1.7f * s, 1.7f * s, 1.7f * s); drawCharacter(sym, mm, t, true) }
+                if (Cast.hero(sym) != null) { Mat4.translate(mm, 0f, -0.7f * s, 0f); Mat4.scale(mm, 1.7f * s, 1.7f * s, 1.7f * s); drawCharacter(sym, mm, t, true, hero = true) }
                 else { Mat4.translate(mm, 0f, -0.6f * s, 0f); Mat4.scale(mm, 1.5f * s, 1.5f * s, 1.5f * s); drawRaven(mm, t, true, 1f, perched = false) }
             }
             ReaperConfig.DEMON -> {
-                if (Cast.get(sym) != null) { Mat4.translate(mm, 0f, -0.9f * s, 0f); Mat4.scale(mm, 1.8f * s, 1.8f * s, 1.8f * s); drawCharacter(sym, mm, t, true) }
+                if (Cast.hero(sym) != null) { Mat4.translate(mm, 0f, -0.9f * s, 0f); Mat4.scale(mm, 1.8f * s, 1.8f * s, 1.8f * s); drawCharacter(sym, mm, t, true, hero = true) }
                 else { Mat4.rotate(mm, sin(t * 3f) * 15f, 0f, 1f, 0f); Mat4.scale(mm, 0.75f * s, 0.75f * s, 0.75f * s); drawPumpkin(mm, t, true) }
             }
             ReaperConfig.SKULL -> {
-                if (Cast.get(sym) != null) { Mat4.translate(mm, 0f, -0.7f * s, 0f); Mat4.scale(mm, 1.6f * s, 1.6f * s, 1.6f * s); drawCharacter(sym, mm, t, true) }
+                if (Cast.hero(sym) != null) { Mat4.translate(mm, 0f, -0.7f * s, 0f); Mat4.scale(mm, 1.6f * s, 1.6f * s, 1.6f * s); drawCharacter(sym, mm, t, true, hero = true) }
                 else { Mat4.rotate(mm, sin(t * 2.5f) * 18f, 0f, 1f, 0f); Mat4.scale(mm, 0.7f * s, 0.7f * s, 0.7f * s); drawSkull(mm, t, true) }
             }
             else -> { Mat4.translate(mm, 0f, -1.2f * s, 0f); Mat4.scale(mm, 1.9f * s, 1.9f * s, 1.9f * s); castOr(ReaperConfig.WILD, mm, t, true, 1f) { drawReaper(mm, t, true, 1f, scythe = true, crimson = false) } }
@@ -964,7 +967,7 @@ class Scene3D(private val gl: Gl) {
         if (sym < 0) return
         val g = S.showcaseGrow
         val mm = m(); Mat4.translate(mm, 0f, -0.9f * g, Layout3D.R + 1.5f * g); val s = 0.6f + 1.6f * g; Mat4.scale(mm, s, s, s)
-        drawCharacter(sym, mm, t, true)
+        drawCharacter(sym, mm, t, true, hero = true)
     }
 
     /**

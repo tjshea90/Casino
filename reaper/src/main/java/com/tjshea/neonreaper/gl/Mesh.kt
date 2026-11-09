@@ -289,7 +289,7 @@ object Shapes {
     fun deadTree(seed: Long, height: Float): MeshData {
         val out = MeshData()
         val rnd = java.util.Random(seed)
-        val unit = cylinder(1f, 1f, 7)
+        val unit = cylinder(1f, 1f, 5)
         fun branch(m: FloatArray, len: Float, rad: Float, depth: Int) {
             if (depth == 0 || rad < 0.004f) return
             val seg = m.copyOf()
@@ -304,7 +304,7 @@ object Shapes {
                 branch(c, len * (0.6f + rnd.nextFloat() * 0.2f), rad * 0.62f, depth - 1)
             }
         }
-        branch(Mat4.identity(), height * 0.38f, height * 0.045f, 5)
+        branch(Mat4.identity(), height * 0.38f, height * 0.045f, 4)
         return out
     }
 
