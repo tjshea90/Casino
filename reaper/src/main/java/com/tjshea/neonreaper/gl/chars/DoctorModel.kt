@@ -45,7 +45,7 @@ class DoctorModel : CharacterModel {
     private val lantern: Mesh
 
     val drawCalls = 5
-    val glowSprites = 4
+    val glowSprites = 4          // + 1 breath puff while excited
     val triangleCount: Int get() = (body.indexCount + head.indexCount + beakLow.indexCount + armR.indexCount + lantern.indexCount) / 3
 
     // ---------------------------------------------------------------------------------------------- shared shapes
@@ -87,7 +87,7 @@ class DoctorModel : CharacterModel {
         // long waxed-leather coat: scalloped hem, grimy toward the ground, darker on downward-facing folds
         val coat = Sculpt.shell(coatProf, 28, radial = { ang, _, t -> coatRad(ang, t) },
             dy = { ang, k, _ -> if (k >= rows - 2) -((if (k == rows - 1) 1f else 0.3f) * (0.004f + 0.040f * abs(sin(3f * ang + 0.7f)).pow(1.4f) + 0.024f * abs(sin(7f * ang)))) else 0f })
-        KitA.shade(coat) { _, y, _, _, ny, _ -> (0.55f + 0.45f * sstep(0.02f, 0.75f, y)) * (0.88f + 0.12f * (ny * 0.5f + 0.5f)) }
+        KitA.shade(coat) { _, y, _, _, ny, _ -> (0.72f + 0.28f * sstep(0.02f, 0.75f, y)) * (0.88f + 0.12f * (ny * 0.5f + 0.5f)) }
         pb.add(coat, 0x1D1915, Mat.MATTE)
         // front seam + a double row of tarnished buttons
         val pk = ArrayList<FloatArray>()
@@ -110,7 +110,7 @@ class DoctorModel : CharacterModel {
         pb.add(mantle, 0x2A221D, Mat.CLOTH, ao = 0.9f)
         // belt, buckle and two pouches
         val beltY = 0.690f
-        pb.add(Sculpt.tube(18, 4, { t -> val a = KitA.TAU * t; val r = 0.140f * KitA.ell(a, 0.88f); floatArrayOf(r * cos(a), beltY, r * sin(a)) }, { 0.0125f }), 0x3A2A1D, Mat.LEATHER)
+        pb.add(Sculpt.tube(18, 4, { t -> val a = KitA.TAU * t; val r = 0.140f * KitA.ell(a, 0.88f); floatArrayOf(r * cos(a), beltY, r * sin(a)) }, { 0.0125f }), 0x45331F, Mat.MATTE)
         pb.add(Sculpt.box(0.02f, 0.017f, 0.006f), 0x9A8A60, Mat.METAL, y = beltY, z = 0.140f * 0.88f + 0.012f)
         for (sx in SGN) {
             pb.add(Sculpt.box(0.030f, 0.040f, 0.022f), 0x2B2018, Mat.LEATHER, x = sx * 0.104f, y = 0.636f, z = 0.088f, rz = sx * -8f, ao = 0.9f)
@@ -127,7 +127,7 @@ class DoctorModel : CharacterModel {
             return coatZr((k + u) / (rows - 1)) * sqrt(max(r * r - x * x, 0f))
         }
         val sp = (0..5).map { i -> val u = i / 5f; val x = 0.120f - 0.270f * u; val y = 0.835f - 0.250f * u; floatArrayOf(x, y, frontZ(x, y) + 0.013f) }
-        pb.add(Sculpt.tube(5, 4, KitA.poly(sp), { 0.0115f }), 0x3A2A1D, Mat.LEATHER)
+        pb.add(Sculpt.tube(5, 4, KitA.poly(sp), { 0.0115f }), 0x45331F, Mat.MATTE)
         val vialCols = intArrayOf(0x3CE03A, 0xB3141F, 0x9ED020, 0x3CE03A)
         for ((i, uu) in floatArrayOf(0.18f, 0.42f, 0.66f, 0.90f).withIndex()) {
             val x = 0.120f - 0.270f * uu; val y = 0.835f - 0.250f * uu; val z = frontZ(x, y) + 0.022f
@@ -147,9 +147,9 @@ class DoctorModel : CharacterModel {
     // ---------------------------------------------------------------------------------------------- head
     private fun lens(): MeshData {
         val pb = PartBuilder()
-        pb.add(Sculpt.tube(1, 8, { t -> floatArrayOf(0f, 0f, 0.046f * t) }, { 0.0325f }, cap = true), 0x2A211A, Mat.MATTE, ao = 0.9f)
-        pb.add(Sculpt.tube(8, 4, { t -> val a = KitA.TAU * t; floatArrayOf(0.0345f * cos(a), 0.0345f * sin(a), 0.047f) }, { 0.0060f }), 0xA28E5E, Mat.METAL)
-        pb.add(Sculpt.ellipsoid(0.0295f, 0.0295f, 0.0125f, 3, 8), 0x2FC832, Mat.GLASS, z = 0.040f)
+        pb.add(Sculpt.tube(1, 10, { t -> floatArrayOf(0f, 0f, 0.046f * t) }, { 0.0325f }, cap = true), 0x2A211A, Mat.MATTE, ao = 0.9f)
+        pb.add(Sculpt.tube(10, 4, { t -> val a = KitA.TAU * t; floatArrayOf(0.0345f * cos(a), 0.0345f * sin(a), 0.047f) }, { 0.0060f }), 0xA28E5E, Mat.METAL)
+        pb.add(Sculpt.ellipsoid(0.0295f, 0.0295f, 0.0125f, 3, 10), 0x2FC832, Mat.GLASS, z = 0.040f)
         pb.add(Sculpt.ellipsoid(0.017f, 0.017f, 0.0045f, 2, 6), 0x5ACB3A, Mat.EMISSIVE, z = 0.0518f)
         return pb.data
     }
@@ -167,7 +167,7 @@ class DoctorModel : CharacterModel {
         // the beak: aged leather, darker where it joins the mask and on its underside
         val beak = Sculpt.tube(10, 8, { t -> beakC(t) }, { t -> beakR(t) }, cap = true)
         KitA.shade(beak) { _, _, z, _, ny, _ -> (0.72f + 0.28f * sstep(0.10f, 0.22f, z)) * (0.8f + 0.2f * (ny * 0.5f + 0.5f)) }
-        pb.add(beak, 0x6B5542, Mat.MATTE, sx = 0.88f, sy = 1f, sz = 1f)
+        pb.add(beak, 0x7C5C3C, Mat.MATTE, sx = 0.88f, sy = 1f, sz = 1f)
         // cracks (dark), crossed by pale stitches; the top seam is stitched all the way
         val cracks = listOf(
             listOf(0.12f to 40f, 0.24f to 50f, 0.36f to 44f, 0.50f to 58f),
@@ -196,7 +196,7 @@ class DoctorModel : CharacterModel {
         val crown = Sculpt.shell(crownProf, 20, radial = { ang, _, t -> 1f - 0.05f * sstep(0.4f, 1f, t) * (0.5f - 0.5f * cos(2f * ang)) + 0.015f * sin(3f * ang) })
         KitA.shade(crown) { _, y, _, _, _, _ -> 0.75f + 0.25f * sstep(0.0f, 0.19f, y) }
         hat.add(crown, 0x231C17, Mat.MATTE)
-        hat.add(Sculpt.shell(listOf(0.1012f to 0.040f, 0.1012f to 0.012f), 20), 0x3A2D22, Mat.LEATHER)         // hat band
+        hat.add(Sculpt.shell(listOf(0.1012f to 0.040f, 0.1012f to 0.012f), 20), 0x4A3826, Mat.MATTE)         // hat band
         hat.add(Sculpt.box(0.022f, 0.016f, 0.005f), 0xA39468, Mat.METAL, y = 0.026f, z = 0.1075f)
         KitA.addRaw(pb, hat.data, y = 1.115f, rx = -2f)
         return pb.build()
@@ -204,7 +204,7 @@ class DoctorModel : CharacterModel {
 
     private fun buildBeakLow(): Mesh {
         val pb = PartBuilder()
-        pb.add(Sculpt.tube(8, 6, { t -> lowC(t) }, { t -> lowR(t) }, cap = true), 0x5E4938, Mat.MATTE, sx = 0.9f, sy = 1f, sz = 1f)
+        pb.add(Sculpt.tube(8, 6, { t -> lowC(t) }, { t -> lowR(t) }, cap = true), 0x6E5236, Mat.MATTE, sx = 0.9f, sy = 1f, sz = 1f)
         // needle teeth along the inside edge, and a green glow leaking from the throat
         for (i in 0 until 4) {
             val t = 0.20f + i * 0.17f; val c = lowC(t)
@@ -281,13 +281,11 @@ class DoctorModel : CharacterModel {
 
     override fun draw(sc: Scene3D, mm: FloatArray, t: Float, ex: Float, dim: Float) {
         val fl = KitA.flicker(t, 1.3f)
-        // ---- body: slow sway, leans in when excited
+        // ---- poses first: the two local lights below need the lantern and head positions before the first drawV
         KitA.set(root, mm)
-        Mat4.rotate(root, sin(t * 0.52f) * 1.1f + ex * sin(t * 6.3f) * 1.4f, 0f, 0f, 1f)
+        Mat4.rotate(root, sin(t * 0.52f) * 1.1f + ex * sin(t * 6.3f) * 1.4f, 0f, 0f, 1f)          // slow sway, leans in when excited
         Mat4.rotate(root, ex * 5f, 1f, 0f, 0f)
-        sc.drawV(body, root, emis = 0.5f, dim = dim, rim = 0x0A1A10, spec = 0.5f, shine = 34f, wave = 1.2f + ex)
-
-        // ---- head: long stillness, then sudden bird-like snaps; stares into the camera when excited
+        // head: long stillness, then sudden bird-like snaps; stares into the camera when excited
         val seg = t / 3.4f; val k = floor(seg); val u = sstep(0f, 0.15f, seg - k)
         val look = (KitA.hash(k + 0.5f) * 2f - 1f) * (1f - u) + (KitA.hash(k + 1.5f) * 2f - 1f) * u
         val yaw = look * 26f * (1f - ex) + ex * sin(t * 8f) * 2.5f
@@ -297,24 +295,31 @@ class DoctorModel : CharacterModel {
         Mat4.translate(hm, neck[0], neck[1], neck[2]); Mat4.rotate(hm, yaw, 0f, 1f, 0f); Mat4.rotate(hm, pitch, 1f, 0f, 0f); Mat4.rotate(hm, roll, 0f, 0f, 1f)
         Mat4.translate(hm, -neck[0], -neck[1], -neck[2])
         val eye = 1.5f + 0.2f * sin(t * 1.9f) + ex * (1.3f + 0.25f * sin(t * 17f))
-        sc.drawV(head, hm, emis = eye, dim = dim, rim = 0x1B4A24, spec = 0.4f, shine = 20f)
         val open = 1.2f + 0.8f * sin(t * 0.9f) + ex * 24f * sstep(-0.35f, 0.35f, sin(t * 13f))
         KitA.pivot(jm, hm, hinge[0], hinge[1], hinge[2], open, 0f, 0f)
-        sc.drawV(beakLow, jm, emis = 1f + ex * 1.2f, dim = dim, rim = 0x1B4A24, spec = 0.4f, shine = 20f)
-        for (sx in SGN) sc.glowAt(hm, sx * (lensP[0] + 0.012f), lensP[1], lensP[2] + 0.075f, 0.10f * eye + 0.03f, 0x35FF3A, 0.7f * dim, 0.5f)
-
-        // ---- the swinging lantern (the left arm is part of the body mesh)
+        // swinging lantern (the left arm is part of the body mesh)
         val swz = sin(t * 1.6f) * (3.5f + 11f * ex); val swx = sin(t * 1.15f + 1.2f) * (2.5f + 7f * ex)
         KitA.set(lm, root); Mat4.translate(lm, handL[0], handL[1], handL[2]); Mat4.rotate(lm, swz, 0f, 0f, 1f); Mat4.rotate(lm, swx, 1f, 0f, 0f)
+        // right arm + cane, one rigid piece: the arm lifts and the cane is brandished forward when excited
+        KitA.pivot(aR, root, shoulderR[0], shoulderR[1], shoulderR[2], -ex * 30f + sin(t * 0.8f) * 1f + ex * 3f * sin(t * 9f), 0f, -ex * 8f)
+
+        // ---- two local lights (budget: 2 per character): the corpse-flame lights the coat, the lenses wash the mantle and beak green
+        sc.beginLocalLights()
+        sc.pointLightAt(lm, 0f, -0.23f, 0.05f, 1.25f, 0x4CFF3A, (0.55f + 0.35f * fl + 0.9f * ex) * dim)
+        sc.pointLightAt(hm, 0f, lensP[1] - 0.03f, 0.24f, 0.55f, 0x35FF3A, (0.16f + 0.10f * ex) * eye * dim)
+
+        // ---- draws
+        sc.drawV(body, root, emis = 0.5f, dim = dim, rim = 0x0A1A10, spec = 0.5f, shine = 34f, wave = 1.2f + ex)
+        sc.drawV(head, hm, emis = eye, dim = dim, rim = 0x1B4A24, spec = 0.28f, shine = 18f)
+        sc.drawV(beakLow, jm, emis = 1f + ex * 1.2f, dim = dim, rim = 0x1B4A24, spec = 0.28f, shine = 18f)
         sc.drawV(lantern, lm, emis = 1.2f + 0.7f * fl + 1.0f * ex, dim = dim, rim = 0x2E8A2E, spec = 0.5f, shine = 34f)
+        sc.drawV(armR, aR, dim = dim, rim = 0x0A1A10, spec = 0.5f, shine = 34f)
+        // glow sprites: one per lens (halo with a hot core), the flame core and its wide halo
+        for (sx in SGN) sc.glowAt(hm, sx * (lensP[0] + 0.012f), lensP[1], lensP[2] + 0.075f, 0.10f * eye + 0.03f, 0x35FF3A, 0.7f * dim, 0.5f)
         val fh = 0.9f + 0.45f * fl + 0.6f * ex
+        if (ex > 0.05f) { val ph = KitA.frac(t * 0.9f); val tip = beakC(1f); sc.glowAt(hm, tip[0], tip[1] - 0.01f + 0.06f * ph, tip[2] + 0.03f + 0.10f * ph, 0.10f + 0.20f * ph, 0x7CFF6A, 0.30f * ex * sin(PI.toFloat() * ph) * dim, 0f) }
         sc.glowAt(lm, 0f, -0.228f, 0.012f, 0.16f * fh + 0.05f * ex, 0x5CFF3A, 0.85f * dim, 0.9f)
         sc.glowAt(lm, 0f, -0.226f, 0.012f, 0.70f * fh + 0.35f * ex, 0x35FF3A, (0.20f + 0.10f * fl + 0.2f * ex) * dim, 0f)
-        sc.pointLightAt(lm, 0f, -0.23f, 0.04f, 1.25f, 0x4CFF3A, (0.55f + 0.35f * fl + 0.9f * ex) * dim)
-
-        // ---- right arm + cane, one rigid piece: the arm lifts and the cane is brandished forward when excited
-        KitA.pivot(aR, root, shoulderR[0], shoulderR[1], shoulderR[2], -ex * 30f + sin(t * 0.8f) * 1f + ex * 3f * sin(t * 9f), 0f, -ex * 8f)
-        sc.drawV(armR, aR, dim = dim, rim = 0x0A1A10, spec = 0.5f, shine = 34f)
     }
 
     private companion object { val SGN = floatArrayOf(-1f, 1f) }

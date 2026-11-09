@@ -80,6 +80,13 @@ internal object KitA {
         pb.data.append(d, m)
     }
 
+    /** p' = to + (p - from) * s for every vertex position (uniform scale: normals stay valid). Re-places a part built around [from]. */
+    fun xform(d: MeshData, from: FloatArray, to: FloatArray, s: Float): MeshData {
+        val st = MeshData.STRIDE
+        for (k in 0 until d.vertexCount) { val p = k * st; for (c in 0 until 3) d.v[p + c] = to[c] + (d.v[p + c] - from[c]) * s }
+        return d
+    }
+
     // ------------------------------------------------------------------------------------------ per frame (no allocation)
     fun set(dst: FloatArray, src: FloatArray) { System.arraycopy(src, 0, dst, 0, 16) }
 
