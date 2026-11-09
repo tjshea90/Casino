@@ -185,12 +185,12 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
         is AuthResult.Failed -> r.message
     }
 
-    /** Runs a slow wallet call (PBKDF2) off the UI thread. */
-    private fun <T> background(work: () -> T, done: (T) -> Unit) {
-        io.execute {
-            val r = work()
-            act.runOnUiThread { if (!act.isFinishing) done(r) }
-        }
+    /**
+     * Runs a slow wallet call (PBKDF2) off the UI thread. A failure inside [work] (a full disk when the wallet is saved, an
+     * OutOfMemoryError) is handed to [failed] on the UI thread instead of killing the worker thread, which would crash the app.
+     */
+    private fun <T> background(work: () -> T, failed: (Throwable) -> Unit = { toastBanner("That could not be saved: is the storage full?") }, done: (T) -> Unit) {
+        runInBackground(io, { r -> act.runOnUiThread { if (!act.isFinishing) r.run() } }, work, done, failed)
     }
 
     // ------------------------------------------------------------------ amount entry
@@ -260,7 +260,8 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
                 else -> {
                     v.isEnabled = false; status.busy("Securing machine…")
                     val chars = readPw(pw1)
-                    background({ wallet.setInitialPassword(chars).also { chars.fill('\u0000') } }) {
+                    background({ wallet.setInitialPassword(chars).also { chars.fill('\u0000') } },
+                        { chars.fill('\u0000'); v.isEnabled = true; status.fail("The password could not be saved: is the storage full?") }) {
                         sh.close()
                         message("Machine ready", "Your password now protects every deposit and cash-out.\n\nTap DEPOSIT to add tokens, then SPIN. Collect all five relics to open the Soul Vault, and land three coffins to awaken THE SÉANCE.\n\nThere is no password recovery — keep it safe.")
                     }
@@ -289,7 +290,8 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
             if (tokens <= 0) { status.fail("Enter an amount."); return@button }
             v.isEnabled = false; status.busy("Verifying…")
             val chars = readPw(pw)
-            background({ wallet.deposit(chars, tokens).also { chars.fill('\u0000') } }) { r ->
+            background({ wallet.deposit(chars, tokens).also { chars.fill('\u0000') } },
+                { chars.fill('\u0000'); v.isEnabled = true; status.fail("The deposit could not be saved: is the storage full?") }) { r ->
                 if (r is AuthResult.Ok) {
                     sh.close()
                     toastBanner("Deposited ${Money.describe(tokens)}")
@@ -320,7 +322,8 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
             if (tokens < Money.TOKENS_PER_MACK) { status.fail("Cash-outs are whole macks — enter at least 10 tokens."); return@button }
             v.isEnabled = false; status.busy("Verifying…")
             val chars = readPw(pw)
-            background({ wallet.withdraw(chars, tokens).also { chars.fill('\u0000') } }) { r ->
+            background({ wallet.withdraw(chars, tokens).also { chars.fill('\u0000') } },
+                { chars.fill('\u0000'); v.isEnabled = true; status.fail("The cash-out could not be saved: is the storage full?") }) { r ->
                 if (r is AuthResult.Ok) {
                     sh.close()
                     ticket(wallet.lastCashOut)
@@ -401,7 +404,8 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
             if (n1.text.toString() != n2.text.toString()) { status.fail("New passwords don't match."); return@button }
             v.isEnabled = false; status.busy("Verifying…")
             val o = readPw(old); val n = readPw(n1)
-            background({ wallet.changePassword(o, n).also { o.fill('\u0000'); n.fill('\u0000') } }) { r ->
+            background({ wallet.changePassword(o, n).also { o.fill('\u0000'); n.fill('\u0000') } },
+                { o.fill('\u0000'); n.fill('\u0000'); v.isEnabled = true; status.fail("The new password could not be saved: is the storage full?") }) { r ->
                 if (r is AuthResult.Ok) { sh.close(); toastBanner("Password changed") }
                 else { v.isEnabled = true; status.fail(authMessage(r)); old.setText("") }
             }
@@ -419,7 +423,8 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
         val ok = ui.button("Erase everything", Dread.Kind.DANGER) { v ->
             v.isEnabled = false; status.busy("Verifying…")
             val chars = readPw(pw)
-            background({ wallet.factoryReset(chars).also { chars.fill('\u0000') } }) { r ->
+            background({ wallet.factoryReset(chars).also { chars.fill('\u0000') } },
+                { chars.fill('\u0000'); v.isEnabled = true; status.fail("The machine could not be reset.") }) { r ->
                 if (r is AuthResult.Ok) { dismissAll(); setupPassword() }
                 else { v.isEnabled = true; status.fail(authMessage(r)); pw.setText("") }
             }
@@ -672,6 +677,17 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
     }
 
     var toastBanner: (String) -> Unit = {}
+}
+
+/**
+ * Runs [work] on [io]; the outcome (or the exception it threw) is delivered through [ui], which posts to the UI thread. The worker
+ * thread can never die from an exception thrown by [work] (an uncaught exception on any thread ends an Android process).
+ */
+internal fun <T> runInBackground(io: java.util.concurrent.Executor, ui: (Runnable) -> Unit, work: () -> T, done: (T) -> Unit, failed: (Throwable) -> Unit) {
+    io.execute {
+        val r: Result<T> = try { Result.success(work()) } catch (e: Throwable) { Result.failure(e) }
+        ui(Runnable { r.fold(done, failed) })
+    }
 }
 
 /** The cash-out ticket: aged paper with torn (zig-zag) top and bottom edges. */

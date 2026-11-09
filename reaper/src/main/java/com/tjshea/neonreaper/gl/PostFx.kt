@@ -32,6 +32,8 @@ class PostFx(private val gl: Gl, private val quad: Mesh) {
     private var sw = 0; private var sh = 0
     private var bloomFbo = IntArray(2); private var bloomTex = IntArray(2)
     private var bw = 0; private var bh = 0
+    /** The frame size / bloom divisor the GPU last refused, and how many frames to wait before trying it again (see [ensure]). */
+    private var refusedKey = 0L; private var refusedWait = 0
 
     private fun makeTex(w: Int, h: Int): Int {
         val t = gl.genTexture()
@@ -54,6 +56,11 @@ class PostFx(private val gl: Gl, private val quad: Mesh) {
     private fun ensure(w: Int, h: Int, div: Int): Boolean {
         val nbw = (w / div).coerceAtLeast(16); val nbh = (h / div).coerceAtLeast(16)
         if (sceneFbo != 0 && sw == w && sh == h && bw == nbw && bh == nbh) return true
+        // A GPU that refused this size (incomplete framebuffer, out of memory) must not be asked again every frame: that would create and
+        // delete three textures, three framebuffers and a renderbuffer 60 times a second. Retry after about five seconds, or at once for
+        // a different size / tier.
+        val key = (w.toLong() shl 40) or (h.toLong() shl 16) or div.toLong()
+        if (key == refusedKey && refusedWait > 0) { refusedWait--; return false }
         release()
         sw = w; sh = h; bw = nbw; bh = nbh
         val prev = gl.getInteger(Gl.FRAMEBUFFER_BINDING)
@@ -71,7 +78,8 @@ class PostFx(private val gl: Gl, private val quad: Mesh) {
             ok = ok && gl.checkFramebufferStatus(Gl.FRAMEBUFFER) == Gl.FRAMEBUFFER_COMPLETE
         }
         gl.bindFramebuffer(Gl.FRAMEBUFFER, prev)
-        if (!ok) { release(); return false }
+        if (!ok) { release(); refusedKey = key; refusedWait = REFUSED_RETRY_FRAMES; return false }
+        refusedKey = 0L
         return true
     }
 
@@ -116,6 +124,9 @@ class PostFx(private val gl: Gl, private val quad: Mesh) {
         gl.depthMask(true)
     }
 }
+
+/** Frames to wait before asking a GPU again for a framebuffer size it refused. */
+private const val REFUSED_RETRY_FRAMES = 300
 
 object PostShaders {
     const val QUAD_VS = """#version 300 es

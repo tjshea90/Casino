@@ -547,8 +547,10 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         o.stops.copyInto(shownStops); shownFs = free != null
         if (free == null) boughtPrice = 0L
         pendingWin = spinWin(o)
-        pendingVault = p.vault?.payTokens ?: 0L
         if (free == null) {
+            // (a free spin carries no Vault of its own: a Vault unlocked by the spin that started the Séance must stay hidden in the
+            // credit meter until the Vault screen has been shown, so the free spins must not reset it)
+            pendingVault = p.vault?.payTokens ?: 0L
             pendingSeance = p.seance?.payTokens ?: 0L
             vaultToShow = p.vault
             seanceToStart = p.seance
@@ -865,6 +867,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
 
     /** App restarted with a paid-but-unseen Séance: replay it first. */
     fun resumeSeance(se: SeanceResult) {
+        pendingVault = wallet.pendingVault()?.payTokens ?: 0L      // a Vault unlocked by the same spin is shown after the Séance: keep it hidden
         startSeanceTrigger(se)
     }
 
