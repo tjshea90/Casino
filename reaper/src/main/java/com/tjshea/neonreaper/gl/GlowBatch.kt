@@ -62,7 +62,7 @@ internal class GlowBatch(private val gl: Gl, private val maxGlows: Int = 384) {
         prog.use()
         prog.m4("uViewProj", viewProj)
         prog.f3("uCamRight", camRight[0], camRight[1], camRight[2]); prog.f3("uCamUp", camUp[0], camUp[1], camUp[2])
-        buf.clear(); buf.put(data, 0, n * 4 * MeshData.STRIDE); buf.position(0)
+        buf.clear(); buf.put(data, 0, n * 4 * MeshData.STRIDE); buf.flip()      // upload only the sprites of this frame
         gl.bindVertexArray(vao)
         gl.bindBuffer(Gl.ARRAY_BUFFER, vbo)
         gl.bufferData(Gl.ARRAY_BUFFER, buf, Gl.DYNAMIC_DRAW)

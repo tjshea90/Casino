@@ -22,13 +22,46 @@ class Program(private val gl: Gl, vs: String, fs: String, val name: String) {
 
     fun use() = gl.useProgram(id)
     fun loc(n: String): Int = locs.getOrPut(n) { gl.getUniformLocation(id, n) }
-    fun f(n: String, x: Float) = gl.uniform1f(loc(n), x)
-    fun f2(n: String, x: Float, y: Float) = gl.uniform2f(loc(n), x, y)
-    fun f3(n: String, x: Float, y: Float, z: Float) = gl.uniform3f(loc(n), x, y, z)
-    fun f4(n: String, x: Float, y: Float, z: Float, w: Float) = gl.uniform4f(loc(n), x, y, z, w)
-    fun i(n: String, x: Int) = gl.uniform1i(loc(n), x)
+
+    // Uniform values persist inside a program, so setting the value it already holds is wasted driver work (a busy frame sets
+    // ~3,000 uniforms, most of them unchanged from the previous draw): remember the last value per location and skip repeats.
+    private val last = FloatArray(MAX_LOC * 4)
+    private val lastN = ByteArray(MAX_LOC)           // number of floats cached for the location; 0 = nothing known yet
+
+    private fun same1(l: Int, a: Float): Boolean {
+        if (l !in 0 until MAX_LOC) return false
+        val o = l * 4
+        if (lastN[l].toInt() == 1 && last[o] == a) return true
+        last[o] = a; lastN[l] = 1; return false
+    }
+    private fun same2(l: Int, a: Float, b: Float): Boolean {
+        if (l !in 0 until MAX_LOC) return false
+        val o = l * 4
+        if (lastN[l].toInt() == 2 && last[o] == a && last[o + 1] == b) return true
+        last[o] = a; last[o + 1] = b; lastN[l] = 2; return false
+    }
+    private fun same3(l: Int, a: Float, b: Float, c: Float): Boolean {
+        if (l !in 0 until MAX_LOC) return false
+        val o = l * 4
+        if (lastN[l].toInt() == 3 && last[o] == a && last[o + 1] == b && last[o + 2] == c) return true
+        last[o] = a; last[o + 1] = b; last[o + 2] = c; lastN[l] = 3; return false
+    }
+    private fun same4(l: Int, a: Float, b: Float, c: Float, d: Float): Boolean {
+        if (l !in 0 until MAX_LOC) return false
+        val o = l * 4
+        if (lastN[l].toInt() == 4 && last[o] == a && last[o + 1] == b && last[o + 2] == c && last[o + 3] == d) return true
+        last[o] = a; last[o + 1] = b; last[o + 2] = c; last[o + 3] = d; lastN[l] = 4; return false
+    }
+
+    fun f(n: String, x: Float) { val l = loc(n); if (l >= 0 && !same1(l, x)) gl.uniform1f(l, x) }
+    fun f2(n: String, x: Float, y: Float) { val l = loc(n); if (l >= 0 && !same2(l, x, y)) gl.uniform2f(l, x, y) }
+    fun f3(n: String, x: Float, y: Float, z: Float) { val l = loc(n); if (l >= 0 && !same3(l, x, y, z)) gl.uniform3f(l, x, y, z) }
+    fun f4(n: String, x: Float, y: Float, z: Float, w: Float) { val l = loc(n); if (l >= 0 && !same4(l, x, y, z, w)) gl.uniform4f(l, x, y, z, w) }
+    fun i(n: String, x: Int) { val l = loc(n); if (l >= 0 && !same1(l, x.toFloat())) gl.uniform1i(l, x) }
     fun m4(n: String, m: FloatArray) = gl.uniformMatrix4fv(loc(n), m)
     fun m3(n: String, m: FloatArray) = gl.uniformMatrix3fv(loc(n), m)
+    private companion object { const val MAX_LOC = 512 }
+
     /** Sets a vec3 uniform from 0xRRGGBB scaled by [k]. */
     fun rgb(n: String, c: Int, k: Float = 1f) = f3(n, ((c shr 16) and 255) / 255f * k, ((c shr 8) and 255) / 255f * k, (c and 255) / 255f * k)
 }
