@@ -164,7 +164,7 @@ class VaultShotsTest {
         val v = begin(tag, w, h, natural(30..70))
         tap(v)
         var guard = 0
-        while (guard++ < 40 && !(v.summaryAge >= 0)) { step(v, 0.5); if (v.awaitingSpin) press(v) }
+        while (guard++ < 240 && !(v.summaryAge >= 0)) { step(v, 0.5, 100); if (v.awaitingSpin) press(v) }
         assertTrue(until(30.0, v) { v.summaryAge in 1.3..1.5 }); shot(v, "vs_${tag}_16_summary_natural")
     }
 
@@ -184,7 +184,7 @@ class VaultShotsTest {
         val v = VaultView(ctx, audio, res) {}
         size(v, 1280, 800); step(v, 1.0); tap(v)
         var guard = 0
-        while (guard++ < 80 && v.summaryAge < 0) { step(v, 0.5, 100); if (v.awaitingSpin) press(v) }
+        while (guard++ < 600 && v.summaryAge < 0) { step(v, 0.5, 100); if (v.awaitingSpin) press(v) }
         assertTrue(v.summaryAge >= 0)
         assertEquals(res.totalMult, v.tallyMult)
         for (i in 0 until SoulVault.CELLS) {

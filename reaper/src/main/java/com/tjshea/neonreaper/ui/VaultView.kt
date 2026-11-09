@@ -188,6 +188,8 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
     private lateinit var mistBmp: Bitmap
     private lateinit var chainBmp: Bitmap
     private var introTitle: Bitmap? = null
+    private var doorBmp: Bitmap? = null
+    private var doorSlammed = false
     private var introPlate: Bitmap? = null
     private var grandTitle: Bitmap? = null
     private var summaryTitle: Bitmap? = null
@@ -471,7 +473,8 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         for (b in owned) if (!b.isRecycled) b.recycle()
         owned.clear()
         for (i in plates.indices) plates[i] = null
-        introTitle = null; introPlate = null; grandTitle = null; summaryTitle = null; summaryPlate = null; summaryTier = -1
+        introTitle = null; introPlate = null; grandTitle = null; summaryTitle = null; summaryPlate = null; summaryTier = -1; doorBmp = null
+        for (k in jpTitle.indices) jpTitle[k] = null
     }
 
     private fun mk(w: Int, h: Int, draw: (Canvas) -> Unit): Bitmap {
@@ -914,10 +917,10 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         }
         val outer = LinearGradient(0f, h, 0f, 0f, intArrayOf(0xFFFFB347.toInt(), 0xFFFF5A12.toInt(), 0x00A01005), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
         p.maskFilter = BlurMaskFilter(3f, BlurMaskFilter.Blur.NORMAL)
-        for (k in 0 until 8) tongue(w * (0.08f + 0.84f * k / 7f), w * (0.07f + 0.05f * r.nextFloat()), 0.42f + 0.56f * r.nextFloat(), (r.nextFloat() - 0.5f) * 16f, outer)
+        for (k in 0 until 6) tongue(w * (0.14f + 0.72f * k / 5f), w * (0.10f + 0.07f * r.nextFloat()), 0.40f + 0.58f * r.nextFloat(), (r.nextFloat() - 0.5f) * 22f, outer)
         p.maskFilter = null
         val core = LinearGradient(0f, h, 0f, h * 0.35f, intArrayOf(0xFFFFF4C0.toInt(), 0xFFFFC060.toInt(), 0x00FF9A3C), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
-        for (k in 0 until 5) tongue(w * (0.14f + 0.72f * k / 4f), w * 0.045f, 0.25f + 0.3f * r.nextFloat(), (r.nextFloat() - 0.5f) * 8f, core)
+        for (k in 0 until 4) tongue(w * (0.18f + 0.64f * k / 3f), w * 0.06f, 0.25f + 0.3f * r.nextFloat(), (r.nextFloat() - 0.5f) * 10f, core)
         p.shader = LinearGradient(0f, h, 0f, h * 0.6f, 0x00FFFFFF, 0xFFFFFFFF.toInt(), Shader.TileMode.CLAMP)
         p.xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
         c.drawRect(0f, 0f, w, h, p)
@@ -1291,8 +1294,10 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         c.drawText(nb, nbStart, n, x, y, pText)
     }
 
-    private fun label(c: Canvas, s: String, x: Float, y: Float, size: Float, fill: Int, tf: Typeface = serif, spacing: Float = 0.12f, outline: Boolean = true) {
-        pText.typeface = tf; pText.letterSpacing = spacing; pText.textSize = size
+    private fun label(c: Canvas, s: String, x: Float, y: Float, size0: Float, fill: Int, tf: Typeface = serif, spacing: Float = 0.12f, outline: Boolean = true, maxW: Float = 0f) {
+        pText.typeface = tf; pText.letterSpacing = spacing; pText.textSize = size0
+        if (maxW > 0f) { val w = pText.measureText(s); if (w > maxW) pText.textSize = size0 * maxW / w }
+        val size = pText.textSize
         if (outline) { pText.style = Paint.Style.STROKE; pText.strokeWidth = size * 0.16f; pText.color = 0xE6000000.toInt(); c.drawText(s, x, y, pText) }
         pText.style = Paint.Style.FILL; pText.color = fill
         c.drawText(s, x, y, pText)
@@ -1334,7 +1339,9 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         if (fin < 0.8f) { pFill.color = Color.argb(((1f - fin / 0.8f) * (if (calm) 120 else 235)).toInt(), 236, 230, 214); c.drawRect(0f, 0f, width.toFloat(), height.toFloat(), pFill) }
         if (outroAt > 0) {
             val q = ((real - outroAt) / 0.9).coerceIn(0.0, 1.0).toFloat()
-            pFill.color = Color.argb((q * 255).toInt(), 0, 0, 0); c.drawRect(0f, 0f, width.toFloat(), height.toFloat(), pFill)
+            drawDoors(c, q)
+            if (q >= 0.8f && !doorSlammed) { doorSlammed = true; audio.play(Sfx.DOOR_SLAM, 0.9f) }
+            pFill.color = Color.argb((smooth((q - 0.72f) / 0.28f) * 255).toInt(), 0, 0, 0); c.drawRect(0f, 0f, width.toFloat(), height.toFloat(), pFill)
             if (q >= 1f && !finished) { finished = true; post { onFinished(result.payTokens) }; return }
         }
         scheduleNext(real)
@@ -1346,6 +1353,65 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             (grandAt >= 0 && vt - grandAt < 3.2) || collectTo >= 0 || vt - resetFlash < 1.0 || (summaryAt >= 0 && (vt - summaryAt < 2.2 || rainLevel > 0.05f)) ||
             outroAt > 0 || real - spinPressedAt < 0.3 || sparksLive()
         if (busy) postInvalidateOnAnimation() else postInvalidateDelayed(if (calm) 250L else 90L)
+    }
+
+    /** One heavy iron-bound door leaf (hinged on the outside edge), baked on first use; mirrored for the other side. */
+    private fun ensureDoor() {
+        if (doorBmp != null) return
+        val w = (vw / 2f).toInt() + 3; val h = vh.toInt()
+        doorBmp = mk(w, h) { c ->
+            val p = Paint(Paint.ANTI_ALIAS_FLAG)
+            val rnd = Random(31)
+            val pw = 52f * u
+            var x = 0f
+            while (x < w) {
+                val sh = 24 + rnd.nextInt(12)
+                p.shader = LinearGradient(x, 0f, x + pw, 0f, Color.rgb(sh + 10, sh + 2, sh - 4), Color.rgb(sh - 6, sh - 12, sh - 16), Shader.TileMode.CLAMP)
+                c.drawRect(x, 0f, x + pw, h.toFloat(), p); p.shader = null
+                p.color = 0x26000000
+                for (k in 0 until 7) { val gx = x + rnd.nextFloat() * pw; c.drawLine(gx, 0f, gx + (rnd.nextFloat() - 0.5f) * 8f * u, h.toFloat(), p) }
+                p.color = 0xDD000000.toInt(); c.drawRect(x + pw - 2.4f * u, 0f, x + pw, h.toFloat(), p)
+                x += pw
+            }
+            p.shader = BitmapShader(noise, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT); p.alpha = 120; c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), p); p.shader = null; p.alpha = 255
+            // horizontal iron straps with rivets and a pointed tip toward the seam
+            for (yy in floatArrayOf(0.07f, 0.29f, 0.50f, 0.71f, 0.93f)) {
+                val y = h * yy; val th = 30f * u
+                path.reset(); path.moveTo(0f, y - th / 2); path.lineTo(w - 34f * u, y - th / 2); path.lineTo(w - 6f * u, y); path.lineTo(w - 34f * u, y + th / 2); path.lineTo(0f, y + th / 2); path.close()
+                p.shader = LinearGradient(0f, y - th / 2, 0f, y + th / 2, intArrayOf(0xFF3E424B.toInt(), 0xFF14161B.toInt(), 0xFF08090B.toInt()), null, Shader.TileMode.CLAMP)
+                c.drawPath(path, p); p.shader = null
+                p.style = Paint.Style.STROKE; p.strokeWidth = 1.6f * u; p.color = 0xCC000000.toInt(); c.drawPath(path, p); p.style = Paint.Style.FILL
+                var rxp = 26f * u
+                while (rxp < w - 50f * u) { rivet(c, rxp, y, 3.2f * u); rxp += 52f * u }
+            }
+            // the seam: a vertical iron band with a heavy brass ring and a skull boss
+            val sx = w - 30f * u
+            p.shader = LinearGradient(sx, 0f, sx + 30f * u, 0f, intArrayOf(0xFF2E3138.toInt(), 0xFF0E1014.toInt(), 0xFF050608.toInt()), null, Shader.TileMode.CLAMP)
+            c.drawRect(sx, 0f, w.toFloat(), h.toFloat(), p); p.shader = null
+            p.color = 0x33FFFFFF; c.drawRect(sx, 0f, sx + 1.6f * u, h.toFloat(), p)
+            skullGlyph(c, w - 40f * u, h * 0.5f - 66f * u, 52f * u, 0xFF0A0B0D.toInt(), 0x88D9D2BE.toInt(), withA(Neon.RED, 255))
+            p.style = Paint.Style.STROKE; p.strokeWidth = 9f * u
+            p.shader = SweepGradient(w - 40f * u, h * 0.5f + 20f * u, intArrayOf(0xFFE3C676.toInt(), Neon.BRASS_DIM, 0xFFC8A24C.toInt(), 0xFF2E230C.toInt(), 0xFFE3C676.toInt()), null)
+            c.drawCircle(w - 40f * u, h * 0.5f + 20f * u, 34f * u, p); p.shader = null; p.style = Paint.Style.FILL
+            // darkness gathers toward the hinges
+            p.shader = LinearGradient(0f, 0f, w * 0.5f, 0f, 0x99000000.toInt(), 0x00000000, Shader.TileMode.CLAMP)
+            c.drawRect(0f, 0f, w * 0.5f, h.toFloat(), p); p.shader = null
+        }
+    }
+
+    private fun drawDoors(c: Canvas, q: Float) {
+        ensureDoor()
+        val d = doorBmp ?: return
+        val e = (q / 0.8f).coerceIn(0f, 1f)
+        val slide = e * e * (3f - 2f * e) * (1f - 0.04f * (1f - e))      // eased, finishing with a little weight
+        val w = d.width.toFloat()
+        val lx = -w + slide * (vw / 2f + 1f)
+        c.drawBitmap(d, lx, 0f, pBmp)
+        c.save(); c.scale(-1f, 1f, vw / 2f, 0f)
+        c.drawBitmap(d, lx, 0f, pBmp)
+        c.restore()
+        // the closing gap glows ember-red and a shadow falls across the room
+        if (e < 1f) { val gap = (1f - slide) * vw * 0.5f; glow(c, vw / 2f, vh * 0.5f, gap * 0.8f + 30f * u, tintRed, 0.5f * (1f - e)) }
     }
 
     private fun sparksLive(): Boolean { for (i in 0 until spN) if (spT[i] >= 0) return true; return false }
@@ -1557,16 +1623,25 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
 
     /** Burning edge: [n] overlapped fire sheets along y = [base], from x0 to x1, [hgt] tall, animated by [t]. */
     private fun fireLine(c: Canvas, x0: Float, x1: Float, base: Float, hgt: Float, n: Int, t: Float, strength: Float) {
-        val sw = (x1 - x0) / max(1, n - 1) * 1.7f
-        pAdd.alpha = (215 * strength).toInt().coerceIn(0, 255)
+        val gapX = (x1 - x0) / max(1, n - 1)
+        pAdd.alpha = (200 * strength).toInt().coerceIn(0, 255)
         for (k in 0 until n) {
-            val frame = ((t * 9f + k * 5).toInt() and 0x7FFFFFFF) % 6
-            val fxp = x0 + (x1 - x0) * k / max(1, n - 1)
-            val hh = hgt * (0.7f + 0.3f * flick(t, k * 1.9f)) * (if (k == 0 || k == n - 1) 0.7f else 1f)
+            val frame = ((t * 8f + hash(k) * 6f).toInt() and 0x7FFFFFFF) % 6
+            val fxp = x0 + gapX * k + (hash(k + 5) - 0.5f) * gapX * 0.7f
+            val sw = gapX * (1.9f + 0.7f * hash(k + 17))
+            val hh = hgt * (0.55f + 0.7f * hash(k + 33)) * (0.75f + 0.25f * flick(t, k * 1.9f)) * (if (k == 0 || k == n - 1) 0.7f else 1f)
             dst.set(fxp - sw / 2f, base - hh * 0.9f, fxp + sw / 2f, base + hh * 0.1f)
             c.drawBitmap(fireBmp[frame], null, dst, pAdd)
         }
         pAdd.alpha = 255
+    }
+
+    /** Cheap deterministic hash to 0..1 (stable per index, no allocation). */
+    private fun hash(i: Int): Float {
+        var x = i * 374761393 + 668265263
+        x = (x xor (x ushr 13)) * 1274126177
+        x = x xor (x ushr 16)
+        return (x and 0xFFFF) / 65535f
     }
 
     private fun sprite(c: Canvas, b: Bitmap, cx: Float, cy: Float, w: Float, h: Float) {
@@ -1882,7 +1957,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             for (i in rows.indices) {
                 val y0 = 14f * u + i * rowH; val cy = y0 + rowH / 2f
                 if (i > 0) { tp.color = 0x33D2B060; c.drawRect(26f * u, y0 - 0.6f * u, w - 26f * u, y0 + 0.6f * u, tp) }
-                val ix = iconW / 2f + 12f * u
+                val ix = iconW / 2f + (if (portrait) 24f else 12f) * u
                 when (i) {
                     0 -> for (k in 0..2) { dst.set(ix + (k - 1) * 31f * u - 15f * u, cy - 15f * u, ix + (k - 1) * 31f * u + 15f * u, cy + 15f * u); c.drawBitmap(pipOn, null, dst, pBmp) }
                     1 -> for (k in 0..2) { val xx = ix + (k - 1) * 33f * u; dst.set(xx - 19f * u, cy - 19f * u, xx + 19f * u, cy + 19f * u); c.drawBitmap(sealBmp[k], null, dst, pBmp) }
@@ -1946,7 +2021,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         val capTop = cy - gt.height * s * 0.17f
         val fl = gt.width * s * 0.70f
         fireLine(c, cx - fl / 2f, cx + fl / 2f, capTop + H * 0.02f, H * 0.2f * min(1f, e * 2f), 9, t, 1f)
-        label(c, "THE VAULT IS FULL", cx, H * 0.69f, H * (if (portrait) 0.034f else 0.05f), 0xFFF2EBD8.toInt(), serif, 0.24f)
+        label(c, "THE VAULT IS FULL", cx, H * 0.69f, H * (if (portrait) 0.034f else 0.05f), 0xFFF2EBD8.toInt(), serif, 0.24f, true, W * 0.9f)
     }
 
     // ------------------------------------------------------------------ intro and summary
@@ -1963,7 +2038,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         pBmp.alpha = (255 * smooth((e - 0.25f) * 2f)).toInt()
         c.drawBitmap(introPlate!!, introRect.left - plateM, introRect.top - plateM, pBmp); pBmp.alpha = 255
         val pa = 0.55f + 0.45f * sin(t * 2.6f)
-        label(c, "TAP TO BEGIN", W / 2f, introPromptY, H * (if (portrait) 0.034f else 0.045f), mix(0xFF7A0F18.toInt(), 0xFFFF3B4E.toInt(), pa), serif, 0.22f)
+        label(c, "TAP TO BEGIN", W / 2f, introPromptY, H * (if (portrait) 0.034f else 0.045f), mix(0xFF7A0F18.toInt(), 0xFFFF3B4E.toInt(), pa), serif, 0.22f, true, W * 0.9f)
     }
 
     private fun summaryTierOf(): Int {
@@ -2050,13 +2125,13 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         if (wd > r.width() * 0.86f) pText.textSize = asz * r.width() * 0.86f / wd
         pText.style = Paint.Style.STROKE; pText.strokeWidth = pText.textSize * 0.13f; pText.color = 0xFF000000.toInt(); c.drawText(nb, nbStart, n, r.centerX(), ay, pText)
         pText.style = Paint.Style.FILL; pText.shader = sh; c.drawText(nb, nbStart, n, r.centerX(), ay, pText); pText.shader = null
-        label(c, wonLine, r.centerX(), r.top + r.height() * 0.675f, r.height() * (if (portrait) 0.052f else 0.062f), 0xFFE9E1CB.toInt(), cond, 0f)
-        label(c, noteLine, r.centerX(), r.top + r.height() * 0.765f, r.height() * (if (portrait) 0.036f else 0.044f), 0xFFA9A596.toInt(), cond, 0f)
+        label(c, wonLine, r.centerX(), r.top + r.height() * 0.675f, r.height() * (if (portrait) 0.052f else 0.062f), 0xFFE9E1CB.toInt(), cond, 0f, true, r.width() * 0.9f)
+        label(c, noteLine, r.centerX(), r.top + r.height() * 0.765f, r.height() * (if (portrait) 0.036f else 0.044f), 0xFFA9A596.toInt(), cond, 0f, true, r.width() * 0.9f)
         label(c, "Added to your credit", r.centerX(), r.top + r.height() * 0.83f, r.height() * (if (portrait) 0.036f else 0.044f), 0xFFA9A596.toInt(), cond, 0f)
         c.restore()
         if (e > 0.8f) {
             val pa = 0.55f + 0.45f * sin(t * 2.6f)
-            label(c, "TAP TO RETURN TO THE GRAVEYARD", r.centerX(), r.bottom + H * 0.075f, H * (if (portrait) 0.030f else 0.04f), mix(0xFF7A6A44.toInt(), GOLD_HOT, pa), serif, 0.14f)
+            label(c, "TAP TO RETURN TO THE GRAVEYARD", r.centerX(), r.bottom + H * 0.075f, H * (if (portrait) 0.030f else 0.04f), mix(0xFF7A6A44.toInt(), GOLD_HOT, pa), serif, 0.14f, true, W * 0.94f)
         }
     }
 
