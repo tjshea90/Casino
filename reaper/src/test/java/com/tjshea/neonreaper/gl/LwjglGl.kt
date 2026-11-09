@@ -56,4 +56,20 @@ class LwjglGl : Gl {
     override fun deleteBuffer(buffer: Int) = GLES30.glDeleteBuffers(buffer)
     override fun deleteTexture(tex: Int) = GLES30.glDeleteTextures(tex)
     override fun deleteProgram(program: Int) = GLES30.glDeleteProgram(program)
+    override fun texImage2DEmpty(width: Int, height: Int) =
+        GLES30.glTexImage2D(GLES30.GL_TEXTURE_2D, 0, GLES30.GL_RGBA, width, height, 0, GLES30.GL_RGBA, GLES30.GL_UNSIGNED_BYTE, null as ByteBuffer?)
+    override fun genFramebuffer() = GLES30.glGenFramebuffers()
+    override fun bindFramebuffer(target: Int, fb: Int) = GLES30.glBindFramebuffer(target, fb)
+    override fun framebufferTexture2D(target: Int, attachment: Int, textarget: Int, tex: Int, level: Int) =
+        GLES30.glFramebufferTexture2D(target, attachment, textarget, tex, level)
+    override fun genRenderbuffer() = GLES30.glGenRenderbuffers()
+    override fun bindRenderbuffer(target: Int, rb: Int) = GLES30.glBindRenderbuffer(target, rb)
+    override fun renderbufferStorage(target: Int, internalformat: Int, w: Int, h: Int) = GLES30.glRenderbufferStorage(target, internalformat, w, h)
+    override fun framebufferRenderbuffer(target: Int, attachment: Int, rbTarget: Int, rb: Int) =
+        GLES30.glFramebufferRenderbuffer(target, attachment, rbTarget, rb)
+    override fun checkFramebufferStatus(target: Int) = GLES30.glCheckFramebufferStatus(target)
+    override fun deleteFramebuffer(fb: Int) = GLES30.glDeleteFramebuffers(fb)
+    override fun deleteRenderbuffer(rb: Int) = GLES30.glDeleteRenderbuffers(rb)
+    override fun getInteger(pname: Int) = GLES30.glGetInteger(pname)
+    override fun colorMask(r: Boolean, g: Boolean, b: Boolean, a: Boolean) = GLES30.glColorMask(r, g, b, a)
 }

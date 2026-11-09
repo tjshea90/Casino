@@ -61,8 +61,8 @@ BUY_RTP = 0.93               # feature buys are priced so that RTP(buy) <= this 
 # CONFIG -- mirror of ReaperConfig.kt (keep in sync; RtpExactTest checks the Kotlin side)
 # ----------------------------------------------------------------------------------------------
 CFG = SimpleNamespace(
-    pays=[(6, 20, 100), (3, 10, 40), (3, 6, 25), (2, 5, 15), (2, 4, 10), (2, 3, 8),
-          (1, 2, 6), (1, 2, 5), (1, 2, 4), (1, 2, 4), (1, 2, 3), (0, 0, 0)],      # x stake for 3/4/5 of a kind
+    pays=[(6, 20, 100), (3, 10, 40), (3, 6, 25), (2, 5, 15), (2, 4, 12), (2, 3, 8),
+          (1, 2, 6), (1, 2, 5), (1, 2, 4), (1, 1, 4), (1, 1, 3), (0, 0, 0)],      # x stake for 3/4/5 of a kind
     #       W DOC SK RV DE WR  A  K  Q  J 10 SC
     counts=[1, 3, 3, 5, 5, 5, 6, 6, 8, 9, 12, 2],                                   # symbols per BASE reel strip (all 5 reels)
     fs_counts=[2, 3, 3, 4, 4, 4, 5, 5, 6, 6, 7, 2],                                 # symbols per SEANCE reel strip
@@ -76,7 +76,7 @@ CFG = SimpleNamespace(
     coin_counts=[3, 4, 5, 6], coin_count_weights=[0.45, 0.3, 0.17, 0.08],
     coin_values=[1, 2, 3, 5, 10, 20, 50], coin_weights=[30, 25, 18, 13, 9, 4, 1],
     skull_mults=[2, 3, 5], skull_mult_weights=[0.6, 0.3, 0.1], skull_wilds=2,
-    relic_count=5, relic_chance=5 / 125,                                            # a Soul Vault about every 125 spins
+    relic_count=5, relic_chance=5 / 135,                                            # a Soul Vault about every 135 spins
     vault_cols=5, vault_rows=4, vault_start=5, vault_respins=3, vault_orb_chance=0.03,
     orb_values=[1, 2, 3, 4, 5, 8, 10, 15, 25], orb_weights=[36, 24, 14, 9, 6, 5, 3, 2, 1],
     p_major=0.003, p_minor=0.012, p_mini=0.03, p_reaper=0.02, v_mini=15, v_minor=40, v_major=150, grand=1000,
@@ -643,14 +643,28 @@ def report(cfg=CFG, n_base=8_000_000, n_mini=2_000_000, n_vault=4_000_000, n_fs=
 # tuning: find reel counts that hit the RTP budget targets
 # ----------------------------------------------------------------------------------------------
 TUNE = SimpleNamespace(
-    base_len=(68, 76), fs_len=(48, 60), cast_share=0.33,   # share of every base strip that is a 3D model (wild, 5 characters, coffin)
-    seance_share=0.16, f_target=0.0065, hit_min=0.300,     # share of RTP at stake 1; mini-feature rate; P(any win on a plain spin)
+    base_len=(68, 76), fs_len=(46, 60), cast_share=0.33,   # share of every base strip that is a 3D model (wild, 5 characters, coffin)
+    seance_share=0.155, f_target=0.0065, hit_min=0.300,    # share of RTP at stake 1; mini-feature rate; P(any win on a plain spin)
+    seance_every=195, mu_fs_min=0.85,
 )
 
+PAY_ORDER = [DOC, SKULL, RAVEN, DEMON, WRAITH, A, K, Q, J, TEN]     # pays must not increase down this list for any run length
 
-def tune(cfg=CFG, iters=4000, seed=3):
-    """Random hill-climb over the FS reel counts so the Seance share of RTP hits TUNE.seance_share and over the base
-    counts to keep the plain-spin hit rate >= TUNE.hit_min with a coffin trigger around 1 in 190 spins."""
+
+def pays_valid(pays):
+    for n in range(3):
+        for hi, lo in zip(PAY_ORDER, PAY_ORDER[1:]):
+            if pays[hi][n] < pays[lo][n]:
+                return False
+    for t in range(NSYM - 1):
+        if not (1 <= pays[t][0] <= pays[t][1] <= pays[t][2]):
+            return False
+    return pays[W][2] >= 100 or True
+
+
+def tune(cfg=CFG, iters=6000, seed=3, tune_pays=False):
+    """Random hill-climb over base reel counts, Seance reel counts and the paytable so that the budget lands on TUNE's targets
+    (Seance share of RTP, mini-feature rate, plain-spin hit rate, Seance frequency, richness of a Seance spin)."""
     import copy
     rng = np.random.default_rng(seed)
     best = copy.deepcopy(cfg)
@@ -661,41 +675,58 @@ def tune(cfg=CFG, iters=4000, seed=3):
         except AssertionError:
             return 1e9, None
         f = solve_feature_rate(c, ex)
-        trig_v = c.relic_chance / c.relic_count
         seance = (1 - f) * ex['fs_base'] + f * ex['fs_mini']
         trig_all = (1 - f) * ex['trig_base'] + f * ex['trig_mini']
-        lines = (1 - f) * ex['base'] + f * ex['mini_lines']
-        # plain spin hit rate from the per-line probabilities is not additive; approximate with 1-(1-h)^NLINES / overlap: use sim-free proxy
         hit_proxy = 1 - np.exp(-NLINES * ex['hit_line'] * 0.93)
         cast = (c.counts[0] + sum(c.counts[1:6]) + c.counts[11]) / sum(c.counts)
-        pen = 0.0
-        pen += 400 * abs(seance - TUNE.seance_share)
-        pen += 2.0 * max(0.0, TUNE.hit_min - hit_proxy) * 100
-        pen += 0.02 * abs(1 / trig_all - 190)
+        pen = 600 * abs(seance - TUNE.seance_share)
+        pen += 2500 * max(0.0, TUNE.hit_min - hit_proxy)
+        pen += 0.02 * abs(1 / trig_all - TUNE.seance_every)
         pen += 60000 * abs(f - TUNE.f_target)
+        pen += 200 * max(0.0, TUNE.mu_fs_min - ex['mu_fs'])
         pen += 100 * max(0.0, TUNE.cast_share - cast)
         L = sum(c.counts)
         pen += 50 * (L < TUNE.base_len[0] or L > TUNE.base_len[1]) + 50 * (sum(c.fs_counts) < TUNE.fs_len[0] or sum(c.fs_counts) > TUNE.fs_len[1])
-        return pen, dict(seance=seance, trig=1 / trig_all, lines=lines, f=f, hit=hit_proxy)
+        return pen, dict(seance=seance, trig=1 / trig_all, f=f, hit=hit_proxy, base=ex['base'], mu_fs=ex['mu_fs'])
 
     cur, info = score(best)
     print("start score %.3f %s" % (cur, info))
     for it in range(iters):
         cand = copy.deepcopy(best)
-        arr = cand.counts if rng.random() < 0.5 else cand.fs_counts
-        i = int(rng.integers(0, 11))              # never touch the scatter count (index 11)
-        d = int(rng.choice([-1, 1]))
-        if arr[i] + d < (1 if arr is cand.counts and i in (0, 1, 2) else 0) or arr[i] + d > 14:
-            continue
-        arr[i] += d
-        if arr is cand.counts and cand.counts[0] > 2:
-            continue
+        r = rng.random()
+        if r < 0.5 or not tune_pays:
+            arr = cand.counts if rng.random() < 0.55 else cand.fs_counts
+        else:
+            arr = None
+        if arr is not None:
+            i = int(rng.integers(0, 11))              # never touch the scatter count (index 11)
+            d = int(rng.choice([-1, 1]))
+            if arr[i] + d < (1 if i in (0, 1, 2) else 0) or arr[i] + d > 14:
+                continue
+            arr[i] += d
+            if arr is cand.counts and cand.counts[0] > 2:
+                continue
+        else:
+            t = int(rng.integers(0, 11))
+            n = int(rng.integers(0, 3))
+            d = int(rng.choice([-1, 1]))
+            pl = [list(x) for x in cand.pays]
+            pl[t][n] += d
+            if t == W and n < 2:
+                continue
+            if t == W:
+                if pl[t][n] < 20:
+                    continue
+            elif not pays_valid([tuple(x) for x in pl]):
+                continue
+            cand.pays = [tuple(x) for x in pl]
         sc, inf = score(cand)
         if sc < cur:
             best, cur, info = cand, sc, inf
     print("best score %.3f %s" % (cur, info))
     print("counts    =", best.counts, "L =", sum(best.counts))
     print("fs_counts =", best.fs_counts, "L =", sum(best.fs_counts))
+    print("pays      =", best.pays)
     return best
 
 
@@ -827,7 +858,8 @@ if __name__ == "__main__":
         f = solve_feature_rate(CFG, ex)
         print("FEATURE_RATE", f, " prices", buy_prices(CFG, ex))
     elif cmd == "tune":
-        tune()
+        tune(seed=int(sys.argv[2]) if len(sys.argv) > 2 else 3, iters=int(sys.argv[3]) if len(sys.argv) > 3 else 6000,
+             tune_pays=(len(sys.argv) > 4 and sys.argv[4] == 'pays'))
     elif cmd == "exploit":
         exploit_report()
     elif cmd == "check":

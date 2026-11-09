@@ -92,6 +92,7 @@ object ReaperConfig {
     const val MINI_REAPER = 1   // Reaper's Touch: 1-3 middle reels turn fully wild
     const val MINI_RAVEN = 2    // Murder of Crows: 3-6 random symbols become wild
     const val MINI_DEMON = 3    // Demon's Bargain: 3-6 soul coins land, each paying 1x-50x the stake
+    const val MINI_PUMPKIN = MINI_DEMON   // transitional alias (pre-3.0 name)
     const val MINI_SKULL = 4    // Skull's Curse: 2 wilds plus a x2 / x3 / x5 multiplier on line wins
     val MINI_NAMES = arrayOf("", "REAPER'S TOUCH", "MURDER OF CROWS", "DEMON'S BARGAIN", "SKULL'S CURSE")
     val MINI_WEIGHTS = doubleArrayOf(0.0, 0.25, 0.30, 0.30, 0.15)

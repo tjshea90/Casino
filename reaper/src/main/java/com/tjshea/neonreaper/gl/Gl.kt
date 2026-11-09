@@ -60,6 +60,23 @@ interface Gl {
     fun deleteTexture(tex: Int)
     fun deleteProgram(program: Int)
 
+    // ---- framebuffers (post-processing: bloom, grading) ----
+    /** Allocates empty RGBA8 storage for the bound 2D texture. */
+    fun texImage2DEmpty(width: Int, height: Int)
+    fun genFramebuffer(): Int
+    fun bindFramebuffer(target: Int, fb: Int)
+    fun framebufferTexture2D(target: Int, attachment: Int, textarget: Int, tex: Int, level: Int)
+    fun genRenderbuffer(): Int
+    fun bindRenderbuffer(target: Int, rb: Int)
+    fun renderbufferStorage(target: Int, internalformat: Int, w: Int, h: Int)
+    fun framebufferRenderbuffer(target: Int, attachment: Int, rbTarget: Int, rb: Int)
+    fun checkFramebufferStatus(target: Int): Int
+    fun deleteFramebuffer(fb: Int)
+    fun deleteRenderbuffer(rb: Int)
+    /** glGetIntegerv for a single value (e.g. [FRAMEBUFFER_BINDING]). */
+    fun getInteger(pname: Int): Int
+    fun colorMask(r: Boolean, g: Boolean, b: Boolean, a: Boolean)
+
     companion object {
         const val VERTEX_SHADER = 0x8B31
         const val FRAGMENT_SHADER = 0x8B30
@@ -92,6 +109,18 @@ interface Gl {
         const val LESS = 0x0201
         const val COLOR_BUFFER_BIT = 0x4000
         const val DEPTH_BUFFER_BIT = 0x0100
+        const val FRAMEBUFFER = 0x8D40
+        const val RENDERBUFFER = 0x8D41
+        const val COLOR_ATTACHMENT0 = 0x8CE0
+        const val DEPTH_ATTACHMENT = 0x8D00
+        const val DEPTH_COMPONENT16 = 0x81A5
+        const val DEPTH_COMPONENT24 = 0x81A6
+        const val FRAMEBUFFER_COMPLETE = 0x8CD5
+        const val FRAMEBUFFER_BINDING = 0x8CA6
+        const val NEAREST = 0x2600
+        const val TEXTURE1 = 0x84C1
+        const val TEXTURE2 = 0x84C2
+        const val REPEAT = 0x2901
     }
 }
 

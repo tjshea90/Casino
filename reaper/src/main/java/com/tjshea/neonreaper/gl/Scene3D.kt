@@ -22,6 +22,13 @@ class Scene3D(private val gl: Gl) {
     private lateinit var fog: Program
     private lateinit var glowP: Program
     private lateinit var part: Program
+    private lateinit var blit: Program
+    private lateinit var post: PostFx
+    /** Post-processing tier: 0 off (direct to screen), 1 low, 2 medium, 3 high. Set by the GL view (auto quality). */
+    var quality = 2
+    val postParams = PostFx.Params()
+    private var noiseTex = 0
+    private var skyFbo = 0; private var skyTex = 0; private var skyW = 0; private var skyH = 0
     private var layout: Layout3D? = null
     private var atlasTex = 0
     private var atlasCols = 8
@@ -79,8 +86,18 @@ class Scene3D(private val gl: Gl) {
         fog = Program(gl, Shaders.FOG_VS, Shaders.FOG_FS, "fog")
         glowP = Program(gl, Shaders.GLOW_VS, Shaders.GLOW_FS, "glow")
         part = Program(gl, Shaders.PART_VS, Shaders.PART_FS, "particles")
+        blit = Program(gl, PostShaders.QUAD_VS, PostShaders.BLIT_FS, "blit")
         buildMeshes()
         buildProps()
+        post = PostFx(gl, mScreen)
+        noiseTex = gl.genTexture()
+        gl.bindTexture(Gl.TEXTURE_2D, noiseTex)
+        gl.texImage2D(NoiseTex.SIZE, NoiseTex.SIZE, NoiseTex.build())
+        gl.texParameteri(Gl.TEXTURE_2D, Gl.TEXTURE_MIN_FILTER, Gl.LINEAR_MIPMAP_LINEAR)
+        gl.texParameteri(Gl.TEXTURE_2D, Gl.TEXTURE_MAG_FILTER, Gl.LINEAR)
+        gl.texParameteri(Gl.TEXTURE_2D, Gl.TEXTURE_WRAP_S, Gl.REPEAT)
+        gl.texParameteri(Gl.TEXTURE_2D, Gl.TEXTURE_WRAP_T, Gl.REPEAT)
+        gl.generateMipmap(Gl.TEXTURE_2D)
         ready = true
     }
 
@@ -213,17 +230,19 @@ class Scene3D(private val gl: Gl) {
         val l = layout ?: return
         S.copyFrom(state)
         t = time
-        gl.viewport(0, 0, w, h)
+        val target = gl.getInteger(Gl.FRAMEBUFFER_BINDING)
+        val usePost = quality > 0 && post.begin(w, h, quality)
+        if (!usePost) gl.viewport(0, 0, w, h)
         gl.clearColor(0f, 0f, 0f, 1f)
         gl.clear(Gl.COLOR_BUFFER_BIT or Gl.DEPTH_BUFFER_BIT)
         camX = l.camX; camY = l.camY; camZ = l.camZ
         l.viewProj.copyInto(vp)
         glowUsed = 0
 
-        // sky
-        gl.disable(Gl.DEPTH_TEST); gl.disable(Gl.CULL_FACE); gl.disable(Gl.BLEND)
-        sky.use(); sky.f("uTime", t); sky.f2("uRes", w.toFloat(), h.toFloat()); sky.f2("uMoon", 0.83f, 0.8f); sky.f("uMoonR", 0.075f); sky.f("uFlash", S.flash)
-        mScreen.draw(gl)
+        // shared noise texture on unit 1 (unit 0 is the reel atlas)
+        gl.activeTexture(Gl.TEXTURE1); gl.bindTexture(Gl.TEXTURE_2D, noiseTex); gl.activeTexture(Gl.TEXTURE0)
+
+        drawSky(w, h)
 
         gl.enable(Gl.DEPTH_TEST); gl.depthFunc(Gl.LEQUAL); gl.depthMask(true)
         gl.enable(Gl.CULL_FACE); gl.cullFace(Gl.BACK)
@@ -250,6 +269,34 @@ class Scene3D(private val gl: Gl) {
         drawGlows()
         gl.blendFunc(Gl.SRC_ALPHA, Gl.ONE_MINUS_SRC_ALPHA)
         gl.depthMask(true)
+
+        if (usePost) {
+            postParams.flash = S.flash * 0.35f
+            post.end(target, w, h, quality, time, postParams)
+        }
+    }
+
+    /** The sky is expensive per pixel and soft by nature: render it at a fraction of the resolution and stretch it. */
+    private fun drawSky(w: Int, h: Int) {
+        val sw = 320; val sh = (320f * h / w).toInt().coerceIn(120, 640)
+        val cur = gl.getInteger(Gl.FRAMEBUFFER_BINDING)
+        if (skyFbo == 0 || skyW != sw || skyH != sh) {
+            if (skyFbo != 0) { gl.deleteFramebuffer(skyFbo); gl.deleteTexture(skyTex) }
+            skyW = sw; skyH = sh
+            skyTex = gl.genTexture(); gl.bindTexture(Gl.TEXTURE_2D, skyTex); gl.texImage2DEmpty(sw, sh)
+            gl.texParameteri(Gl.TEXTURE_2D, Gl.TEXTURE_MIN_FILTER, Gl.LINEAR); gl.texParameteri(Gl.TEXTURE_2D, Gl.TEXTURE_MAG_FILTER, Gl.LINEAR)
+            gl.texParameteri(Gl.TEXTURE_2D, Gl.TEXTURE_WRAP_S, Gl.CLAMP_TO_EDGE); gl.texParameteri(Gl.TEXTURE_2D, Gl.TEXTURE_WRAP_T, Gl.CLAMP_TO_EDGE)
+            skyFbo = gl.genFramebuffer(); gl.bindFramebuffer(Gl.FRAMEBUFFER, skyFbo)
+            gl.framebufferTexture2D(Gl.FRAMEBUFFER, Gl.COLOR_ATTACHMENT0, Gl.TEXTURE_2D, skyTex, 0)
+        }
+        gl.bindFramebuffer(Gl.FRAMEBUFFER, skyFbo); gl.viewport(0, 0, sw, sh)
+        gl.disable(Gl.DEPTH_TEST); gl.disable(Gl.CULL_FACE); gl.disable(Gl.BLEND)
+        sky.use(); sky.f("uTime", t); sky.f2("uRes", sw.toFloat(), sh.toFloat()); sky.f2("uMoon", 0.83f, 0.8f); sky.f("uMoonR", 0.075f); sky.f("uFlash", S.flash)
+        mScreen.draw(gl)
+        gl.bindFramebuffer(Gl.FRAMEBUFFER, cur); gl.viewport(0, 0, w, h)
+        blit.use(); blit.i("uTex", 0)
+        gl.bindTexture(Gl.TEXTURE_2D, skyTex)
+        mScreen.draw(gl)
     }
 
     private fun setupLit() {

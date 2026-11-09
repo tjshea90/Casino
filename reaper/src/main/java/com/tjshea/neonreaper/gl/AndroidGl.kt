@@ -57,4 +57,20 @@ class AndroidGl : Gl {
     override fun deleteBuffer(buffer: Int) { tmp[0] = buffer; GLES30.glDeleteBuffers(1, tmp, 0) }
     override fun deleteTexture(tex: Int) { tmp[0] = tex; GLES30.glDeleteTextures(1, tmp, 0) }
     override fun deleteProgram(program: Int) = GLES30.glDeleteProgram(program)
+    override fun texImage2DEmpty(width: Int, height: Int) =
+        GLES30.glTexImage2D(GLES30.GL_TEXTURE_2D, 0, GLES30.GL_RGBA, width, height, 0, GLES30.GL_RGBA, GLES30.GL_UNSIGNED_BYTE, null)
+    override fun genFramebuffer(): Int { GLES30.glGenFramebuffers(1, tmp, 0); return tmp[0] }
+    override fun bindFramebuffer(target: Int, fb: Int) = GLES30.glBindFramebuffer(target, fb)
+    override fun framebufferTexture2D(target: Int, attachment: Int, textarget: Int, tex: Int, level: Int) =
+        GLES30.glFramebufferTexture2D(target, attachment, textarget, tex, level)
+    override fun genRenderbuffer(): Int { GLES30.glGenRenderbuffers(1, tmp, 0); return tmp[0] }
+    override fun bindRenderbuffer(target: Int, rb: Int) = GLES30.glBindRenderbuffer(target, rb)
+    override fun renderbufferStorage(target: Int, internalformat: Int, w: Int, h: Int) = GLES30.glRenderbufferStorage(target, internalformat, w, h)
+    override fun framebufferRenderbuffer(target: Int, attachment: Int, rbTarget: Int, rb: Int) =
+        GLES30.glFramebufferRenderbuffer(target, attachment, rbTarget, rb)
+    override fun checkFramebufferStatus(target: Int) = GLES30.glCheckFramebufferStatus(target)
+    override fun deleteFramebuffer(fb: Int) { tmp[0] = fb; GLES30.glDeleteFramebuffers(1, tmp, 0) }
+    override fun deleteRenderbuffer(rb: Int) { tmp[0] = rb; GLES30.glDeleteRenderbuffers(1, tmp, 0) }
+    override fun getInteger(pname: Int): Int { GLES30.glGetIntegerv(pname, tmp, 0); return tmp[0] }
+    override fun colorMask(r: Boolean, g: Boolean, b: Boolean, a: Boolean) = GLES30.glColorMask(r, g, b, a)
 }

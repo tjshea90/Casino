@@ -10,15 +10,22 @@ import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-/** CPU-side mesh: interleaved position(3) normal(3) uv(2), 16-bit indices. */
+/**
+ * CPU-side mesh: interleaved position(3) normal(3) uv(2) colour(4), 16-bit indices.
+ * The colour is a per-vertex albedo (rgb) and a material id in alpha (id / 15, see Shaders "vertex material" mode), which is
+ * what lets a whole character be merged into ONE mesh with baked tints and ambient occlusion instead of 40 tiny draws.
+ */
 class MeshData {
+    companion object { const val STRIDE = 12; const val BYTES = STRIDE * 4 }
     var v = FloatArray(1024); var vn = 0          // floats used
     var i = ShortArray(1024); var inN = 0          // indices used
-    val vertexCount get() = vn / 8
+    val vertexCount get() = vn / STRIDE
 
-    fun vertex(x: Float, y: Float, z: Float, nx: Float, ny: Float, nz: Float, u: Float, w: Float): Int {
-        if (vn + 8 > v.size) v = v.copyOf(v.size * 2)
+    fun vertex(x: Float, y: Float, z: Float, nx: Float, ny: Float, nz: Float, u: Float, w: Float,
+               r: Float = 1f, g: Float = 1f, b: Float = 1f, a: Float = 0f): Int {
+        if (vn + STRIDE > v.size) v = v.copyOf(v.size * 2)
         v[vn++] = x; v[vn++] = y; v[vn++] = z; v[vn++] = nx; v[vn++] = ny; v[vn++] = nz; v[vn++] = u; v[vn++] = w
+        v[vn++] = r; v[vn++] = g; v[vn++] = b; v[vn++] = a
         return vertexCount - 1
     }
 
@@ -29,18 +36,25 @@ class MeshData {
 
     fun quad(a: Int, b: Int, c: Int, d: Int) { tri(a, b, c); tri(a, c, d) }
 
-    /** Appends [o] transformed by column-major matrix [m] (normals by its normal matrix). */
-    fun append(o: MeshData, m: FloatArray): MeshData {
+    /**
+     * Appends [o] transformed by column-major matrix [m] (normals by its normal matrix). [tint] (0xRRGGBB) replaces the vertex
+     * albedo and [mat] (0..15) the material id; [ao] darkens the albedo (baked ambient occlusion); null keeps what [o] had.
+     */
+    fun append(o: MeshData, m: FloatArray, tint: Int? = null, mat: Int? = null, ao: Float = 1f): MeshData {
         val nm = Mat4.normalMatrix(FloatArray(9), m)
         val base = vertexCount
         for (k in 0 until o.vertexCount) {
-            val p = k * 8
+            val p = k * STRIDE
             val x = o.v[p]; val y = o.v[p + 1]; val z = o.v[p + 2]
             val nx = o.v[p + 3]; val ny = o.v[p + 4]; val nz = o.v[p + 5]
             var tx = nm[0] * nx + nm[3] * ny + nm[6] * nz; var ty = nm[1] * nx + nm[4] * ny + nm[7] * nz; var tz = nm[2] * nx + nm[5] * ny + nm[8] * nz
             val l = sqrt(tx * tx + ty * ty + tz * tz).coerceAtLeast(1e-6f); tx /= l; ty /= l; tz /= l
+            val r = if (tint != null) ((tint shr 16) and 255) / 255f else o.v[p + 8]
+            val g = if (tint != null) ((tint shr 8) and 255) / 255f else o.v[p + 9]
+            val b = if (tint != null) (tint and 255) / 255f else o.v[p + 10]
+            val a = if (mat != null) mat / 15f else o.v[p + 11]
             vertex(m[0] * x + m[4] * y + m[8] * z + m[12], m[1] * x + m[5] * y + m[9] * z + m[13], m[2] * x + m[6] * y + m[10] * z + m[14],
-                tx, ty, tz, o.v[p + 6], o.v[p + 7])
+                tx, ty, tz, o.v[p + 6], o.v[p + 7], r * ao, g * ao, b * ao, a)
         }
         for (k in 0 until o.inN) tri0(o.i[k] + base)
         return this
@@ -54,9 +68,10 @@ class MeshData {
         var k = 0
         while (k < inN) {
             val a = i[k].toInt() and 0xFFFF; val b = i[k + 1].toInt() and 0xFFFF; val c = i[k + 2].toInt() and 0xFFFF
-            val ax = v[a * 8]; val ay = v[a * 8 + 1]; val az = v[a * 8 + 2]
-            val ux = v[b * 8] - ax; val uy = v[b * 8 + 1] - ay; val uz = v[b * 8 + 2] - az
-            val wx = v[c * 8] - ax; val wy = v[c * 8 + 1] - ay; val wz = v[c * 8 + 2] - az
+            val S = STRIDE
+            val ax = v[a * S]; val ay = v[a * S + 1]; val az = v[a * S + 2]
+            val ux = v[b * S] - ax; val uy = v[b * S + 1] - ay; val uz = v[b * S + 2] - az
+            val wx = v[c * S] - ax; val wy = v[c * S + 1] - ay; val wz = v[c * S + 2] - az
             val nx = uy * wz - uz * wy; val ny = uz * wx - ux * wz; val nz = ux * wy - uy * wx
             for (q in intArrayOf(a, b, c)) { acc[q * 3] += nx; acc[q * 3 + 1] += ny; acc[q * 3 + 2] += nz }
             k += 3
@@ -64,7 +79,7 @@ class MeshData {
         for (q in 0 until vertexCount) {
             val x = acc[q * 3]; val y = acc[q * 3 + 1]; val z = acc[q * 3 + 2]
             val l = sqrt(x * x + y * y + z * z).coerceAtLeast(1e-6f)
-            v[q * 8 + 3] = x / l; v[q * 8 + 4] = y / l; v[q * 8 + 5] = z / l
+            v[q * STRIDE + 3] = x / l; v[q * STRIDE + 4] = y / l; v[q * STRIDE + 5] = z / l
         }
         return this
     }
@@ -90,9 +105,10 @@ class Mesh(private val data: MeshData) {
         upload(gl)
         gl.bindBuffer(Gl.ARRAY_BUFFER, vbo)
         gl.bindBuffer(Gl.ELEMENT_ARRAY_BUFFER, ibo)
-        gl.vertexAttribPointer(0, 3, 32, 0); gl.enableVertexAttribArray(0)
-        gl.vertexAttribPointer(1, 3, 32, 12); gl.enableVertexAttribArray(1)
-        gl.vertexAttribPointer(2, 2, 32, 24); gl.enableVertexAttribArray(2)
+        gl.vertexAttribPointer(0, 3, MeshData.BYTES, 0); gl.enableVertexAttribArray(0)
+        gl.vertexAttribPointer(1, 3, MeshData.BYTES, 12); gl.enableVertexAttribArray(1)
+        gl.vertexAttribPointer(2, 2, MeshData.BYTES, 24); gl.enableVertexAttribArray(2)
+        gl.vertexAttribPointer(3, 4, MeshData.BYTES, 32); gl.enableVertexAttribArray(3)
         gl.drawElements(Gl.TRIANGLES, indexCount)
     }
 
@@ -100,9 +116,9 @@ class Mesh(private val data: MeshData) {
     fun drawPointsSetup(gl: Gl) {
         upload(gl)
         gl.bindBuffer(Gl.ARRAY_BUFFER, vbo)
-        gl.vertexAttribPointer(0, 3, 32, 0); gl.enableVertexAttribArray(0)
-        gl.vertexAttribPointer(1, 3, 32, 12); gl.enableVertexAttribArray(1)
-        gl.disableVertexAttribArray(2)
+        gl.vertexAttribPointer(0, 3, MeshData.BYTES, 0); gl.enableVertexAttribArray(0)
+        gl.vertexAttribPointer(1, 3, MeshData.BYTES, 12); gl.enableVertexAttribArray(1)
+        gl.disableVertexAttribArray(2); gl.disableVertexAttribArray(3)
     }
 
     fun release(gl: Gl) { if (vbo != 0) { gl.deleteBuffer(vbo); gl.deleteBuffer(ibo); vbo = 0; ibo = 0 } }

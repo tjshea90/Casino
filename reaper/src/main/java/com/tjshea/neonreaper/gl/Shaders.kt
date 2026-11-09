@@ -15,7 +15,7 @@ class Program(private val gl: Gl, vs: String, fs: String, val name: String) {
         id = gl.createProgram()
         gl.attachShader(id, compile(Gl.VERTEX_SHADER, vs))
         gl.attachShader(id, compile(Gl.FRAGMENT_SHADER, fs))
-        gl.bindAttribLocation(id, 0, "aPos"); gl.bindAttribLocation(id, 1, "aNormal"); gl.bindAttribLocation(id, 2, "aUv")
+        gl.bindAttribLocation(id, 0, "aPos"); gl.bindAttribLocation(id, 1, "aNormal"); gl.bindAttribLocation(id, 2, "aUv"); gl.bindAttribLocation(id, 3, "aColor")
         gl.linkProgram(id)
         if (gl.getProgrami(id, Gl.LINK_STATUS) == 0) throw IllegalStateException("$name link: " + gl.getProgramInfoLog(id))
     }
