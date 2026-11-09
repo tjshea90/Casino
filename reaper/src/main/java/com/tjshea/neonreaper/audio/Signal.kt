@@ -253,6 +253,19 @@ internal object Wav {
         if (!tmp.renameTo(f)) { f.delete(); tmp.renameTo(f) }
     }
 
+    /** Cheap check (header + length only) that [f] is a complete WAV written by [write]; used to skip re-rendering cached one-shots. */
+    fun valid(f: File): Boolean {
+        try {
+            if (!f.isFile || f.length() < 46) return false
+            val h = ByteArray(44)
+            java.io.FileInputStream(f).use { if (it.read(h) != 44) return false }
+            val b = ByteBuffer.wrap(h).order(ByteOrder.LITTLE_ENDIAN)
+            if (String(h, 0, 4) != "RIFF" || String(h, 8, 4) != "WAVE" || String(h, 36, 4) != "data") return false
+            val ch = b.getShort(22).toInt(); val dataLen = b.getInt(40)
+            return b.getInt(24) == SR && b.getShort(34).toInt() == 16 && (ch == 1 || ch == 2) && dataLen > 0 && 44L + dataLen == f.length()
+        } catch (_: Throwable) { return false }
+    }
+
     /** Reads a WAV written by [write]; returns null when missing or malformed. */
     fun read(f: File): Pcm? {
         try {

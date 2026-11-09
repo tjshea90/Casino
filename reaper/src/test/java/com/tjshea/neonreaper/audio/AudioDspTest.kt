@@ -51,10 +51,13 @@ class AudioDspTest {
         val f = File.createTempFile("neon", ".wav")
         val pcm = Pcm(ShortArray(100) { (it * 300).toShort() }, ShortArray(100) { (-it * 200).toShort() })
         Wav.write(f, pcm)
+        assertTrue(Wav.valid(f))
         val back = Wav.read(f)!!
         assertTrue(back.l.contentEquals(pcm.l) && back.r!!.contentEquals(pcm.r!!))
+        f.writeBytes(f.readBytes().copyOf(120))                 // truncated file (killed mid-write)
+        assertTrue(!Wav.valid(f) && Wav.read(f) == null)
         f.writeBytes(byteArrayOf(1, 2, 3))
-        assertTrue(Wav.read(f) == null)
+        assertTrue(Wav.read(f) == null && !Wav.valid(f))
         f.delete()
     }
 

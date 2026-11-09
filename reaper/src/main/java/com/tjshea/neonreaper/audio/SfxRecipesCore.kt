@@ -26,13 +26,13 @@ internal fun registerCoreSfx(r: SfxRegistry) {
         b.at(0.0, bandBurst(0.012, 3, 3200.0, 3.0, 0.003), 0.4)
         Wet(room = Rv.TINY)
     }
-    r.add(S.UI_OPEN, 0.42, -23.0, 0, fadeOut = 0.12) { b ->
+    r.add(S.UI_OPEN, 0.42, -23.0, 0, fadeOut = 0.12, air = -5.0) { b ->
         b.at(0.0, rumble(0.38, 4, 420.0, 12.0, 0.8) { p -> sin(PI * p).pow(0.7) }, 0.7, room = 0.1)
         b.at(0.0, whoosh(0.38, 5, 350.0, 1700.0, 0.8, 0.45), 0.4, room = 0.2)
         b.at(0.26, thump(0.14, 130.0, 70.0, 0.02, 0.06, 1.4), 0.45)
         Wet(room = Rv.BOX)
     }
-    r.add(S.UI_CLOSE, 0.32, -24.0, 0, fadeOut = 0.08) { b ->
+    r.add(S.UI_CLOSE, 0.32, -24.0, 0, fadeOut = 0.08, air = -5.0) { b ->
         b.at(0.0, whoosh(0.28, 6, 1500.0, 320.0, 0.8, 0.55), 0.35, room = 0.2)
         b.at(0.0, rumble(0.26, 14, 380.0, 12.0, 0.8) { p -> sin(PI * p).pow(0.8) }, 0.5, room = 0.1)
         b.at(0.2, thump(0.1, 150.0, 80.0, 0.015, 0.045, 1.4), 0.55)
@@ -40,7 +40,7 @@ internal fun registerCoreSfx(r: SfxRegistry) {
     }
 
     // ----------------------------------------------------------------------------------------- reels
-    r.add(S.SPIN_START, 0.55, -18.0, 0, fadeOut = 0.07, hitAt = 0.0) { b ->
+    r.add(S.SPIN_START, 0.55, -18.0, 0, fadeOut = 0.07, hitAt = 0.0, air = -4.5) { b ->
         b.at(0.0, thump(0.3, 88.0, 38.0, 0.04, 0.12, 2.0), 0.85, room = 0.15)
         val ticks = doubleArrayOf(0.0, 0.05, 0.095, 0.135, 0.17)
         for ((k, t) in ticks.withIndex()) b.at(t, bandBurst(0.02, 10L + k, 1800.0 + k * 220.0, 2.0, 0.005), 0.4 + 0.1 * k, room = 0.1)
@@ -48,20 +48,20 @@ internal fun registerCoreSfx(r: SfxRegistry) {
         b.at(0.06, riser(0.46, 8, 220.0, 1500.0, 70.0, 175.0, 0.4, 0.9, 0.9), 0.55, room = 0.15)
         Wet(room = Rv.BOX)
     }
-    r.add(S.SPIN, 0.42, -22.0, 0, fadeOut = 0.1) { b ->
+    r.add(S.SPIN, 0.42, -22.0, 0, fadeOut = 0.1, air = -5.0) { b ->
         b.at(0.0, whoosh(0.4, 9, 150.0, 950.0, 0.9, 0.5), 0.8, room = 0.15)
         b.at(0.02, clinks(0.3, 21, 45.0, 900.0, 3000.0, 0.02), 0.22, room = 0.2)
         b.at(0.0, thump(0.18, 70.0, 45.0, 0.03, 0.08), 0.4)
         Wet(room = Rv.BOX)
     }
-    r.add(S.STOP, 0.3, -20.0, 0, fadeOut = 0.08) { b ->
+    r.add(S.STOP, 0.3, -20.0, 0, fadeOut = 0.08, air = -4.0) { b ->
         b.at(0.0, thump(0.26, 112.0, 52.0, 0.025, 0.075, 1.8), 0.6, room = 0.15)
         b.at(0.0, thump(0.14, 330.0, 170.0, 0.02, 0.05, 2.2), 0.9, room = 0.2)
         b.at(0.0, bandBurst(0.03, 12, 900.0, 1.6, 0.008), 0.55, room = 0.1)
         b.at(0.0, bell(520.0, 0.12, Bells.BLOCK, decay = 0.8), 0.25, room = 0.2)
         Wet(room = Rv.BOX)
     }
-    r.add(S.REEL_THUD, 0.48, -17.0, 0, fadeOut = 0.1, hitAt = 0.0) { b ->
+    r.add(S.REEL_THUD, 0.48, -17.0, 0, fadeOut = 0.1, hitAt = 0.0, air = -4.0) { b ->
         b.at(0.0, thump(0.45, 96.0, 33.0, 0.05, 0.17, 2.0), 1.0, room = 0.2)
         b.at(0.0, thump(0.3, 165.0, 82.0, 0.03, 0.09, 2.2), 0.6, room = 0.2)
         b.at(0.0, noiseBurst(0.07, 13, 0.02, lp = 1100.0), 0.5, room = 0.3)

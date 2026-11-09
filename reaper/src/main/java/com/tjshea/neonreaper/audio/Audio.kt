@@ -208,6 +208,9 @@ class Audio internal constructor(context: Context, autoRender: Boolean) {
         if (released || mixer.currentTrack == t) return
         val mt = synchronized(lock) { tracks[t] }
         if (mt != null && mt.has(0)) { startMixer(mt); return }
+        // not in memory: render what is missing first (L0 ends up in front) and load whatever is already cached
+        val spec = Scores.tracks[t]
+        if (spec != null) for (l in spec.layers.reversed()) bump(Job.Layer(t, l.index))
         val e = io ?: return
         try { e.execute { try { loadFromCache(t) } catch (_: Throwable) {} } } catch (_: Throwable) {}
     }
@@ -243,7 +246,7 @@ class Audio internal constructor(context: Context, autoRender: Boolean) {
         val fmt = AudioFormat.Builder().setSampleRate(SR).setEncoding(AudioFormat.ENCODING_PCM_16BIT).setChannelMask(AudioFormat.CHANNEL_OUT_STEREO).build()
         val attrs = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_GAME).setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build()
         val min = AudioTrack.getMinBufferSize(SR, AudioFormat.CHANNEL_OUT_STEREO, AudioFormat.ENCODING_PCM_16BIT)
-        val bytes = maxOf(min, CHUNK * 4 * 3)
+        val bytes = maxOf(min, CHUNK * 4 * 4)           // ~190 ms: ducking stays responsive, slow tablets keep a safety margin
         AudioTrack.Builder().setAudioAttributes(attrs).setAudioFormat(fmt).setBufferSizeInBytes(bytes).setTransferMode(AudioTrack.MODE_STREAM).build()
     } catch (_: Throwable) { null }
 
@@ -312,7 +315,7 @@ class Audio internal constructor(context: Context, autoRender: Boolean) {
                     val f = File(dir, job.file)
                     when (job) {
                         is Job.OneShot -> {
-                            if (Wav.read(f) == null) { val pcm = AudioRender.render(job); Wav.write(f, pcm) }
+                            if (!Wav.valid(f)) { val pcm = AudioRender.render(job); Wav.write(f, pcm) }
                             if (!released) {
                                 val id = pool?.load(f.path, 1) ?: 0
                                 if (id != 0) { ids[job.sfx.ordinal] = id; idToOrdinal[id] = job.sfx.ordinal }

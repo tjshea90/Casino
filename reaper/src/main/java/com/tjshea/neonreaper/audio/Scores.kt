@@ -177,7 +177,7 @@ internal object Scores {
 
     private fun baseL3(): Pcm {
         val ts = BASE; val n = ts.loopFrames; val b = bus(ts); val bar = 3.2; val sx = 0.2
-        val dl = drum(55.0, 1.0, 301, 0.95, 1.4); val dm = drum(82.0, 0.7, 302, 0.85, 1.1); val dh = drum(123.0, 0.5, 303, 0.75, 1.0, 1.3)
+        val dl = drum(55.0, 1.0, 301, 0.95, 1.4); val dm = drum(73.4, 0.7, 302, 0.85, 1.1); val dh = drum(110.0, 0.5, 303, 0.75, 1.0, 1.3)
         val kit = arrayOf(dl, dm, dh)
         // two-bar cell: (slot, drum, velocity)
         val cellA = arrayOf(intArrayOf(0, 0, 10), intArrayOf(3, 0, 4), intArrayOf(6, 1, 7), intArrayOf(8, 0, 9), intArrayOf(11, 0, 4), intArrayOf(14, 2, 6), intArrayOf(15, 2, 4))
@@ -228,8 +228,8 @@ internal object Scores {
 
     private fun seanceL1(): Pcm {
         val ts = SEANCE; val n = ts.loopFrames; val b = bus(ts); val bar = 8.0 / 3.0; val sx = bar / 16
-        val dl = drum(60.0, 0.9, 311, 0.95, 1.2); val dm = drum(90.0, 0.6, 312, 0.85, 1.0); val dh = drum(135.0, 0.45, 313, 0.8, 0.9, 1.3)
-        val hand = drum(190.0, 0.3, 314, 0.9, 0.5, 1.6)
+        val dl = drum(55.0, 0.9, 311, 0.95, 1.2); val dm = drum(73.4, 0.6, 312, 0.85, 1.0); val dh = drum(110.0, 0.45, 313, 0.8, 0.9, 1.3)
+        val hand = drum(220.0, 0.3, 314, 0.9, 0.5, 1.6)
         val kit = arrayOf(dl, dm, dh)
         val pat = arrayOf(intArrayOf(0, 0, 10), intArrayOf(3, 0, 5), intArrayOf(4, 1, 7), intArrayOf(6, 0, 8), intArrayOf(8, 0, 9), intArrayOf(10, 0, 5), intArrayOf(12, 1, 8), intArrayOf(14, 2, 7), intArrayOf(15, 2, 5))
         val tick = noiseBurst(0.05, 315, 0.014, hp = 5200.0).norm()
@@ -260,7 +260,7 @@ internal object Scores {
 
     private fun seanceL3(): Pcm {
         val ts = SEANCE; val n = ts.loopFrames; val b = bus(ts); val bar = 8.0 / 3.0; val sx = bar / 16
-        val dl = drum(62.0, 0.7, 411, 0.95, 1.0); val dm = drum(92.0, 0.5, 412, 0.9, 0.9); val dh = drum(140.0, 0.4, 413, 0.85, 0.8, 1.3)
+        val dl = drum(55.0, 0.7, 411, 0.95, 1.0); val dm = drum(73.4, 0.5, 412, 0.9, 0.9); val dh = drum(110.0, 0.4, 413, 0.85, 0.8, 1.3)
         val kit = arrayOf(dl, dm, dh)
         for (i in 0 until 16) for (k in 0 until 16) {
             val d = if (k % 4 == 0) 0 else if (k % 2 == 0) 1 else 2
@@ -305,7 +305,7 @@ internal object Scores {
             val bassNote = orgCache.getOrPut((roots[i] * 10).toInt() + 1) { organ(hz(roots[i]), beat * 0.5, 0.01, 0.06, 0.0) }
             for (k in 0 until 8) b.add(bassNote, s(t + k * beat / 2), if (k % 2 == 0) 0.2 else 0.12, 0.0, 0.1)
         }
-        val dl = drum(52.0, 0.9, 511, 0.95, 1.3); val dm = drum(78.0, 0.6, 512, 0.9, 1.0); val dh = drum(118.0, 0.4, 513, 0.85, 0.9, 1.3)
+        val dl = drum(55.0, 0.9, 511, 0.95, 1.3); val dm = drum(73.4, 0.6, 512, 0.9, 1.0); val dh = drum(110.0, 0.4, 513, 0.85, 0.9, 1.3)
         for (i in 0 until 16) {
             val fill = i % 4 == 3
             for (k in 0 until 4) {
