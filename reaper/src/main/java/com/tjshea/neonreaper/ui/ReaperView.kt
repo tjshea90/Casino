@@ -209,6 +209,9 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
     private var lay3d: com.tjshea.neonreaper.gl.Layout3D? = null
     private var hudChrome: Bitmap? = null
     private val idleStops = IntArray(REELS) { fx.nextInt(ReaperConfig.STRIPS[it].size) }
+    /** Stops (and strip set) of the grid on screen when no outcome is active (Séance cinematics, between rounds). */
+    private val shownStops = idleStops.copyOf()
+    private var shownFs = false
 
     private var chars: Characters? = null       // reel symbols (cell size)
     private var bigChars: Characters? = null    // side characters / celebrations
@@ -535,6 +538,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         play = p
         curFree = free
         val o = p.outcome
+        o.stops.copyInto(shownStops); shownFs = free != null
         pendingWin = spinWin(o)
         pendingVault = p.vault?.payTokens ?: 0L
         if (free == null) {
@@ -840,7 +844,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
     }
 
     private fun endSeanceFlow() {
-        seance = null; curFree = null; soulRate = 0f
+        seance = null; curFree = null; soulRate = 0f; shownFs = false
         audio.playTrack(Audio.Track.BASE)
         if (vaultToShow == null) vaultToShow = wallet.pendingVault()       // a spin that unlocked both: the Vault comes next
         if (vaultToShow != null) { vaultWinShown = 0; startVaultTrigger(); return }
@@ -891,7 +895,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
             nextReality = t + mins * 60.0
             autoLeft = 0; holdMode = false; autoPlan = null
             audio.play(Sfx.REALITY_CHECK)
-            host.openReality({}, {})
+            host.openReality({}, { (context as? android.app.Activity)?.finish() })     // "take a break" closes the game
         }
     }
 
@@ -1920,7 +1924,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         val pulse = (1 + 0.06 * sin(t * 9)).toFloat()
         synchronized(g.lock) {
             for (r in 0 until REELS) {
-                val strip = ReaperConfig.STRIPS[r]
+                val strip = (if (shownFs) ReaperConfig.FS_STRIPS else ReaperConfig.STRIPS)[r]
                 if (phase == Phase.SPINNING && !done[r]) {
                     val off = offset(r, t); val base = floor(off).toInt()
                     var n = 0
@@ -1928,7 +1932,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
                     s.faceCount[r] = n
                     s.fast[r] = t > liftEnd[r] && t < runEnd[r]
                 } else {
-                    val stop = o?.stops?.get(r) ?: idleStops[r]
+                    val stop = o?.stops?.get(r) ?: shownStops[r]
                     s.faceSym[r][0] = strip[Math.floorMod(stop - 1, strip.size)]; s.facePos[r][0] = -1f
                     for (row in 0 until ROWS) { s.faceSym[r][row + 1] = grid[r][row]; s.facePos[r][row + 1] = row.toFloat() }
                     s.faceSym[r][4] = strip[(stop + 3) % strip.size]; s.facePos[r][4] = 3f
