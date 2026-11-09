@@ -49,7 +49,7 @@ internal class Ledger(private val ui: Ui, private val wallet: Wallet) {
         session.addView(ui.card(highlight = true).apply {
             addView(ui.caps("Net result", 11f), ui.lp())
             addView(ui.figure("${signed(net)} tokens", 34f, netColor(net)), ui.lp(t = 4))
-            addView(ui.text("Won minus wagered since you started playing.", 12.5f, Dread.BONE_DIM), ui.lp(t = 2))
+            addView(ui.text("Won minus wagered this session.", 12.5f, Dread.BONE_DIM), ui.lp(t = 2))
         }, ui.lp())
         session.addView(ui.tiles(
             ui.stat("Time played", minutes(wallet.sessionMillis), maxSp = 20f),

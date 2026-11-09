@@ -116,7 +116,7 @@ internal class Guide(private val ui: Ui, private val wallet: Wallet) {
     private fun wildCard(): View = ui.card().apply {
         addView(cardHeader("The Grim Reaper", "Wild symbol", Art.symbol(ReaperConfig.WILD, ui.dp(48)), 48), ui.lp(b = 8))
         addView(ui.bullet("Substitutes for every symbol except the **Coffin**."), ui.lp(t = 4))
-        addView(ui.bullet("Five Reapers on a payline pay **${ReaperConfig.PAYS[ReaperConfig.WILD][2]}× your stake**."), ui.lp(t = 6))
+        addView(ui.bullet("${ReaperConfig.REELS} Reapers on a payline pay **${ReaperConfig.PAYS[ReaperConfig.WILD][ReaperConfig.REELS - 3]}× your stake**."), ui.lp(t = 6))
         addView(ui.bullet("His touch can turn whole reels wild, see the mini features below."), ui.lp(t = 6))
     }
 
@@ -180,7 +180,7 @@ internal class Guide(private val ui: Ui, private val wallet: Wallet) {
         addView(ui.bullet("**Hold & Spin:** ${ReaperConfig.VAULT_START_ORBS} soul orbs start on a ${ReaperConfig.VAULT_COLS}×${ReaperConfig.VAULT_ROWS} board and you get **${ReaperConfig.VAULT_RESPINS} respins**, one SPIN each. Every orb that lands sticks and resets the respins."), ui.lp(t = 6))
         addView(ui.bullet("Soul orbs pay **${ReaperConfig.ORB_VALUES.min()}× to ${ReaperConfig.ORB_VALUES.max()}×** the bonus bet. Jackpot orbs: **MINI ${ReaperConfig.MINI}×, MINOR ${ReaperConfig.MINOR}×, MAJOR ${ReaperConfig.MAJOR}×**. The **Reaper orb** harvests every soul on the board."), ui.lp(t = 6))
         addView(ui.bullet("Fill all **${ReaperConfig.VAULT_COLS * ReaperConfig.VAULT_ROWS} niches** for the **GRAND ${ReaperConfig.GRAND}×**."), ui.lp(t = 6))
-        addView(ui.bullet("**Bonus bet** = the average stake of the five spins that revealed your relics, rounded down. Now: **${wallet.projectedBonusBet} tokens** if the missing relics arrive at your current stake."), ui.lp(t = 6))
+        addView(ui.bullet("**Bonus bet** = the average stake of the ${ReaperConfig.RELIC_COUNT} spins that revealed your relics, rounded down. Now: **${wallet.projectedBonusBet} tokens** if the missing relics arrive at your current stake."), ui.lp(t = 6))
     }
 
     private fun buyCard(stake: Int): View = ui.card().apply {
