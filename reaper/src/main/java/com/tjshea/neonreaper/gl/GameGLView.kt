@@ -52,7 +52,8 @@ class GameGLView(context: Context) : GLSurfaceView(context), SceneSink {
             if (win != null && win !== applied) { s.setLayout(Layout3D(w.toFloat(), h.toFloat(), win[0], win[1], win[2], win[3])); applied = win }
             synchronized(lock) { snapshot.copyFrom(state) }
             snapshot.miniX *= scale; snapshot.miniY *= scale   // HUD pixels → surface pixels
-            s.quality = if (qualitySetting in 1..3) qualitySetting else autoTier
+            // manual: Low = no post-processing at all (the lightest), Medium / High = bloom tiers; Auto adapts autoTier (1..3, 0 as a last resort)
+            s.quality = when (qualitySetting) { 1 -> 0; 2 -> 2; 3 -> 3; else -> autoTier }
             try {
                 s.render(snapshot, (SystemClock.uptimeMillis() - start) / 1000f, w, h)
             } catch (e: Throwable) {
@@ -64,17 +65,20 @@ class GameGLView(context: Context) : GLSurfaceView(context), SceneSink {
         /** Low-end GPUs: if frames stay slow, render the world at a reduced resolution (scaled up by the compositor). */
         private fun watchFrameRate() {
             val now = SystemClock.uptimeMillis()
-            if (lastFrame != 0L && !reduced && qualitySetting !in 1..3) {
+            if (lastFrame != 0L && qualitySetting !in 1..3) {
                 frames++
                 if (now - lastFrame > 38) slowFrames++
                 if (frames >= 90) {
                     // automatic quality: step the post-processing tier down when frames stay slow (then the resolution as a last
                     // resort) and carefully back up when they stay fast; a tier that failed right after being raised becomes the ceiling
                     if (slowFrames > 45) {
-                        if (autoTier > 1) { autoTier--; if (justRaised) ceilTier = autoTier }
-                        else { reduced = true; post { reduceResolution() } }
+                        when {
+                            autoTier > 1 -> { autoTier--; if (justRaised) ceilTier = autoTier }
+                            !reduced -> { reduced = true; post { reduceResolution() } }
+                            autoTier == 1 -> autoTier = 0                 // last resort: no post-processing
+                        }
                         fastWindows = 0; justRaised = false
-                    } else if (slowFrames < 6) {
+                    } else if (slowFrames < 6 && !reduced) {
                         fastWindows++
                         if (fastWindows >= 4 && autoTier < ceilTier) { autoTier++; justRaised = true; fastWindows = 0 }
                     } else fastWindows = 0
