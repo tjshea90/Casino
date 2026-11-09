@@ -147,7 +147,7 @@ internal fun registerWorldSfx(r: SfxRegistry) {
             b.at(t0 + f * 0.13, noiseBurst(0.1, 240L + j * 7 + f, 0.03, lp = 320.0), 0.35, if (j % 2 == 0) -0.5 else 0.5, 0.1, 0.3)
         Wet(hall = Rv.CRYPT, room = Rv.ROOM)
     }
-    r.add(S.WRAITH_WAIL, 2.6, -17.0, 2, fadeOut = 0.9, duckSec = 2.0, duckTo = 0.6) { b ->
+    r.add(S.WRAITH_WAIL, 2.5, -17.0, 2, fadeOut = 0.9, duckSec = 2.0, duckTo = 0.6) { b ->
         val f0 = { t: Double -> if (t < 0.9) lerp(420.0, 880.0, smooth(t / 0.9)) else lerp(880.0, 600.0, smooth((t - 0.9) / 1.4)) }
         val vw = { t: Double -> when { t < 0.7 -> Vowels.O.mix(Vowels.A, t / 0.7); t < 1.5 -> Vowels.A.mix(Vowels.E, (t - 0.7) / 0.8); else -> Vowels.E.mix(Vowels.U, clamp01((t - 1.5) / 0.9)) } }
         val amp = { t: Double -> smooth(t / 0.5) * smooth((2.5 - t) / 0.8) }

@@ -132,7 +132,7 @@ internal object Scores {
         val ts = BASE; val n = ts.loopFrames; val b = bus(ts); val bar = 3.2; val beat = 0.8
         val lub = thump(0.45, 64.0, 38.0, 0.035, 0.11, 1.7); val dub = thump(0.35, 56.0, 36.0, 0.03, 0.09, 1.6)
         val lubH = thump(0.2, 165.0, 92.0, 0.02, 0.05, 2.0)
-        val barGain = doubleArrayOf(1.0, 1.0, 0.9, 0.35, 1.0, 1.0, 1.0, 0.45, 0.0, 1.0, 1.0, 1.0, 0.5, 1.0, 1.0, 1.0, 0.4, 1.0, 0.9, 0.6)
+        val barGain = doubleArrayOf(1.0, 1.0, 0.9, 0.35, 1.0, 1.0, 1.0, 0.45, 0.2, 1.0, 1.0, 1.0, 0.5, 1.0, 1.0, 1.0, 0.4, 1.0, 0.9, 0.6)
         for (i in 0 until 20) for (k in 0 until 4) {
             val g = barGain[i] * (0.8 + 0.2 * sin(2 * PI * (i * 4 + k) / 80.0))
             if (g <= 0.0) continue
@@ -158,13 +158,12 @@ internal object Scores {
 
     private fun baseL2(): Pcm {
         val ts = BASE; val n = ts.loopFrames; val b = bus(ts); val bar = 3.2
-        val on = booleanArrayOf(true, true, true, true, true, false, true, true, true, true)
         for (c in 0 until 10) {
-            if (!on[c]) continue
+            val soft = if (c == 5) 0.55 else 1.0               // the Am chord breathes: quieter, never silent
             val t0 = c * 2 * bar - 0.6
             val ch = baseChords[c]
-            b.add(choirChord(ch, 7.2, 100L + c, 2.6, 2.6, if (c % 2 == 0) Vowels.O else Vowels.U, Vowels.A, unison = 2), s(t0), 0.5, if (c % 2 == 0) -0.25 else 0.25, 0.7)
-            b.add(choirChord(doubleArrayOf(ch[0] - 12.0, ch[1] - 12.0), 7.2, 120L + c, 2.8, 2.8, Vowels.BASS_O, Vowels.BASS_A, unison = 2, shift = 0.9), s(t0), 0.32, 0.0, 0.6)
+            b.add(choirChord(ch, 7.2, 100L + c, 2.6, 2.6, if (c % 2 == 0) Vowels.O else Vowels.U, Vowels.A, unison = 2), s(t0), 0.5 * soft, if (c % 2 == 0) -0.25 else 0.25, 0.7)
+            b.add(choirChord(doubleArrayOf(ch[0] - 12.0, ch[1] - 12.0), 7.2, 120L + c, 2.8, 2.8, Vowels.BASS_O, Vowels.BASS_A, unison = 2, shift = 0.9), s(t0), 0.32 * soft, 0.0, 0.6)
         }
         for ((k, t) in doubleArrayOf(3 * bar, 11 * bar, 17 * bar).withIndex())
             b.add(bowed(hz(if (k == 1) N.Eb4 else N.D4), 9.0, 130L + k, 3.4, 3.4, flutter = 0.3), s(t), 0.34, if (k == 1) 0.3 else -0.3, 0.8)

@@ -138,7 +138,7 @@ and ends with a raised-cosine fade (4 ms in, at least 4 ms out), so none clicks.
 | `DOCTOR_RASP` | 1.90 s | 0 | -20.0 | -5.1 | - | 2 | mask inhale + exhale, wheeze, chest rattle |
 | `DEMON_ROAR` | 2.10 s | 0 | -15.5 | -1.8 | 1.7 s to 0.60 | 2 | sub-harmonic growl with 36 Hz roughness + boom |
 | `GROWL` | 1.40 s | 0 | -17.0 | -1.6 | - | 2 | legacy: lighter beast growl |
-| `WRAITH_WAIL` | 2.60 s | 0 | -17.0 | -1.8 | 2.0 s to 0.60 | 2 | gliding banshee vowels, dissonant second voice, cathedral |
+| `WRAITH_WAIL` | 2.50 s | 0 | -17.0 | -1.8 | 2.0 s to 0.60 | 2 | gliding banshee vowels, dissonant second voice, cathedral |
 | `CAW` | 0.95 s | 0 | -19.0 | -4.5 | - | 2 | legacy: two hoarse low caws |
 | `RAVEN_FLOCK` | 2.50 s | 0 | -19.0 | -5.2 | - | 2 | six caws + wing flaps, panned |
 | `SKULL_RATTLE` | 1.30 s | 0 | -18.0 | -2.0 | - | 2 | accelerating/decelerating bone clicks |
@@ -199,8 +199,8 @@ with a rising multiplier, 1.0 on retrigger / last spins. Set it on state changes
 
 ## 5. Measured numbers (this sandbox)
 
-* `AUDIO RENDER: 83 files, wall 4247 ms, thread cpu 3425 ms, 43.03 MB`
-* One-shots: 74 files, 11.33 MB on disk (<= 12 MB budget), longest 9.0 s (WIN_APOCALYPSE, 775 KB decoded, under SoundPool's 1 MB per sound).
+* `AUDIO RENDER: 83 files, wall 3165 ms, thread cpu 3027 ms, 43.02 MB`
+* One-shots: 74 files, 11.32 MB on disk (<= 12 MB budget), longest 9.0 s (WIN_APOCALYPSE, 775 KB decoded, under SoundPool's 1 MB per sound).
 * Music: 9 layer files, 31.70 MB decoded (<= 40 MB budget).
 * Summed music at full intensity: .BASE: 4 layers, loop 64.00 s, all layers on RMS -22.2 dBFS; SEANCE: 4 layers, loop 42.67 s, all layers on RMS -21.1 dBFS; VAULT: 1 layers, loop 35.56 s, all layers on RMS -22.0 dBFS (target about -22 dBFS).
 
@@ -208,7 +208,7 @@ with a rising multiplier, 1.0 on retrigger / last spins. Set it on state changes
 |---|---|---|---|---|---|
 | `music_BASE_L0` | stereo | 64.00 s | 5.38 MB | -28.0 | -10.7 |
 | `music_BASE_L1` | mono | 64.00 s | 2.69 MB | -30.0 | -13.6 |
-| `music_BASE_L2` | stereo | 64.00 s | 5.38 MB | -28.0 | -9.8 |
+| `music_BASE_L2` | stereo | 64.00 s | 5.38 MB | -28.0 | -10.1 |
 | `music_BASE_L3` | mono | 64.00 s | 2.69 MB | -27.0 | -13.0 |
 | `music_SEANCE_L0` | stereo | 42.67 s | 3.59 MB | -28.0 | -9.9 |
 | `music_SEANCE_L1` | mono | 42.67 s | 1.79 MB | -27.0 | -14.0 |

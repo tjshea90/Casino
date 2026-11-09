@@ -93,7 +93,7 @@ class AudioQaTest {
         assertTrue(sec(Sfx.SEANCE_START) in 4.0..5.0); assertTrue(sec(Sfx.SEANCE_END) in 2.5..3.5); assertTrue(sec(Sfx.COFFIN_OPEN) in 2.2..2.8)
         assertTrue(sec(Sfx.ANTICIPATE) in 2.2..2.8); assertTrue(sec(Sfx.VAULT_DOOR) in 3.2..3.8); assertTrue(sec(Sfx.COIN_SHOWER) in 2.7..3.3)
         for (s in listOf(Sfx.REAPER_WHISPER, Sfx.REAPER_LAUGH, Sfx.DOCTOR_RASP, Sfx.DEMON_ROAR, Sfx.SKULL_RATTLE, Sfx.RAVEN_FLOCK, Sfx.WRAITH_WAIL))
-            assertTrue("$s voice 0.8-2.6 s", sec(s) in 0.8..2.6)
+            assertTrue("$s voice 0.8-2.5 s", sec(s) in 0.8..2.5)
         assertTrue(sec(Sfx.WIN_TICK) <= 0.15)
         // stacked ticks (~10 per second, up to 3 overlapping) must never clip: single peak <= -9 dBFS leaves 3 x -9 dB < 0 dBFS
         assertTrue(peakDb(sfx[Sfx.WIN_TICK]!!) <= -9.0)
@@ -148,6 +148,23 @@ class AudioQaTest {
             val ws = SR / 4; val wb = (2 * spec.beatsPerBar * SR * 60.0 / spec.bpm).toInt()
             val dShort = db(rmsAt(0, ws)) - db(rmsAt(n - ws, ws)); val dBars = db(rmsAt(0, wb)) - db(rmsAt(n - wb, wb))
             if (abs(dShort) > 6.0 && abs(dBars) > 5.0) bad += "${track.name} L${l.index}: RMS after/before seam ${"%.1f".format(dShort)} dB (250 ms), ${"%.1f".format(dBars)} dB (2 bars)"
+        }
+        assertTrue(bad.joinToString("\n"), bad.isEmpty())
+    }
+
+    @Test fun musicLayersHaveNoSilentHoles() {
+        val bad = ArrayList<String>()
+        val w = SR / 4
+        for ((track, spec) in Scores.tracks) for (l in spec.layers) {
+            val p = layers["${track.name}_${l.index}"]!!
+            var worst = 0.0; var at = 0
+            for (k in 0 until p.frames / w) {
+                var s = 0.0
+                for (i in k * w until (k + 1) * w) { s += (p.l[i] / 32768.0).let { it * it }; if (p.r != null) s += (p.r!![i] / 32768.0).let { it * it } }
+                val d = db(sqrt(s / (w * p.channels)))
+                if (k == 0 || d < worst) { worst = d; at = k }
+            }
+            if (worst < -55.0) bad += "${track.name} L${l.index}: quietest 250 ms window ${"%.1f".format(worst)} dBFS at ${"%.1f".format(at * 0.25)} s"
         }
         assertTrue(bad.joinToString("\n"), bad.isEmpty())
     }
