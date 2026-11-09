@@ -1949,6 +1949,10 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
             }
             val excited = phase == Phase.BIG_WIN || phase == Phase.SHOWCASE || phase == Phase.VAULT_TRIGGER || phase == Phase.SEANCE_TRIGGER ||
                 (phase == Phase.PRESENT && (o?.let { spinWin(it) } ?: 0L) > 0 && t - presentStart < 2.2)
+            // while the last reels slow down with two coffins landed, those coffins rattle
+            if (o != null && phase == Phase.SPINNING && antFrom >= 1) {
+                for (cellIdx in o.scatterCells) if (landed[cellIdx / ROWS]) { s.cellExcited[cellIdx] = true; s.cellPop[cellIdx] = pulse }
+            }
             // coffins that carry the Séance rattle in their cells once three or more have landed
             if (o != null && o.scatterCount >= 3 && (phase == Phase.PRESENT || phase == Phase.SEANCE_TRIGGER)) {
                 for (cellIdx in o.scatterCells) { s.cellExcited[cellIdx] = true; s.cellDim[cellIdx] = 1f; s.cellPop[cellIdx] = pulse }
