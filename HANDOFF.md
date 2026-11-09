@@ -32,13 +32,17 @@ online slots; the house must keep an edge no matter what and never lose money ov
 - [x] 3. MATH v3: tools/reaper_model.py + engine (coffin scatter, Seance.kt, Round.kt, buy prices, re-tuned strips) + exact/sim/exploit tests ALL GREEN. 94.000 % = lines+minis 57.77 + coffin pays 1.11 + SEANCE 14.12 + Vault 21.00; win 1 in 3.2; Seance ~213 spins, Vault ~135; buys 31x/31x (<= 92.8 %). TODO: PAR sheet in docs/MATH.md
 - [x] 4. Wallet v3 (Seance/buy seeds, session stats, Ranks, Achievements, settings; WalletTest green). TODO UI: reality-check dialog, settings dialog
 - [ ] 5. GL foundation: DONE: FBO + bloom/vignette/grain/grade (PostFx), noise texture, point lights, vertex-material shader mode 20, MeshData stride 12, Sculpt.kt. TODO: quality tiers auto-controller in GameGLView, reduce-flashing wiring
-- [ ] 6. New cast meshes + animation (Reaper first as the reference), royals restyle, coffin scatter
+- [ ] 6. New cast meshes + animation: Reaper DONE (gl/chars/ReaperModel.kt = style reference; polish: hood edge trim, bone tint); others by CHARS-A/B agents; royals restyle (Art.kt/Atlas) still TODO
 - [ ] 7. New world: gothic crypt/graveyard, altar cabinet, candles/chains/fog/moon, camera moves
 - [ ] 8. HUD restyle + win tiers + anticipation + Séance mode + feature-buy dialog + autoplay limits + settings/rank/ledger
 - [ ] 9. Soul Vault restyle (dark crypt, lit orbs)
 - [ ] 10. Integrate audio; QA; independent math audit; code review; perf budget; README/MATH; release v3.0.0 (`SHIP=1`)
 
-**In flight (agents / worktrees):** AUDIO agent (id a769d05ea7bfc7344) in a git worktree (see `git worktree list`; branch name starts with `worktree-`); it only touches `audio/**`, `docs/AUDIO.md`, `tools/audio_report.py`. When it finishes: merge its branch, wire new Sfx/Track calls into ReaperView/VaultView/MainActivity.
+**In flight (agents / worktrees)** — each works in `/home/user/Casino/.claude/worktrees/agent-<id>` on branch `worktree-agent-<id>` (see `git worktree list`); they never push, I merge their branches:
+  - AUDIO (id a769d05ea7bfc7344): owns `audio/**`, `docs/AUDIO.md`, `tools/audio_report.py`. On finish: merge, then wire the new Sfx/Track calls (see Audio.kt enum doc) into ReaperView/VaultView/MainActivity.
+  - CHARS-A (id ac1b26aad1b3e0b96): DoctorModel / DemonModel / SkullModel in `gl/chars/`.  CHARS-B (id ab4762f79a77a15e1): WraithModel / RavenModel / CoffinModel.
+    Both add one line each to `Cast.create` (trivial merge conflict). Judge with `CAST=<id> gradle :reaper:testDebugUnitTest --tests '*CharSheetTest*'` -> `reaper/build/screens/cast_*.png`.
+  If an agent died before finishing: its worktree may hold uncommitted work, inspect it, finish or merge what is good.
 **Last verified-green commit:** see `git log` entry 'math v3 green' (engine + wallet suites pass; UI/GL not yet migrated to the new symbol names: transitional aliases HOODED/PUMPKIN/GHOST/MINI_PUMPKIN exist in ReaperConfig)
 **Status line:** math v3 + wallet v3 done and green; GL foundation partly done (FBO post-fx, noise texture, vertex-material shader, Sculpt toolkit written); next = characters (Reaper reference), environment, HUD/Seance flow, audio merge.
 
