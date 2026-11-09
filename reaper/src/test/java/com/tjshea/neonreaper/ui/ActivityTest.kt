@@ -126,11 +126,14 @@ class ActivityTest {
         val w = act.wallet
         w.setInitialPassword(pw); w.deposit(pw, 2_000)
         var plan: AutoPlan? = null
-        Dialogs(act, w) {}.autoPicker { plan = it }
+        val cues = ArrayList<Dialogs.Cue>()
+        val d0 = Dialogs(act, w) {}; d0.onCue = { cues += it }
+        d0.autoPicker { plan = it }
         val dlg = latest()
         assertTrue("Start is offered", button(dlg, "Start autoplay").isEnabled)
         click(dlg, "Until stopped"); click(dlg, "25×"); click(dlg, "25 %")
         click(dlg, "Start autoplay")
+        assertEquals("one open cue, four taps, one close cue", listOf(Dialogs.Cue.OPEN) + List(4) { Dialogs.Cue.TAP } + Dialogs.Cue.CLOSE, cues)
         val p = plan ?: error("no plan")
         assertEquals(-1, p.spins); assertEquals(25, p.stopOnWinX); assertEquals(w.balance * 25 / 100, p.lossLimit)
         assertFalse("the picker closes", dlg.isShowing)
@@ -206,6 +209,9 @@ class ActivityTest {
         click(dlg, "Statistics"); val st = latest(); assertTrue(allText(st).contains("MACHINE STATS")); click(st, "Close")
         click(dlg, "How to play"); val info = latest(); assertTrue(allText(info).contains("PAYTABLE")); click(info, "Close")
         click(dlg, "Done"); assertFalse(dlg.isShowing)
+        val saved = Wallet(RuntimeEnvironment.getApplication())          // what a restart would read back
+        assertEquals(Wallet.LoadStatus.OK, saved.load())
+        assertEquals(55, saved.musicVolume); assertEquals(100, saved.sfxVolume); assertEquals(60, saved.realityMinutes); assertEquals(0, saved.quality)
     }
 
     @Test fun realityCheckIsModal() {

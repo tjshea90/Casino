@@ -583,6 +583,8 @@ internal class Masonry(context: Context, private val thresholdPx: Int, private v
 
 /** Small view factory shared by every dialog, so spacing, type and colour stay consistent. */
 internal class Ui(val ctx: Context) {
+    /** Called on every button / chip / link press (the host can play a click sound). */
+    var onTap: () -> Unit = {}
     val d: Float = ctx.resources.displayMetrics.density
     fun dp(v: Number): Int = (v.toFloat() * d).roundToInt()
 
@@ -735,7 +737,7 @@ internal class Ui(val ctx: Context) {
             val mh = dp(if (small || short) 48 else 52)   // never below the 48 dp touch-target minimum
             minHeight = mh; minimumHeight = mh
             setPadding(dp(14), dp(6), dp(14), dp(6))
-            setOnClickListener(onClick)
+            setOnClickListener { onTap(); onClick(it) }
         }
 
     /** Segmented choice: one chip per label, the selected one lit blood-red. */
@@ -753,7 +755,7 @@ internal class Ui(val ctx: Context) {
                     setPadding(dp(10), dp(6), dp(10), dp(6))
                     maxLines = 2
                     if (desc != null) contentDescription = "$desc: $label"
-                    setOnClickListener { select(i); onSelect(i) }
+                    setOnClickListener { onTap(); select(i); onSelect(i) }
                 }
                 chips += b
                 addView(b)

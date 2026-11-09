@@ -57,8 +57,12 @@ class AutoPlan(val spins: Int, val stopOnWinX: Int = 0, val lossLimit: Long = 0L
  */
 class Dialogs(private val act: Activity, private val wallet: Wallet, private val onChanged: () -> Unit) {
 
+    /** Sound cues the host may play (set [onCue]); the dialogs themselves are silent. */
+    enum class Cue { TAP, OPEN, CLOSE }
+    var onCue: (Cue) -> Unit = {}
+
     private val io = Executors.newSingleThreadExecutor()
-    private val ui = Ui(act)
+    private val ui = Ui(act).also { it.onTap = { onCue(Cue.TAP) } }
     private fun dp(v: Number) = ui.dp(v)
     private fun fmt(n: Long) = Money.fmt(n)
 
@@ -121,14 +125,16 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
             w.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
             w.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
             w.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            @Suppress("DEPRECATION")   // still the way to get the IME-resize behaviour before Android 11
             w.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
             w.addFlags(WindowManager.LayoutParams.FLAG_SECURE) // no screenshots of password dialogs
             w.setWindowAnimations(android.R.style.Animation_Toast)
             if (legacy) w.addFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
         }
-        dlg.setOnDismissListener { stack.remove(dlg); onDismiss(); onChanged() }
+        dlg.setOnDismissListener { stack.remove(dlg); onCue(Cue.CLOSE); onDismiss(); onChanged() }
         stack += dlg
         dlg.show()
+        onCue(Cue.OPEN)
         dlg.window?.let { w -> immerse(w); if (legacy) w.clearFlags(WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE) }
         return sh
     }
@@ -595,7 +601,7 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
             setPadding(dp(14), dp(8), dp(12), dp(8))
             addView(ui.vbox(ui.text(title, 15f, Dread.BONE_HI, bold = true), ui.text(sub, 12.5f, Dread.BONE_DIM)), ui.lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
             addView(ui.text("›", 26f, Dread.BRASS_HI), ui.lp(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0f, l = 8))
-            setOnClickListener { onClick() }
+            setOnClickListener { ui.onTap(); onClick() }
             contentDescription = "$title. $sub"
         }
 
@@ -653,9 +659,9 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
             footer = bar(ui.button("Take a break") { sh.close(); onStop() }, ui.button("Keep playing", Dread.Kind.SECONDARY) { sh.close(); onContinue() }))
     }
 
-    fun message(t: String, body: String) {
+    fun message(title: String, body: String) {
         val sh = Sheet()
-        sheet(sh, t.uppercase(), widthDp = 540, body = ui.text(body, 15f, Dread.BONE, center = body.length < 90), footer = ui.button("OK") { sh.close() })
+        sheet(sh, title.uppercase(), widthDp = 540, body = ui.text(body, 15f, Dread.BONE, center = body.length < 90), footer = ui.button("OK") { sh.close() })
     }
 
     var toastBanner: (String) -> Unit = {}
