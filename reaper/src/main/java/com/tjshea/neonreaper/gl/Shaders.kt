@@ -251,6 +251,7 @@ void main(){
     } else {                                           // matte with a little mottling
       albedo *= 0.82 + 0.3 * q.g;
     }
+    emis *= uColor.r;                                  // material emission (metal/glass reflections, ember veins) follows the dim tint
   } else if (uMode == 9) {
     frag = vec4(uEmissive, uAlpha); return;
   }

@@ -59,20 +59,44 @@ RTP = lines 59.036 % + scatters 2.245 % + free spins 32.715 % = **93.996 %** (ho
 * Verified three ways: closed form (Python) = brute-force enumeration of all 11⁵ line outcomes (Python and Kotlin) =
   3,000,000-spin simulation of the real engine (RTP 94.05 %, any win 43.9 %, win ≥ stake 16.3 %, SD 5.45).
 
-## 3. Neon Reaper (exact + measured cap)
+## 3. Neon Reaper 3.0 — PAR sheet (v3 math, exact + measured cap)
 
-Budget at stakes 1–5: **base 59.34 % + mini features 11.98 % + Soul Vault 22.68 % = 94.000 %**.
+Everything below is produced by `python3 tools/reaper_model.py report` (closed form + Monte-Carlo cross-checks) and enforced by the
+Kotlin tests (`RtpExactTest`, `CalibrationTest`, `FullGameTest`, `NoExploitTest`).
 
-* Base game (20 lines): E[spin] = 0.5993 × stake, every win ≥ 1× stake, hit 32.9 % of spins. Reels re-weighted from
-  `[1,3,3,4,5,5,7,7,8,8,9]` to `[1,3,3,5,5,5,6,6,8,9,12]` — more of the commonest card, characters still ≈ 33 % of every
-  strip so the 3D cast keeps appearing.
-* Mini features (one every ~101 spins, mean 12.07×): Reaper's Touch 9.44×, Raven's Flock 11.43×, Pumpkin's Treats 16.86×,
-  Skull's Curse 8.18× — each mean is computed exactly (wild reels, hypergeometric random wild cells, coin counts × values).
-* Soul Vault (every ~125 spins, mean 28.35× the bonus bet, SD 22; bonus bet = average stake of the 5 relic-revealing spins, rounded down): exact Markov DP over (filled cells, respins left).
-  P(GRAND, full board) = 1 in 111,643 vaults.
-* **The 25-book cap** (2,000 tokens per spin and per bonus) only affects tails, so it is measured as
-  `E[(X − 2000/stake)⁺]` with millions of samples of the *real* engine and subtracted from the exact mean (accuracy ≈ ±0.02 %).
-  The result is the per-stake table above; it can only be ≤ 94 %.
+**RTP budget at stakes 1–5 (stake = 1):**
+
+| Component | Share of RTP | Trigger | Mean payout |
+|---|---|---|---|
+| 20-line base game + mini features | 57.77 % | every spin (hit rate any win 31.3 %, 1 in 3.2; every win ≥ 1× stake) | lines 0.5065× + minis |
+| Coffin scatter pay (3 / 4 / 5 coffins = 2× / 10× / 50× total stake, anywhere) | 1.11 % | P(3) 0.450 %, P(4) 0.0199 %, P(5) 0.000350 % | 0.0112× per spin |
+| **THE SÉANCE** (3/4/5 coffins = 8/12/20 free spins on richer reels, multiplier ×1…×10, retrigger) | 14.12 % | 1 plain spin in 213 | 30.1× stake (3 coffins 28.8×, 4: 58.6×, 5: 119.7×) |
+| **SOUL VAULT** (5 relics, hold & respin, MINI/MINOR/MAJOR/GRAND) | 21.00 % | 1 per 135 spins | 28.35× the bonus bet |
+| **Total** | **94.000 %** | | house edge 6.000 % |
+
+* Mini features (one per ~154 spins, mean 11.5× incl. coins): Reaper's Touch 8.46×, Murder of Crows 10.77×, Demon's Bargain 16.76×,
+  Skull's Curse 7.33× (each exact: wild reels, hypergeometric wild cells, coin counts × values).
+* Séance: per free spin mean 0.733× the stake that started it (line hit 22.5 %), 1 retrigger per ~106 free spins, multiplier
+  `m_t = min(10, t)` (spin 1 = ×1 … spin 10+ = ×10). Exact backward DP over (spins left, multiplier) with retriggers; the whole session pays
+  in proportion to the triggering stake, so it is linear in the stake (until the 25-book cap, which only lowers it).
+* Soul Vault: exact Markov DP over (filled cells, respins left); P(GRAND, full board) = 1 in 111,643 vaults; the bonus bet is
+  `floor(mean stake of the 5 relic-revealing spins)` (Wald-neutral, see the audit below).
+* **Feature Buy** (skip the wait): THE SÉANCE costs 31× stake (EV 28.77× → returns 92.79 %), the SOUL VAULT 31× stake (EV 28.35× →
+  91.46 %): both ≤ 92.8 % < 94 %, so buying never beats playing. The price is checked against the exact EV / 0.93 in the tests.
+* **The 25-book cap** (2,000 tokens per spin, per Séance and per Vault) only affects tails, so it is measured as
+  `E[(X − 2000/stake)⁺]` with millions of samples of the *real* engine and subtracted from the exact mean. It can only lower the return,
+  which is why RTP falls at high stakes:
+
+| stake | 1–4 | 5 | 8 | 10 | 15 | 20 | 25 | 30 | 40 |
+|---|---|---|---|---|---|---|---|---|---|
+| RTP | 94.00 % | 93.99 % | 93.95 % | 93.87 % | 93.32 % | 92.67 % | 91.93 % | 91.06 % | 89.01 % |
+| buy Séance | 92.79 % | 92.75 % | 92.48 % | 92.17 % | 90.98 % | 89.09 % | 86.65 % | 83.86 % | 77.79 % |
+| buy Vault | 91.46 % | 91.44 % | 91.41 % | 91.33 % | 90.09 % | 89.02 % | 87.92 % | 86.54 % | 82.85 % |
+
+**Why a long-run loss for the house is impossible:** every money component is linear in the stake or concave in it (the cap), nothing
+pays more than the stake it comes from, the Vault's bonus bet is neutral by Wald's identity, bought features are priced above their
+exact expected payout and there are no free-credit promotions (rank and ledger are cosmetic). `NoExploitTest` plays adaptive
+staking / buying policies against the real engine and requires every one to stay ≤ 94 %.
 
 ### House-edge audit: two exploits found and fixed while raising 87 → 94 %
 
@@ -99,6 +123,10 @@ player can beat the headline RTP. Three rules were tried (`tools/reaper_model.py
   vault's 22.68 % share, and the rest of the return is also capped at 71.32 % (uniform mini-feature rate) — so
   **no staking policy can exceed 94.00 %**; the best any player can do is play a constant low stake. Trade-off: mixing
   stakes costs a little (the bet is rounded down) — e.g. the 70/30 mix above returns 86.9 %.
+
+**v3 re-check** (`python3 tools/reaper_model.py exploit`, shipped rule, with the Séance and coffin scatter added): constant stake 10 = 93.83 %
+(the best policy); "bet 1, bet 40 with 4 relics and ≤ 60 spins in the window" 92.12 %; "40 while spins ≤ 20/40/60 holding 2/3/4 relics, else 1" 91.33 %;
+"first 45 spins of each window at 25" 91.33 %; "bet 40 only once 4 relics are held" 89.28 %. The old round/floor rules would give 100.8 % / 103.0 % on the same policies.
 
 The audit also independently recomputed both games from the Kotlin rules (exhaustive enumeration of ~10⁸–10⁹ stop
 combinations plus 10⁹-sample simulations): Dragon's Hoard **93.9955 %** (claimed 93.996 %), Neon Reaper **93.9995 %**
