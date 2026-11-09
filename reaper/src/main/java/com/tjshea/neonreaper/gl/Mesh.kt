@@ -38,7 +38,8 @@ class MeshData {
 
     /**
      * Appends [o] transformed by column-major matrix [m] (normals by its normal matrix). [tint] (0xRRGGBB) replaces the vertex
-     * albedo and [mat] (0..15) the material id; [ao] darkens the albedo (baked ambient occlusion); null keeps what [o] had.
+     * albedo MULTIPLIED with the source vertex colour (so baked occlusion in [o] survives) and [mat] (0..15) the material id;
+     * [ao] darkens everything further; null keeps what [o] had.
      */
     fun append(o: MeshData, m: FloatArray, tint: Int? = null, mat: Int? = null, ao: Float = 1f): MeshData {
         val nm = Mat4.normalMatrix(FloatArray(9), m)
@@ -49,9 +50,9 @@ class MeshData {
             val nx = o.v[p + 3]; val ny = o.v[p + 4]; val nz = o.v[p + 5]
             var tx = nm[0] * nx + nm[3] * ny + nm[6] * nz; var ty = nm[1] * nx + nm[4] * ny + nm[7] * nz; var tz = nm[2] * nx + nm[5] * ny + nm[8] * nz
             val l = sqrt(tx * tx + ty * ty + tz * tz).coerceAtLeast(1e-6f); tx /= l; ty /= l; tz /= l
-            val r = if (tint != null) ((tint shr 16) and 255) / 255f else o.v[p + 8]
-            val g = if (tint != null) ((tint shr 8) and 255) / 255f else o.v[p + 9]
-            val b = if (tint != null) (tint and 255) / 255f else o.v[p + 10]
+            val r = if (tint != null) ((tint shr 16) and 255) / 255f * o.v[p + 8] else o.v[p + 8]
+            val g = if (tint != null) ((tint shr 8) and 255) / 255f * o.v[p + 9] else o.v[p + 9]
+            val b = if (tint != null) (tint and 255) / 255f * o.v[p + 10] else o.v[p + 10]
             val a = if (mat != null) mat / 15f else o.v[p + 11]
             vertex(m[0] * x + m[4] * y + m[8] * z + m[12], m[1] * x + m[5] * y + m[9] * z + m[13], m[2] * x + m[6] * y + m[10] * z + m[14],
                 tx, ty, tz, o.v[p + 6], o.v[p + 7], r * ao, g * ao, b * ao, a)

@@ -131,7 +131,7 @@ object Sculpt {
      * A sphere whose radius in direction (dx,dy,dz) is [shape](dx,dy,dz), then scaled by (sx,sy,sz). +Z is the face direction.
      * Used for skulls, heads and any organic lump: sockets, brows and cheekbones are just smooth radial dents/bumps.
      */
-    fun blob(lat: Int, lon: Int, sx: Float, sy: Float, sz: Float, shape: (Float, Float, Float) -> Float): MeshData {
+    fun blob(lat: Int, lon: Int, sx: Float, sy: Float, sz: Float, ao: ((Float, Float) -> Float)? = null, shape: (Float, Float, Float) -> Float): MeshData {
         val m = MeshData()
         for (a in 0..lat) {
             val th = PI * a / lat
@@ -139,14 +139,15 @@ object Sculpt {
                 val ph = 2 * PI * b / lon
                 val dx = (sin(th) * cos(ph)).toFloat(); val dy = cos(th).toFloat(); val dz = (sin(th) * sin(ph)).toFloat()
                 val r = shape(dx, dy, dz)
-                m.vertex(dx * r * sx, dy * r * sy, dz * r * sz, dx, dy, dz, b.toFloat() / lon, a.toFloat() / lat)
+                val o = ao?.invoke(r, dy) ?: 1f                     // baked occlusion from the displacement (dents are dark)
+                m.vertex(dx * r * sx, dy * r * sy, dz * r * sz, dx, dy, dz, b.toFloat() / lon, a.toFloat() / lat, o, o, o, 0f)
             }
         }
         for (a in 0 until lat) for (b in 0 until lon) { val p = a * (lon + 1) + b; val q = p + lon + 1; m.quad(p, p + 1, q + 1, q) }
         return m.finish()
     }
 
-    fun ellipsoid(sx: Float, sy: Float, sz: Float, lat: Int = 12, lon: Int = 18): MeshData = blob(lat, lon, sx, sy, sz) { _, _, _ -> 1f }
+    fun ellipsoid(sx: Float, sy: Float, sz: Float, lat: Int = 12, lon: Int = 18): MeshData = blob(lat, lon, sx, sy, sz, null) { _, _, _ -> 1f }
 
     // ------------------------------------------------------------------------------------------ cloth shells
     /**

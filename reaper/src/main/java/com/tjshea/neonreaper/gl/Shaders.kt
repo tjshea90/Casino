@@ -194,47 +194,49 @@ void main(){
     albedo = gold; spec = 1.2; shine = 60.0;
     if (r < 0.78 && abs(N.z) > 0.6) { albedo = vec3(0.1,0.45,0.1); emis += vec3(0.25,1.0,0.2) * (0.5 + 0.5*uParam.x) * (1.0 - r); }
   } else if (uMode == 20) {                           // VERTEX MATERIAL: merged character / prop meshes
-    albedo = vColor.rgb;
+    albedo = vColor.rgb * uColor;                      // uColor = dim tint (white = full brightness)
+    if (!gl_FrontFacing) albedo *= 0.32;               // the inside of a hood / cloak is dark
     int mat = int(vColor.a * 15.0 + 0.5);
     vec4 q = nz(vLocal, 2.6);
     if (mat == 1) {                                    // cloth: mottled weave, soft sheen at grazing angles
       float fold = nz(vLocal * vec3(1.0, 0.45, 1.0), 1.7).g;
-      albedo *= 0.55 + 0.9 * (0.6 * q.r + 0.4 * fold); spec *= 0.15;
-      N = perturb(N, vWorld, fold, 0.9);
-    } else if (mat == 2) {                             // bone: pitted, cracked, stained in the crevices
+      albedo *= 0.78 + 0.45 * (0.6 * q.r + 0.4 * fold); spec *= 0.15;
+      N = perturb(N, vWorld, fold, 0.10);
+    } else if (mat == 2) {                             // bone: faintly mottled, pitted in the crevices, hairline cracks (no bump: it scatters the lights)
       vec4 b = nz(vLocal, 3.4);
-      float pit = smoothstep(0.55, 0.15, b.a);
-      float crack = smoothstep(0.80, 0.97, nz(vLocal, 1.35).b);
-      albedo *= 0.78 + 0.35 * b.g; albedo = mix(albedo, albedo * vec3(0.42, 0.34, 0.26), pit * 0.7);
-      albedo = mix(albedo, vec3(0.03, 0.02, 0.02), crack * 0.85);
-      spec *= 0.7; N = perturb(N, vWorld, b.g - pit * 0.6 - crack * 0.8, 0.8);
+      float pit = smoothstep(0.50, 0.12, b.a);
+      float crack = smoothstep(0.86, 0.985, nz(vLocal, 1.35).b);
+      albedo *= 0.92 + 0.14 * b.g;
+      albedo = mix(albedo, albedo * vec3(0.62, 0.52, 0.42), pit * 0.25);
+      albedo = mix(albedo, vec3(0.05, 0.04, 0.035), crack * 0.7);
+      spec *= 0.6;
     } else if (mat == 3) {                             // metal: dark steel, fake environment, scratches
       vec3 R = reflect(-V, N);
       vec3 env = mix(vec3(0.02, 0.03, 0.03), vec3(0.34, 0.12, 0.12), clamp(R.y * 0.5 + 0.5, 0.0, 1.0)) + vec3(0.1, 0.45, 0.2) * pow(max(R.y, 0.0), 6.0);
       float scr = nz(vLocal * vec3(8.0, 1.0, 8.0), 3.0).b;
       albedo *= 0.32 + 0.25 * q.g; emis += env * vColor.rgb * (1.5 + 0.7 * scr); spec = 1.4; shine = 60.0;
-      N = perturb(N, vWorld, q.g, 0.25);
+      N = perturb(N, vWorld, q.g, 0.05);
     } else if (mat == 4) {                             // leather: pebbled grain, dark creases
       vec4 l = nz(vLocal, 6.0);
-      albedo *= 0.55 + 0.7 * l.a; spec *= 0.45; N = perturb(N, vWorld, l.a, 0.7);
+      albedo *= 0.70 + 0.5 * l.a; spec *= 0.45; N = perturb(N, vWorld, l.a, 0.10);
     } else if (mat == 5) {                             // emissive (eyes, flames, runes): self-lit, flickers with uParam.x
-      frag = vec4(vColor.rgb * uParam.x * (0.85 + 0.3 * q.r), uAlpha); return;
+      frag = vec4(vColor.rgb * uColor * uParam.x * (0.85 + 0.3 * q.r), uAlpha); return;
     } else if (mat == 6) {                             // stone: mottled, veined, mossy at the bottom
       vec4 b = nz(vWorld * 0.8, 1.6);
       albedo *= 0.55 + 0.85 * b.r; albedo = mix(albedo, albedo * 0.3, smoothstep(0.82, 0.98, b.b) * 0.9);
-      N = perturb(N, vWorld, b.g + b.a * 0.4, 0.7); spec *= 0.35;
+      N = perturb(N, vWorld, b.g + b.a * 0.4, 0.10); spec *= 0.35;
     } else if (mat == 7) {                             // demon flesh: glossy, with glowing ember veins in the crevices
       vec4 v = nz(vLocal, 3.0);
       float vein = smoothstep(0.80, 0.97, v.b);
       albedo *= 0.65 + 0.5 * v.g; emis += vec3(1.0, 0.16, 0.05) * vein * (0.9 + 0.7 * uParam.x);
-      spec = 1.1; shine = 40.0; N = perturb(N, vWorld, v.g, 0.35);
+      spec = 1.1; shine = 40.0; N = perturb(N, vWorld, v.g, 0.08);
     } else if (mat == 8) {                             // glass lens / polished gem: mirror-like with a coloured core glow
       vec3 R = reflect(-V, N);
       emis += (vec3(0.05, 0.08, 0.1) + vec3(0.5, 0.55, 0.65) * pow(max(R.y, 0.0), 3.0)) * 0.6 + vColor.rgb * uParam.x * 0.6;
       spec = 1.8; shine = 90.0;
     } else if (mat == 9) {                             // wood: ridged grain along the local Y axis
       float gr = nz(vLocal * vec3(9.0, 0.7, 9.0), 1.0).b;
-      albedo *= 0.55 + 0.7 * gr; N = perturb(N, vWorld, gr, 0.5); spec *= 0.25;
+      albedo *= 0.65 + 0.5 * gr; N = perturb(N, vWorld, gr, 0.08); spec *= 0.25;
     } else if (mat == 10) {                            // ectoplasm: translucent with a strong fresnel glow, drifting wisps
       float fres = pow(1.0 - max(dot(N, V), 0.0), 2.0);
       float w = nz(vLocal + vec3(0.0, uTime * 0.25, 0.0), 1.4).r;

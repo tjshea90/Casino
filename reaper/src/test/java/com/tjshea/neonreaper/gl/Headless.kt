@@ -81,5 +81,38 @@ class Headless(val w: Int, val h: Int) {
         file.parentFile.mkdirs(); file.writeBytes(out.toByteArray())
     }
 
+    /** Reads the framebuffer as top-down ARGB ints. */
+    fun readArgb(): IntArray {
+        val buf = ByteBuffer.allocateDirect(w * h * 4).order(ByteOrder.nativeOrder())
+        GLES30.glReadPixels(0, 0, w, h, GLES30.GL_RGBA, GLES30.GL_UNSIGNED_BYTE, buf)
+        val out = IntArray(w * h)
+        for (y in 0 until h) for (x in 0 until w) {
+            val i = ((h - 1 - y) * w + x) * 4
+            out[y * w + x] = (255 shl 24) or ((buf[i].toInt() and 255) shl 16) or ((buf[i + 1].toInt() and 255) shl 8) or (buf[i + 2].toInt() and 255)
+        }
+        return out
+    }
+
+    companion object {
+        /** Minimal PNG writer for top-down ARGB (alpha ignored). */
+        fun writePng(file: File, w: Int, h: Int, argb: IntArray) {
+            val raw = java.io.ByteArrayOutputStream()
+            for (y in 0 until h) { raw.write(0); for (x in 0 until w) { val c = argb[y * w + x]; raw.write((c shr 16) and 255); raw.write((c shr 8) and 255); raw.write(c and 255) } }
+            val out = java.io.ByteArrayOutputStream()
+            out.write(byteArrayOf(0x89.toByte(), 'P'.code.toByte(), 'N'.code.toByte(), 'G'.code.toByte(), 13, 10, 26, 10))
+            fun chunk(type: String, data: ByteArray) {
+                val d = java.io.DataOutputStream(out)
+                d.writeInt(data.size)
+                val crc = java.util.zip.CRC32(); crc.update(type.toByteArray()); crc.update(data)
+                d.write(type.toByteArray()); d.write(data); d.writeInt(crc.value.toInt())
+            }
+            chunk("IHDR", java.nio.ByteBuffer.allocate(13).putInt(w).putInt(h).put(8).put(2).put(0).put(0).put(0).array())
+            val z = java.io.ByteArrayOutputStream()
+            java.util.zip.DeflaterOutputStream(z).use { it.write(raw.toByteArray()) }
+            chunk("IDAT", z.toByteArray()); chunk("IEND", ByteArray(0))
+            file.parentFile.mkdirs(); file.writeBytes(out.toByteArray())
+        }
+    }
+
     fun close() { EGL14.eglMakeCurrent(display, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT); EGL14.eglDestroyContext(display, context); EGL14.eglTerminate(display) }
 }

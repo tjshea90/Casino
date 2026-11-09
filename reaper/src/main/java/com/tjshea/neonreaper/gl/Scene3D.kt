@@ -1,6 +1,7 @@
 package com.tjshea.neonreaper.gl
 
 import com.tjshea.neonreaper.engine.ReaperConfig
+import com.tjshea.neonreaper.gl.chars.Cast
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.Random
@@ -317,11 +318,17 @@ class Scene3D(private val gl: Gl) {
     private val plPos = FloatArray(16); private val plCol = FloatArray(12); private var plN = 0
 
     /** Adds a point light for this frame (world position, radius, colour 0xRRGGBB scaled by [k]). Extra lights beyond 4 are ignored. */
-    private fun pointLight(x: Float, y: Float, z: Float, radius: Float, color: Int, k: Float = 1f) {
+    internal fun pointLight(x: Float, y: Float, z: Float, radius: Float, color: Int, k: Float = 1f) {
         if (plN >= 4) return
         plPos[plN * 4] = x; plPos[plN * 4 + 1] = y; plPos[plN * 4 + 2] = z; plPos[plN * 4 + 3] = radius
         plCol[plN * 3] = ((color shr 16) and 255) / 255f * k; plCol[plN * 3 + 1] = ((color shr 8) and 255) / 255f * k; plCol[plN * 3 + 2] = (color and 255) / 255f * k
         plN++
+    }
+
+    /** Point light placed at a point in a model's local space. */
+    internal fun pointLightAt(m: FloatArray, lx: Float, ly: Float, lz: Float, radius: Float, color: Int, k: Float = 1f) {
+        Mat4.transform(tmp4, m, lx, ly, lz)
+        pointLight(tmp4[0], tmp4[1], tmp4[2], radius, color, k)
     }
 
     private fun uploadPointLights() {
@@ -344,14 +351,29 @@ class Scene3D(private val gl: Gl) {
         mesh.draw(gl)
     }
 
-    private fun glow(x: Float, y: Float, z: Float, size: Float, color: Int, alpha: Float = 1f, core: Float = 0.6f) {
+    /**
+     * Draws a vertex-material mesh (the new cast / props): albedo + material id come from the mesh, [dim] darkens it,
+     * [emis] is the brightness of its EMISSIVE parts, [wave] sways cloth below y = 0.4 (character space).
+     */
+    internal fun drawV(mesh: Mesh, model: FloatArray, emis: Float = 1f, dim: Float = 1f, alpha: Float = 1f, rim: Int = 0x000000,
+                       spec: Float = 0.3f, shine: Float = 24f, wave: Float = 0f) {
+        Mat4.mul(mvp, vp, model)
+        lit.m4("uMvp", mvp); lit.m4("uModel", model); lit.m3("uNormalMat", Mat4.normalMatrix(nrm, model))
+        lit.i("uMode", 20)
+        lit.f3("uColor", dim, dim, dim); lit.f3("uEmissive", 0f, 0f, 0f); lit.rgb("uRim", rim, dim)
+        lit.f("uSpec", spec); lit.f("uShine", shine); lit.f("uWave", wave); lit.f("uAlpha", alpha)
+        lit.f4("uParam", emis, 1f, 0f, 0f)
+        mesh.draw(gl)
+    }
+
+    internal fun glow(x: Float, y: Float, z: Float, size: Float, color: Int, alpha: Float = 1f, core: Float = 0.6f) {
         if (glowUsed >= glows.size) glows += Glow(0f, 0f, 0f, 0f, 0, 0f, 0f)
         val g = glows[glowUsed++]
         g.x = x; g.y = y; g.z = z; g.size = size; g.color = color; g.alpha = alpha; g.core = core
     }
 
     /** Glow at a point in a model's local space. */
-    private fun glowAt(m: FloatArray, lx: Float, ly: Float, lz: Float, size: Float, color: Int, alpha: Float = 1f, core: Float = 0.6f) {
+    internal fun glowAt(m: FloatArray, lx: Float, ly: Float, lz: Float, size: Float, color: Int, alpha: Float = 1f, core: Float = 0.6f) {
         Mat4.transform(tmp4, m, lx, ly, lz)
         glow(tmp4[0], tmp4[1], tmp4[2], size, color, alpha, core)
     }
@@ -517,6 +539,8 @@ class Scene3D(private val gl: Gl) {
     }
 
     private fun drawCharacter(sym: Int, mm: FloatArray, tt: Float, ex: Boolean, dim: Float = 1f) {
+        val model = Cast.get(sym)
+        if (model != null) { model.draw(this, mm, tt, if (ex) 1f else 0f, dim); return }
         when (sym) {
             ReaperConfig.WILD -> drawReaper(mm, tt, ex, dim, scythe = true, crimson = false)
             ReaperConfig.HOODED -> drawReaper(mm, tt, ex, dim, scythe = false, crimson = true)
@@ -832,6 +856,42 @@ class Scene3D(private val gl: Gl) {
         val g = S.showcaseGrow
         val mm = m(); Mat4.translate(mm, 0f, -0.9f * g, Layout3D.R + 1.5f * g); val s = 0.6f + 1.6f * g; Mat4.scale(mm, s, s, s)
         drawCharacter(sym, mm, t, true)
+    }
+
+    /**
+     * Developer / test harness: renders one cast member close up on a dark stage with a 3-point light set
+     * (through the same post-processing as the game). [yawDeg] turns the character, [ex] is its excitement 0..1.
+     */
+    internal fun renderPreview(model: com.tjshea.neonreaper.gl.chars.CharacterModel, time: Float, ex: Float, w: Int, h: Int,
+                               yawDeg: Float = 0f, camDist: Float = 2.7f, lookY: Float = 0.55f, scale: Float = 1f) {
+        if (!ready) return
+        t = time
+        S.copyFrom(SceneState())
+        val target = gl.getInteger(Gl.FRAMEBUFFER_BINDING)
+        val usePost = quality > 0 && post.begin(w, h, quality)
+        if (!usePost) gl.viewport(0, 0, w, h)
+        gl.clearColor(0.015f, 0.018f, 0.024f, 1f); gl.clear(Gl.COLOR_BUFFER_BIT or Gl.DEPTH_BUFFER_BIT)
+        val proj = Mat4.perspective(FloatArray(16), 30f, w.toFloat() / h, 0.1f, 60f)
+        val view = Mat4.lookAt(FloatArray(16), 0f, lookY + 0.12f, camDist, 0f, lookY, 0f)
+        Mat4.mul(vp, proj, view); camX = 0f; camY = lookY + 0.12f; camZ = camDist; glowUsed = 0
+        gl.activeTexture(Gl.TEXTURE1); gl.bindTexture(Gl.TEXTURE_2D, noiseTex); gl.activeTexture(Gl.TEXTURE0)
+        gl.enable(Gl.DEPTH_TEST); gl.depthFunc(Gl.LEQUAL); gl.depthMask(true)
+        gl.enable(Gl.CULL_FACE); gl.cullFace(Gl.BACK)
+        gl.enable(Gl.BLEND); gl.blendFunc(Gl.SRC_ALPHA, Gl.ONE_MINUS_SRC_ALPHA)
+        plN = 0
+        pointLight(-1.2f, 1.1f, 1.6f, 4.0f, 0xFF5A40, 0.5f)       // warm red kicker (candle / hellfire)
+        pointLight(1.6f, 0.9f, 1.2f, 4.0f, 0x6FA8FF, 0.35f)       // cold moon fill
+        setupLit()
+        val mm = Mat4.identity(); Mat4.translate(mm, 0f, 0f, 0f); Mat4.rotate(mm, yawDeg, 0f, 1f, 0f); Mat4.scale(mm, scale, scale, scale)
+        // a dark stone slab to stand on
+        val slab = Mat4.identity(); Mat4.translate(slab, 0f, -0.06f, 0f); Mat4.scale(slab, 1.6f, 0.06f, 1.6f)
+        draw(mBox, slab, 6, 0x34363A, spec = 0.1f)
+        model.draw(this, mm, time, ex, 1f)
+        gl.depthMask(false); gl.disable(Gl.CULL_FACE); gl.blendFunc(Gl.SRC_ALPHA, Gl.ONE)
+        drawGlows()
+        gl.blendFunc(Gl.SRC_ALPHA, Gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(true)
+        plN = 0
+        if (usePost) post.end(target, w, h, quality, time, postParams)
     }
 }
 
