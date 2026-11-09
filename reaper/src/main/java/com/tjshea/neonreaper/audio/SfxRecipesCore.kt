@@ -15,8 +15,8 @@ internal fun registerCoreSfx(r: SfxRegistry) {
         Wet(room = Rv.TINY)
     }
     r.add(S.PRESS, 0.24, -21.0, 0, fadeOut = 0.05) { b ->
-        b.at(0.0, thump(0.14, 195.0, 68.0, 0.02, 0.05, 1.6), 0.9, room = 0.15)
-        b.at(0.0, thump(0.12, 62.0, 45.0, 0.02, 0.06), 0.5)
+        b.at(0.0, thump(0.14, 270.0, 120.0, 0.02, 0.05, 1.8), 0.9, room = 0.15)
+        b.at(0.0, thump(0.12, 70.0, 50.0, 0.02, 0.06), 0.25)
         b.at(0.0, bandBurst(0.03, 2, 3000.0, 1.6, 0.005), 0.5, room = 0.1)
         b.at(0.012, bell(1650.0, 0.2, Bells.BLOCK, decay = 0.8), 0.22, room = 0.3)
         Wet(room = Rv.BOX)
@@ -55,9 +55,10 @@ internal fun registerCoreSfx(r: SfxRegistry) {
         Wet(room = Rv.BOX)
     }
     r.add(S.STOP, 0.3, -20.0, 0, fadeOut = 0.08) { b ->
-        b.at(0.0, thump(0.26, 112.0, 52.0, 0.025, 0.075, 1.8), 0.95, room = 0.15)
-        b.at(0.0, thump(0.1, 262.0, 140.0, 0.02, 0.04, 2.0), 0.45, room = 0.2)
-        b.at(0.0, bandBurst(0.025, 12, 1300.0, 2.0, 0.006), 0.4, room = 0.1)
+        b.at(0.0, thump(0.26, 112.0, 52.0, 0.025, 0.075, 1.8), 0.6, room = 0.15)
+        b.at(0.0, thump(0.14, 330.0, 170.0, 0.02, 0.05, 2.2), 0.9, room = 0.2)
+        b.at(0.0, bandBurst(0.03, 12, 900.0, 1.6, 0.008), 0.55, room = 0.1)
+        b.at(0.0, bell(520.0, 0.12, Bells.BLOCK, decay = 0.8), 0.25, room = 0.2)
         Wet(room = Rv.BOX)
     }
     r.add(S.REEL_THUD, 0.48, -17.0, 0, fadeOut = 0.1, hitAt = 0.0) { b ->
@@ -86,9 +87,9 @@ internal fun registerCoreSfx(r: SfxRegistry) {
         Wet(hall = Rv.HALL)
     }
     r.add(S.ERROR, 0.36, -21.0, 0, fadeOut = 0.08) { b ->
-        b.at(0.0, thump(0.3, 125.0, 54.0, 0.03, 0.09, 1.8), 0.9, room = 0.2)
-        b.at(0.0, brass(hz(N.D2), 0.3, 41, 0.01, 0.1, 200.0, 800.0, 3, 0.003, 2.0), 0.7, room = 0.15)
-        b.at(0.0, brass(hz(N.Eb2), 0.3, 42, 0.01, 0.1, 200.0, 800.0, 3, 0.003, 2.0), 0.6, room = 0.15)
+        b.at(0.0, thump(0.3, 190.0, 80.0, 0.03, 0.09, 1.8), 0.6, room = 0.2)
+        b.at(0.0, brass(hz(N.D3), 0.3, 41, 0.01, 0.1, 300.0, 1500.0, 3, 0.003, 2.0), 0.8, room = 0.15)
+        b.at(0.0, brass(hz(N.Eb3), 0.3, 42, 0.01, 0.1, 300.0, 1500.0, 3, 0.003, 2.0), 0.7, room = 0.15)
         b.at(0.0, bandBurst(0.03, 43, 900.0, 2.0, 0.008), 0.35)
         Wet(room = Rv.BOX)
     }

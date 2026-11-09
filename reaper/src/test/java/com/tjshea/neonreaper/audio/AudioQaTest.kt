@@ -20,17 +20,26 @@ class AudioQaTest {
     companion object {
         private val dir = File("build/audio")
         private lateinit var report: AudioRender.Report
+        private var cpuMs = 0L
         private val sfx = HashMap<Sfx, Pcm>()
         private val layers = HashMap<String, Pcm>()
 
         @BeforeClass @JvmStatic fun renderEverything() {
+            val c0 = threadCpuNanos()
             report = AudioRender.renderAllTo(dir)
-            println("AUDIO RENDER: ${report.files} files, wall ${report.ms} ms, thread cpu ${report.cpuMs} ms, ${"%.2f".format(report.bytes / 1048576.0)} MB")
+            cpuMs = (threadCpuNanos() - c0) / 1_000_000
+            println("AUDIO RENDER: ${report.files} files, wall ${report.ms} ms, thread cpu $cpuMs ms, ${"%.2f".format(report.bytes / 1048576.0)} MB")
             for (j in AudioRender.jobs()) {
                 val pcm = Wav.read(File(dir, j.file)) ?: throw AssertionError("cannot read back ${j.file}")
                 when (j) { is Job.OneShot -> sfx[j.sfx] = pcm; is Job.Layer -> layers["${j.track.name}_${j.index}"] = pcm }
             }
         }
+
+        /** CPU time of the calling thread via reflection (the Android unit-test compile classpath has no java.lang.management); wall time as fallback. */
+        private fun threadCpuNanos(): Long = try {
+            val mx = Class.forName("java.lang.management.ManagementFactory").getMethod("getThreadMXBean").invoke(null)
+            Class.forName("java.lang.management.ThreadMXBean").getMethod("getCurrentThreadCpuTime").invoke(mx) as Long
+        } catch (_: Throwable) { System.nanoTime() }
 
         internal fun db(x: Double) = 20 * log10(max(x, 1e-9))
         internal fun rmsDb(p: Pcm): Double {
@@ -149,7 +158,7 @@ class AudioQaTest {
         println("AUDIO SIZE: sfx ${"%.2f".format(sfxBytes / 1048576.0)} MB, music ${"%.2f".format(musicBytes / 1048576.0)} MB")
         assertTrue("SFX files <= ~12 MB", sfxBytes <= 12L * 1048576)
         assertTrue("music <= ~40 MB", musicBytes <= 40L * 1048576)
-        assertTrue("render CPU ${report.cpuMs} ms must stay <= 4000 ms", report.cpuMs <= 4000)
+        assertTrue("render CPU $cpuMs ms must stay <= 4000 ms", cpuMs <= 4000)
     }
 
     @Test fun renderingIsDeterministic() {

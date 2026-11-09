@@ -51,13 +51,12 @@ internal object AudioRender {
         return dir
     }
 
-    class Report(val ms: Long, val cpuMs: Long, val files: Int, val bytes: Long, val perJob: List<Pair<String, Double>>)
+    class Report(val ms: Long, val files: Int, val bytes: Long, val perJob: List<Pair<String, Double>>)
 
     /** Test hook: renders every asset into [out] as `NAME.wav` (effects) and `music_TRACK_Lk.wav` (loop layers). */
     fun renderAllTo(out: File, only: (Job) -> Boolean = { true }): Report {
         out.mkdirs()
-        val mx = java.lang.management.ManagementFactory.getThreadMXBean()
-        val t0 = System.nanoTime(); val c0 = mx.currentThreadCpuTime
+        val t0 = System.nanoTime()
         var bytes = 0L; var n = 0
         val per = ArrayList<Pair<String, Double>>()
         for (j in jobs()) {
@@ -68,6 +67,6 @@ internal object AudioRender {
             bytes += pcm.bytes; n++
             per += j.file to (System.nanoTime() - t1) / 1e6
         }
-        return Report((System.nanoTime() - t0) / 1_000_000, (mx.currentThreadCpuTime - c0) / 1_000_000, n, bytes, per)
+        return Report((System.nanoTime() - t0) / 1_000_000, n, bytes, per)
     }
 }

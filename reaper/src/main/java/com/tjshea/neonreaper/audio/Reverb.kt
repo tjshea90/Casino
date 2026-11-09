@@ -48,7 +48,6 @@ internal object Reverb {
         val hl = FloatArray(ht + 2); val hr = FloatArray(ht + 2)
         core(dec, hs, spec, ht - hs, 1f, hl, hr, false, 2)
         val dn = dstL.size
-        var idx = if (wrap) 0 else 0
         for (i in 0 until total) {
             val k = i shr 1
             val f = if (i and 1 == 0) 0f else 0.5f
@@ -56,7 +55,6 @@ internal object Reverb {
             val r = (hr[k] + (hr[k + 1] - hr[k]) * f) * gain
             if (wrap) { val j = i % dn; dstL[j] += l; dstR[j] += r }
             else { if (i >= dn) break; dstL[i] += l; dstR[i] += r }
-            idx++
         }
     }
 

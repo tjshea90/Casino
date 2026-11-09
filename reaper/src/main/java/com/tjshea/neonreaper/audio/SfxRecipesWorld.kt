@@ -157,25 +157,26 @@ internal fun registerWorldSfx(r: SfxRegistry) {
         Wet(hall = Rv.CATHEDRAL, room = Rv.ROOM)
     }
     r.add(S.HEARTBEAT, 0.75, -20.0, 1, fadeOut = 0.2) { b ->
-        b.at(0.0, thump(0.2, 72.0, 43.0, 0.03, 0.075, 1.6), 1.0, 0.0, 0.1)
-        b.at(0.0, thump(0.1, 150.0, 90.0, 0.02, 0.04, 2.0), 0.3)
-        b.at(0.26, thump(0.2, 66.0, 40.0, 0.03, 0.07, 1.6), 0.75, 0.0, 0.1)
-        b.at(0.26, thump(0.1, 140.0, 85.0, 0.02, 0.04, 2.0), 0.22)
+        b.at(0.0, thump(0.2, 72.0, 43.0, 0.03, 0.075, 1.6), 0.6, 0.0, 0.1)
+        b.at(0.0, thump(0.12, 210.0, 120.0, 0.02, 0.05, 2.2), 0.9)
+        b.at(0.0, bandBurst(0.03, 91, 600.0, 1.5, 0.008), 0.3)
+        b.at(0.26, thump(0.2, 66.0, 40.0, 0.03, 0.07, 1.6), 0.45, 0.0, 0.1)
+        b.at(0.26, thump(0.12, 190.0, 110.0, 0.02, 0.05, 2.2), 0.65)
         Wet(room = Rv.CRYPT)
     }
 
     // ======================================================================================== atmosphere
     r.add(S.THUNDER, 2.8, -17.0, 2, hitAt = 0.05, fadeOut = 0.9) { b ->
         b.at(0.0, noiseBurst(0.25, 301, 0.06, hp = 300.0, lp = 3500.0), 0.7, 0.0, 0.3)
-        b.at(0.02, rumble(2.7, 302, 150.0, 5.0, 0.85) { p -> smooth(p / 0.1) * exp(-1.7 * p) }, 1.0, 0.0, 0.25)
-        b.boom(0.04, 0.8, 1.3)
+        b.at(0.02, rumble(2.7, 302, 260.0, 5.0, 0.85) { p -> smooth(p / 0.1) * exp(-1.7 * p) }, 1.0, 0.0, 0.25)
+        b.boom(0.04, 0.5, 1.3)
         Wet(hall = Rv.HALL)
     }
     r.add(S.LIGHTNING_CRACK, 1.7, -16.0, 2, hitAt = 0.0, fadeOut = 0.6) { b ->
         b.at(0.0, noiseBurst(0.15, 311, 0.022, hp = 700.0, lp = 7000.0), 1.0, 0.0, 0.2)
         b.at(0.0, noiseBurst(0.55, 312, 0.13, hp = 2500.0, lp = 8000.0), 0.22, 0.0, 0.3)
-        b.boom(0.03, 0.8, 0.9, seed = 313)
-        b.at(0.05, rumble(1.5, 314, 160.0, 6.0, 0.85) { p -> smooth(p / 0.08) * exp(-2.2 * p) }, 0.7, 0.0, 0.25)
+        b.boom(0.03, 0.4, 0.9, seed = 313)
+        b.at(0.05, rumble(1.5, 314, 240.0, 6.0, 0.85) { p -> smooth(p / 0.08) * exp(-2.2 * p) }, 0.45, 0.0, 0.25)
         Wet(hall = Rv.HALL)
     }
     r.add(S.DOOR_SLAM, 1.3, -16.0, 2, hitAt = 0.0, fadeOut = 0.45) { b ->
@@ -220,8 +221,8 @@ internal fun registerWorldSfx(r: SfxRegistry) {
         Wet(room = Rv.ROOM)
     }
     r.add(S.BELL, 2.9, -20.0, 2, fadeOut = 0.9) { b ->
-        b.toll(0.0, N.D3, 2.9, 0.9, 0.4, decay = 0.65)
-        b.at(0.0, thump(0.4, 80.0, 44.0, 0.05, 0.15, 1.4), 0.3, 0.0, 0.1)
+        b.toll(0.0, N.D3, 2.9, 0.9, 0.4, decay = 0.65, bright = 1.15)
+        b.at(0.0, thump(0.4, 80.0, 44.0, 0.05, 0.15, 1.4), 0.12, 0.0, 0.1)
         Wet(hall = Rv.HALL)
     }
     r.add(S.REALITY_CHECK, 2.4, -22.0, 3, fadeOut = 0.9) { b ->
@@ -341,8 +342,8 @@ internal fun registerWorldSfx(r: SfxRegistry) {
     r.add(S.MINI_INTRO, 1.4, -18.0, 2, hitAt = 0.5, fadeOut = 0.5) { b ->
         b.at(0.0, whoosh(0.6, 501, 300.0, 2600.0, 0.9, 0.7, 1.0), 0.6, 0.0, 0.3)
         b.at(0.35, whisper(0.5, 502, { t -> Vowels.O.mix(Vowels.A, t / 0.5) }, { t -> sin(PI * t / 0.5).pow(1.5) }, 500.0, 0.85), 0.8, 0.0, 0.4)
-        b.boom(0.5, 0.8, 0.9, seed = 503)
-        b.toll(0.5, N.D3, 1.0, 0.4, 0.4, decay = 0.45)
+        b.boom(0.5, 0.5, 0.9, seed = 503)
+        b.toll(0.5, N.D3, 1.0, 0.5, 0.4, decay = 0.45, bright = 1.0)
         Wet(hall = Rv.HALL)
     }
     r.add(S.ORB_LAND, 0.6, -21.0, 1, hitAt = 0.0, fadeOut = 0.25) { b ->
@@ -371,7 +372,7 @@ internal fun registerWorldSfx(r: SfxRegistry) {
     r.add(S.VAULT, 3.4, -16.0, 2, hitAt = 2.7, fadeOut = 0.9, duckSec = 3.0, duckTo = 0.5) { b ->
         b.toll(0.0, N.D2, 3.4, 0.8, 0.45, decay = 1.0)
         b.toll(1.1, N.A2, 2.3, 0.5, 0.45, decay = 0.8)
-        b.at(0.0, rumble(3.2, 541, 180.0, 4.0, 0.8) { p -> sin(PI * p.pow(0.8)) }, 0.5, 0.0, 0.3)
+        b.at(0.0, rumble(3.2, 541, 260.0, 4.0, 0.8) { p -> sin(PI * p.pow(0.8)) }, 0.35, 0.0, 0.3)
         val src = choirChord(minor, 0.6, 542, 0.25, 0.3, Vowels.O, Vowels.A)
         val sw = reverseSwell(src, Rv.CATHEDRAL, 2.2)
         b.at(2.7 - sw.size / SRD, sw, 0.9, 0.0, 0.2)
