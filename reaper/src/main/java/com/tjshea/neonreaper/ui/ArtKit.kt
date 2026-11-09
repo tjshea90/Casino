@@ -62,7 +62,7 @@ internal object Kit {
     val MULTIPLY = PorterDuffXfermode(PorterDuff.Mode.MULTIPLY)
 
     // ------------------------------------------------------------------ noise textures (built once, 3 x 64 KB)
-    private const val NS = 128
+    private const val NS = 64
     private fun fbm(seed: Long, octaves: Int, baseLattice: Int, gain: Float): FloatArray {
         val rnd = java.util.Random(seed)
         val acc = FloatArray(NS * NS); var amp = 1f; var tot = 0f
@@ -110,7 +110,7 @@ internal object Kit {
      */
     fun tex(c: Canvas, area: RectF, bmp: Bitmap, grain: Float, alpha: Float, tint: Int = 0, mode: PorterDuffXfermode? = null, ox: Float = 0f, oy: Float = 0f) {
         val sh = BitmapShader(bmp, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT)
-        val m = Matrix(); m.setScale(grain, grain); m.postTranslate(ox, oy); sh.setLocalMatrix(m)
+        val m = Matrix(); m.setScale(grain * 2f, grain * 2f); m.postTranslate(ox, oy); sh.setLocalMatrix(m)   // tiles are 64 texels; x2 keeps the old feature size
         val p = Paint(Paint.FILTER_BITMAP_FLAG)
         p.shader = sh; p.alpha = (alpha.coerceIn(0f, 1f) * 255).toInt()
         if (tint != 0) p.colorFilter = PorterDuffColorFilter(tint, PorterDuff.Mode.SRC_IN)

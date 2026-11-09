@@ -84,19 +84,30 @@ internal object Demon {
         val head = Kit.sym(s, "M.5,.18 C.38,.18 .28,.24 .26,.35 C.24,.46 .25,.56 .30,.65 C.34,.73 .41,.82 .5,.85")
         val hb = Kit.bounds(head)
         val p = Kit.fill()
-        p.shader = RadialGradient(s * 0.42f, s * 0.38f, s * 0.46f, intArrayOf(0xFFD0503A.toInt(), 0xFF8C241A.toInt(), 0xFF3A0C0A.toInt(), 0xFF120404.toInt()), floatArrayOf(0f, 0.38f, 0.78f, 1f), Shader.TileMode.CLAMP)
+        p.shader = RadialGradient(s * 0.42f, s * 0.36f, s * 0.46f, intArrayOf(0xFFBE4632.toInt(), 0xFF7A1E16.toInt(), 0xFF300A08.toInt(), 0xFF0E0303.toInt()), floatArrayOf(0f, 0.36f, 0.76f, 1f), Shader.TileMode.CLAMP)
         c.drawPath(head, p)
         c.save(); c.clipPath(head)
         val blk = 0xFF000000.toInt()
-        // sunken cheeks, heavy brow shadow, temple light
-        Kit.halo(c, s * 0.31f, s * 0.60f, s * 0.12f, blk, 0.45f, s * 0.10f); Kit.halo(c, s * 0.69f, s * 0.60f, s * 0.12f, blk, 0.55f, s * 0.10f)
+        // sunken cheeks, heavy brow shadow, under-eye bags, temple light
+        Kit.halo(c, s * 0.31f, s * 0.60f, s * 0.12f, blk, 0.50f, s * 0.10f); Kit.halo(c, s * 0.69f, s * 0.60f, s * 0.12f, blk, 0.60f, s * 0.10f)
         Kit.halo(c, s * 0.5f, s * 0.40f, s * 0.20f, blk, 0.35f, s * 0.04f)
-        Kit.halo(c, s * 0.40f, s * 0.26f, s * 0.14f, 0xFFFFB090.toInt(), 0.25f, s * 0.08f)
+        Kit.halo(c, s * 0.385f, s * 0.505f, s * 0.06f, blk, 0.40f, s * 0.03f); Kit.halo(c, s * 0.615f, s * 0.505f, s * 0.06f, blk, 0.40f, s * 0.03f)
+        Kit.halo(c, s * 0.40f, s * 0.25f, s * 0.14f, 0xFFFFB090.toInt(), 0.28f, s * 0.08f)
+        // the face falls into shadow towards the jaw
+        val sh = Kit.fill(); sh.shader = LinearGradient(0f, s * 0.55f, 0f, s * 0.85f, 0x00000000, 0x88000000.toInt(), Shader.TileMode.CLAMP); c.drawRect(0f, s * 0.5f, s, s * 0.9f, sh)
+        // forehead ridges and the frown between the brows
+        val rg = Kit.stroke(0x66120303, s * 0.007f)
+        for (i in 0..2) { val q = Path(); q.moveTo(s * 0.34f, s * (0.255f + i * 0.026f)); q.quadTo(s * 0.5f, s * (0.225f + i * 0.026f), s * 0.66f, s * (0.255f + i * 0.026f)); c.drawPath(q, rg) }
+        c.drawLine(s * 0.5f, s * 0.31f, s * 0.5f, s * 0.43f, Kit.stroke(0x88120303.toInt(), s * 0.008f))
         // fire in the throat lights the chin from below
         Kit.halo(c, s * 0.5f, s * 0.78f, s * 0.22f, EMBER, 0.38f, s * 0.12f)
         Kit.weather(c, head, s, 0.4f, 0.18f, 0xFF1A0202.toInt(), 0xFFFFC0A0.toInt(), 6)
         c.restore()
-        c.drawPath(head, Kit.stroke(0xFF050202.toInt(), s * 0.006f))
+        // chin spikes
+        for (k in -1..1) Kit.thorn(c, s * (0.5f + k * 0.04f), s * (0.835f - kotlin.math.abs(k) * 0.008f), 1.5708f + k * 0.25f, s * (0.075f - kotlin.math.abs(k) * 0.02f), s * 0.03f, 0xFF3A1210.toInt(), 0xFFC07860.toInt())
+        Kit.edgeLight(c, head, -s * 0.007f, -s * 0.007f, Kit.fill(0x66FFA080))
+        Kit.edgeLight(c, head, s * 0.01f, s * 0.01f, Kit.fill(Kit.al(EMBER, 0.35f)))
+        c.drawPath(head, Kit.stroke(0xFF140303.toInt(), s * 0.004f))
         // brows: angry slabs sloping to the nose
         for (mir in 0..1) {
             val brow = Kit.path(s, "M.255,.345 C.31,.335 .42,.385 .485,.445 L.485,.475 C.42,.44 .33,.405 .27,.41 Z")

@@ -29,6 +29,7 @@ internal object Doctor {
         Kit.groundShadow(c, s * 0.5f, s * 0.975f, s * 0.38f, s * 0.028f, 0.7f)
         staff(c, s)
         coat(c, s)
+        rightArm(c, s)
         harness(c, s)
         belt(c, s)
         lantern(c, s, live)
@@ -73,6 +74,19 @@ internal object Doctor {
             bp.shader = RadialGradient(x - s * 0.004f, y - s * 0.004f, s * 0.016f, intArrayOf(0xFFF3D98A.toInt(), BRASS, 0xFF2A1C06.toInt()), floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP)
             c.drawCircle(x, y, s * 0.0125f, bp)
         }
+    }
+
+    /** The arm that holds the staff: leather sleeve with a brass-studded cuff and a black glove closed round the shaft. */
+    private fun rightArm(c: Canvas, s: Float) {
+        val arm = Kit.path(s, "M.73,.52 C.78,.55 .84,.60 .875,.655 L.84,.70 C.80,.65 .75,.61 .70,.585 Z")
+        val ap = Kit.fill(); ap.shader = LinearGradient(s * 0.70f, s * 0.52f, s * 0.88f, s * 0.70f, 0xFF3A2820.toInt(), 0xFF120A07.toInt(), Shader.TileMode.CLAMP)
+        c.drawPath(arm, ap); c.drawPath(arm, Kit.stroke(0xFF050302.toInt(), s * 0.005f))
+        Kit.edgeLight(c, arm, -s * 0.006f, -s * 0.006f, Kit.fill(0x66C09070))
+        val glove = RectF(s * 0.835f, s * 0.635f, s * 0.905f, s * 0.70f)
+        val gp = Kit.fill(); gp.shader = RadialGradient(s * 0.86f, s * 0.65f, s * 0.06f, 0xFF3A2A22.toInt(), 0xFF0A0605.toInt(), Shader.TileMode.CLAMP)
+        c.drawOval(glove, gp); c.drawOval(glove, Kit.stroke(0xFF050302.toInt(), s * 0.004f))
+        for (i in 0..2) c.drawLine(s * 0.845f, s * (0.648f + i * 0.015f), s * 0.895f, s * (0.645f + i * 0.015f), Kit.stroke(0x66000000, s * 0.004f))
+        c.drawCircle(s * 0.865f, s * 0.60f, s * 0.008f, Kit.fill(BRASS))
     }
 
     private fun harness(c: Canvas, s: Float) {
@@ -166,6 +180,13 @@ internal object Doctor {
         val fp = Kit.fill()
         fp.shader = RadialGradient(s * 0.44f, s * 0.30f, s * 0.2f, intArrayOf(0xFF3A2A22.toInt(), 0xFF1A100C.toInt(), 0xFF070403.toInt()), floatArrayOf(0f, 0.6f, 1f), Shader.TileMode.CLAMP)
         c.drawPath(cowl, fp); fp.shader = null
+        c.save(); c.clipPath(cowl)
+        // leather folds and a lit left edge so the hood reads as material, not a void
+        for (sx in floatArrayOf(-1f, 1f)) { val q = Path(); q.moveTo(s * (0.5f + sx * 0.05f), s * 0.20f); q.quadTo(s * (0.5f + sx * 0.13f), s * 0.34f, s * (0.5f + sx * 0.10f), s * 0.49f); c.drawPath(q, Kit.stroke(0x66000000, s * 0.012f)) }
+        Kit.halo(c, s * 0.40f, s * 0.26f, s * 0.07f, 0xFFD0A07A.toInt(), 0.30f, s * 0.08f)
+        Kit.weather(c, cowl, s, 0.3f, 0.2f, 0xFF000000.toInt(), 0xFFB08868.toInt(), 4)
+        c.restore()
+        Kit.edgeLight(c, cowl, -s * 0.007f, -s * 0.007f, Kit.fill(0x66C09070))
         c.drawPath(cowl, Kit.stroke(0xFF050302.toInt(), s * 0.006f))
         // beak: long tapering leather cone with a lit ridge, stitched seam and vents
         val beak = Kit.sym(s, "M.5,.285 C.455,.285 .44,.34 .445,.40 C.45,.49 .478,.575 .5,.655")

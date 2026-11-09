@@ -31,13 +31,13 @@ internal object Royals {
     private val STYLES = mapOf(
         ReaperConfig.ACE to Style("A", 0xFFFF2A3F.toInt(), 0xFFD5D8E2.toInt(), 0xFF7A8094.toInt(), 0xFF1A0709.toInt(),
             0xFF3A3D48.toInt(), 0xFF0A0A0D.toInt(), 0xFF3A0A0E.toInt(), 0xFFFF3A44.toInt(), 1),
-        ReaperConfig.KING to Style("K", 0xFFFFC24A.toInt(), 0xFFFFEBA6.toInt(), 0xFFC49A40.toInt(), 0xFF150F05.toInt(),
+        ReaperConfig.KING to Style("K", 0xFFFFC94F.toInt(), 0xFFFFF0B8.toInt(), 0xFFD6AB4C.toInt(), 0xFF150F05.toInt(),
             0xFF7A5A20.toInt(), 0xFF1A1105.toInt(), 0xFF2B3A10.toInt(), 0, 2),
-        ReaperConfig.QUEEN to Style("Q", 0xFFB27CFF.toInt(), 0xFFD6C6F6.toInt(), 0xFF7A60B4.toInt(), 0xFF110820.toInt(),
+        ReaperConfig.QUEEN to Style("Q", 0xFFBE8CFF.toInt(), 0xFFE2D4FA.toInt(), 0xFF8E74CC.toInt(), 0xFF110820.toInt(),
             0xFF3E2D66.toInt(), 0xFF0C0816.toInt(), 0xFF1B0F3A.toInt(), 0xFFB27CFF.toInt(), 3),
         ReaperConfig.JACK to Style("J", 0xFF62F0EA.toInt(), 0xFFFFFBEA.toInt(), 0xFFD9D0B2.toInt(), 0xFF041214.toInt(),
             0xFF9A9078.toInt(), 0xFF25210F.toInt(), 0xFF3B4A3C.toInt(), 0, 4),
-        ReaperConfig.TEN to Style("10", 0xFFFF8A2B.toInt(), 0xFFB9A294.toInt(), 0xFF76665C.toInt(), 0xFF130703.toInt(),
+        ReaperConfig.TEN to Style("10", 0xFFFF9030.toInt(), 0xFFD0BBAA.toInt(), 0xFF8E7C70.toInt(), 0xFF130703.toInt(),
             0xFF3A271D.toInt(), 0xFF080403.toInt(), 0xFF2A0F06.toInt(), 0xFFFF7A1A.toInt(), 5)
     )
 
