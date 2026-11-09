@@ -95,6 +95,7 @@ class Scene3D(private val gl: Gl) {
         blit = Program(gl, PostShaders.QUAD_VS, PostShaders.BLIT_FS, "blit")
         buildMeshes()
         buildProps()
+        Cast.reset()          // models cache GPU buffers: never reuse them across GL contexts
         Cast.warm()
         post = PostFx(gl, mScreen)
         noiseTex = gl.genTexture()

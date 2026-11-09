@@ -31,8 +31,14 @@ object Cast {
 
     private val heroCache = HashMap<Int, CharacterModel?>()
 
+    /**
+     * Forgets every model. The models own GPU buffers (uploaded lazily on the GL thread); after an EGL context loss a new Scene3D
+     * is created and those buffer ids are meaningless, so the registry must be rebuilt for each scene (see Scene3D.init).
+     */
+    @Synchronized fun reset() { cache.clear(); heroCache.clear() }
+
     /** Builds every model once (CPU only) so none of them causes a hitch the first time it appears on the reels. */
-    fun warm() {
+    @Synchronized fun warm() {
         for (sym in 0 until ReaperConfig.SYMBOL_COUNT) get(sym)
         hero(ReaperConfig.WILD)
     }

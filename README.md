@@ -8,43 +8,56 @@
 
 | Game | APK | Theme |
 |------|-----|-------|
-| **Neon Reaper** | [`release/NeonReaper.apk`](release/NeonReaper.apk) (~250 KB) | Dark horror: reapers, hooded watchers, neon green & blood red. **94 % RTP**, Soul Vault bonus |
+| **Neon Reaper** | [`release/NeonReaper.apk`](release/NeonReaper.apk) (~550 KB) | **3.0 "DREAD"** — gothic horror 3D slot: Grim Reaper, Plague Doctor, Cursed Skull, Blood Raven, Demon, Wraith, haunted coffins. **94 % RTP**, THE SÉANCE free spins, Soul Vault bonus, feature buy |
 | **Dragon's Hoard** | [`release/DragonsHoard.apk`](release/DragonsHoard.apk) (~115 KB) | Red & gold Asian fortune. **94 % RTP**, free spins |
 
 Both run on Android 10 (Go) and up (MT8168 / armv7 tested target), share the same currency and password security, and are separate apps (they can be installed side by side).
 
 ---
 
-# Neon Reaper
+# Neon Reaper 3.0 — DREAD
 
 ![Neon Reaper](docs/reaper_idle.jpg)
 
-- **Stake:** one STAKE button, 1–40 tokens (1, 2, 3, 4, 5, 8, 10, 15, 20, 25, 30, 40).
-- **20 lines**, pays are whole multiples of the stake, so **every win is exact tokens**. Rounding down to a whole mack happens **only at cash-out** (odd tokens stay on the machine). Max win **25 books (2,000 tokens)** per spin and per bonus.
-- **RTP 94 %** (stakes 1–10; the 25-book win cap trims it a little at higher stakes: 25 → 92.7 %, 40 → 90.9 %): over time the machine keeps **6 % of every token wagered**. About **1 spin in 3 wins** (33 %) and **every win pays at least your stake back**. See [`docs/MATH.md`](docs/MATH.md).
-- Every win pops up a huge **"YOU WIN 70 TOKENS"**, can't be skipped until shown, and counts up with rising ticks for bigger wins (fanfare for big wins).
-- **Giant SPIN button** — tap for one spin, **hold for rapid spins** until you let go.
-- **Mini features (≈1 spin in 100):** a 3D character floats out in front of the reels — Reaper's Touch (wild reels), Raven's Flock (3–6 wilds), Pumpkin's Treats (3–6 soul coins worth their token value), Skull's Curse (2 wilds + ×2/×3/×5).
-- **OpenGL ES 3 3D engine (v2.0):** real 3D reel drums, a moonlit graveyard (tombstones, dead trees, fog, fireflies, bats, lightning) and individually modelled Halloween characters with per-pixel lighting — a skull-faced Grim Reaper with a scythe, a red-eyed crimson Hooded Watcher holding a candle, a chattering skull, a cawing raven, a flickering jack-o'-lantern and a wailing ghost. Falls back to the 2D renderer on devices without OpenGL ES 3.
-- **Reaper's Touch:** the Grim Reaper swoops in and slashes 1–3 middle reels fully wild.
-- **Relics → Soul Vault bonus:** about 1 spin in 25 reveals one of 5 relics (kept between sessions). Collect all 5 (≈ every 125 spins) to open the **Soul Vault**, a separate hold-and-spin screen:
-  its own epic soundtrack, 5 starting orbs, 3 respins (press SPIN for each) that reset whenever an orb lands; orbs worth 1×–25× the bonus bet; MINI 15×, MINOR 40×, MAJOR 150× jackpot orbs;
-  the Reaper orb harvests every soul on the board; fill all 20 niches for the GRAND (1000×). Averages ~28× the bonus bet. The bonus bet is the **average stake of the five spins that revealed your relics, rounded down** — no pattern of stakes (big bets at the last relic, bets timed to relic count, mixing stakes) can earn a bigger bonus than the tokens you actually wagered.
-- Big/Huge/Massive/Deadly win celebrations with the reaper rising, characters looming out of the reels on 5-of-a-kind, lightning, bats, fog, soul particles, synthesized horror music (separate bonus track) and sound effects.
+A dark, scary 3D video slot (OpenGL ES 3 engine behind a Canvas HUD, Android 10 Go → Android 16, auto quality tiers for weak GPUs). The reels are drawn in a crypt cabinet of carved
+pillars, iron-strapped beams, burning skulls and chained cages; the cast are real animated 3D models with per-pixel lighting, bloom, fog and a blood-red mood in the bonus.
 
-| Reaper's Touch | Big win | Soul Vault |
+- **Stake:** one STAKE button, 1–40 tokens (1, 2, 3, 4, 5, 8, 10, 15, 20, 25, 30, 40). **20 lines**, every payout is a whole number of tokens; rounding to a whole mack happens only at cash-out.
+- **Cast:** Grim Reaper (wild), Plague Doctor, Cursed Skull, Blood Raven, Demon, Wraith, carved A K Q J 10, and the **Coffin** scatter.
+- **RTP 94 %** (stakes 1–5; the 25-book win cap trims it at high stakes: ≈ 93.8 % at 10, ≈ 92 % at 25, ≈ 89 % at 40) → the house keeps **6 % of every token wagered, whatever you do**. Plain spins win 1 time in 3.2 and **every win pays at least your stake back**.
+  See [`docs/MATH.md`](docs/MATH.md) (PAR sheet) and the independent audit [`docs/AUDIT_v3.md`](docs/AUDIT_v3.md).
+- **Win tiers:** SOUL REAPED (10×), DEATH'S TOLL (25×), HELLFIRE (50×), APOCALYPSE (100×) — one stinger per tier, the title slams in on the hit. Big wins count up with rising ticks and can't be skipped until shown.
+- **Anticipation:** when two coffins land the remaining reels slow down, the room reddens and a heartbeat builds (it only ever reflects what really landed).
+- **Mini features (about 1 spin in 154):** Reaper's Touch (wild reels), Murder of Crows (wilds), Demon's Bargain (soul coins worth tokens), Skull's Curse (wilds + ×2/×3/×5), each performed by its 3D character.
+
+| THE SÉANCE | Free spins, multiplier ×1…×10 | Feature Buy |
 |---|---|---|
-| ![](docs/reaper_touch.jpg) | ![](docs/reaper_bigwin.jpg) | ![](docs/reaper_vault.jpg) |
+| ![](docs/reaper_seance.jpg) | ![](docs/reaper_freespins.jpg) | ![](docs/reaper_buy.jpg) |
 
-| Pumpkin's Treats | Raven's Flock |
+- **THE SÉANCE** (coffins anywhere: 3 / 4 / 5 pay 2× / 10× / 50× your stake **and** give 8 / 12 / 20 free spins, about 1 round in 213 spins, ≈ 30× stake on average): giant chained coffins rise and burst open, the music turns,
+  free spins play on richer reels with a **multiplier that climbs ×1, ×2 … ×10**, more coffins add spins, and a closing tally counts the total. The round is paid and saved with the trigger, so it replays identically after a crash.
+- **Relics → Soul Vault:** about 1 spin in 27 reveals one of 5 relics (kept between sessions). With all five the **Soul Vault** opens — a hold-and-respin crypt: 5 starting soul orbs, 3 respins that reset when an orb lands,
+  orbs worth 1×–25× the bonus bet, MINI 15× / MINOR 40× / MAJOR 150× jackpot skulls, the Reaper orb harvests every soul, fill the board for the GRAND (1000×); about 28× the bonus bet on average.
+  The bonus bet is the **average stake of the five relic-revealing spins, rounded down** — no staking pattern can make it worth more than the tokens you actually wagered.
+- **Feature Buy:** skip the wait — THE SÉANCE or the SOUL VAULT for 31× your stake. Priced above their exact expected payout (they return about 92.8 % / 91.5 %, **less** than normal play), and a bought round that pays back less than it cost is never celebrated.
+
+| Reaper's Touch | Demon's Bargain | Big win |
+|---|---|---|
+| ![](docs/reaper_touch.jpg) | ![](docs/reaper_demon.jpg) | ![](docs/reaper_bigwin.jpg) |
+
+| Soul Vault | The vault pays |
 |---|---|
-| ![](docs/reaper_coins.jpg) | ![](docs/reaper_raven.jpg) |
+| ![](docs/reaper_vault.jpg) | ![](docs/reaper_vault_win.jpg) |
 
-**Math verification** (`reaper/src/test/.../engine`): the RTP budget is *calculated exactly* — base game 59.34 % + mini features 11.98 % +
-Soul Vault 22.68 % = **94.00 %** (`RtpExactTest`, `tools/reaper_model.py`) — and cross-checked against simulations of the real engine code
-(`FullGameTest`: 4 M spins at each of 5 stakes, 94.05 / 93.99 / 93.89 / 92.84 / 90.87 % at stakes 1 / 5 / 10 / 25 / 40, hit rate 34 %).
-`CalibrationTest` measures the 25-book cap per stake; `NoExploitTest` replays adaptive staking policies on the real engine and fails if
-any beats 94 % (two earlier bonus-bet rules leaked 98 % and 101–104 % — found by testing and an independent audit, fixed, see `docs/MATH.md`).
+- **Sound:** a fully procedural dark score (BASE / SÉANCE / VAULT, layers that fade in with the action) and 74 effects, rendered on first launch and cached (no audio assets in the APK).
+- **Player protection (like regulated brands):** session time, wagered, won and net result in Stats; a **reality check** every 30 minutes (15 / 30 / 60 / off); **autoplay limits** (stop on a single win of N× stake, stop when credit drops by N %);
+  a **reduce flashing** option; no "losses disguised as wins", no free-credit promos, no progressive jackpots. Rank and the Reaper's Ledger (achievements) are purely cosmetic.
+- **Controls:** giant SPIN (tap, or hold for rapid), AUTO, BUY, STAKE, TURBO, SOUND, INFO (pay table & rules), MENU (settings: quality, flashing, reality check, volumes, rank & ledger, statistics).
+  Deposits, cash-outs and password changes need the machine password (same security model as Dragon's Hoard: PBKDF2 hash, signed credit file, TILT on tampering).
+
+**Math verification** (`reaper/src/test/.../engine`): the RTP budget is *calculated exactly* — base game + minis 57.77 % + coffin pays 1.11 % + THE SÉANCE 14.12 % + Soul Vault 21.00 % = **94.00 %**
+(`RtpExactTest`, `tools/reaper_model.py`) — and cross-checked against simulations of the real engine (`FullGameTest`, `CalibrationTest` measures the 25-book cap per stake, `NoExploitTest` replays adaptive staking / buying policies).
+An independent audit (`docs/AUDIT_v3.md`, `tools/audit/`, `*Audit*Test`) enumerated all 2.2·10⁹ reel combinations and could not beat the house with any staking, buying, timing, rounding, crash or file-edit trick.
 
 ---
 
