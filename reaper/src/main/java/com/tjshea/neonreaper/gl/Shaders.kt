@@ -213,9 +213,9 @@ void main(){
     } else if (mat == 3) {                             // metal: dark steel, fake environment, scratches
       vec3 R = reflect(-V, N);
       vec3 env = mix(vec3(0.02, 0.03, 0.03), vec3(0.34, 0.12, 0.12), clamp(R.y * 0.5 + 0.5, 0.0, 1.0)) + vec3(0.1, 0.45, 0.2) * pow(max(R.y, 0.0), 6.0);
-      float scr = nz(vLocal * vec3(8.0, 1.0, 8.0), 3.0).b;
-      albedo *= 0.32 + 0.25 * q.g; emis += env * vColor.rgb * (1.5 + 0.7 * scr); spec = 1.4; shine = 60.0;
-      N = perturb(N, vWorld, q.g, 0.05);
+      float scr = nz(vLocal * vec3(3.0, 1.0, 3.0), 1.2).b;
+      albedo *= 0.32 + 0.2 * q.g; emis += env * vColor.rgb * (1.5 + 0.25 * scr); spec = 1.4; shine = 60.0;
+      N = perturb(N, vWorld, q.g, 0.025);
     } else if (mat == 4) {                             // leather: pebbled grain, dark creases
       vec4 l = nz(vLocal, 6.0);
       albedo *= 0.70 + 0.5 * l.a; spec *= 0.45; N = perturb(N, vWorld, l.a, 0.10);
@@ -223,8 +223,8 @@ void main(){
       frag = vec4(vColor.rgb * uColor * uParam.x * (0.85 + 0.3 * q.r), uAlpha); return;
     } else if (mat == 6) {                             // stone: mottled, veined, mossy at the bottom
       vec4 b = nz(vWorld * 0.8, 1.6);
-      albedo *= 0.55 + 0.85 * b.r; albedo = mix(albedo, albedo * 0.3, smoothstep(0.82, 0.98, b.b) * 0.9);
-      N = perturb(N, vWorld, b.g + b.a * 0.4, 0.10); spec *= 0.35;
+      albedo *= 0.72 + 0.5 * b.r; albedo = mix(albedo, albedo * 0.35, smoothstep(0.88, 0.99, b.b) * 0.6);
+      N = perturb(N, vWorld, b.g * 0.6, 0.03); spec *= 0.35;
     } else if (mat == 7) {                             // demon flesh: glossy, with glowing ember veins in the crevices
       vec4 v = nz(vLocal, 3.0);
       float vein = smoothstep(0.80, 0.97, v.b);
@@ -235,8 +235,8 @@ void main(){
       emis += (vec3(0.05, 0.08, 0.1) + vec3(0.5, 0.55, 0.65) * pow(max(R.y, 0.0), 3.0)) * 0.6 + vColor.rgb * uParam.x * 0.6;
       spec = 1.8; shine = 90.0;
     } else if (mat == 9) {                             // wood: ridged grain along the local Y axis
-      float gr = nz(vLocal * vec3(9.0, 0.7, 9.0), 1.0).b;
-      albedo *= 0.65 + 0.5 * gr; N = perturb(N, vWorld, gr, 0.08); spec *= 0.25;
+      float gr = nz(vLocal * vec3(2.2, 0.6, 2.2), 0.9).b;
+      albedo *= 0.78 + 0.32 * gr; N = perturb(N, vWorld, gr, 0.03); spec *= 0.25;
     } else if (mat == 10) {                            // ectoplasm: translucent with a strong fresnel glow, drifting wisps
       float fres = pow(1.0 - max(dot(N, V), 0.0), 2.0);
       float w = nz(vLocal + vec3(0.0, uTime * 0.25, 0.0), 1.4).r;

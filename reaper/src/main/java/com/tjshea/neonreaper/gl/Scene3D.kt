@@ -61,6 +61,11 @@ class Scene3D(private val gl: Gl) {
     private lateinit var mBatWing: Mesh
     private lateinit var mCoin: Mesh
     private lateinit var mParticles: Mesh
+    // gothic world (vertex-material meshes, see GothicWorld)
+    private lateinit var wPillarL: Mesh; private lateinit var wPillarR: Mesh
+    private lateinit var wLintel: Mesh; private lateinit var wSill: Mesh
+    private lateinit var wBrazier: Mesh; private lateinit var wArch: Mesh; private lateinit var wLamp: Mesh
+    private lateinit var wFence: Mesh; private lateinit var wSkullCandle: Mesh; private lateinit var wCross: Mesh; private lateinit var wCage: Mesh
     private var particleCount = 0
 
     // matrices / scratch
@@ -174,6 +179,10 @@ class Scene3D(private val gl: Gl) {
         particleCount = 140
         for (k in 0 until particleCount) pd.vertex(r.nextFloat() - 0.5f, r.nextFloat(), r.nextFloat() - 0.5f, r.nextFloat(), 0.5f + r.nextFloat(), if (k % 5 == 0) 1f else 0f, 0f, 0f)
         mParticles = mesh(pd)
+        wPillarL = mesh(GothicWorld.pillar(-1f)); wPillarR = mesh(GothicWorld.pillar(1f))
+        wLintel = mesh(GothicWorld.lintel(Layout3D.WORLD_W + 1.5f, true)); wSill = mesh(GothicWorld.lintel(Layout3D.WORLD_W + 1.5f, false))
+        wBrazier = mesh(GothicWorld.brazier()); wArch = mesh(GothicWorld.archRuin()); wLamp = mesh(GothicWorld.lamp())
+        wFence = mesh(GothicWorld.fence()); wSkullCandle = mesh(GothicWorld.skullCandle()); wCross = mesh(GothicWorld.gravecross()); wCage = mesh(GothicWorld.hangingCage())
     }
 
     /** Lathed hood shell ([inward] flips it into a lining); the face opening is cut per-pixel (uParam.z). */
@@ -295,9 +304,10 @@ class Scene3D(private val gl: Gl) {
     /** Lights shared by the whole frame (braziers, candles): slots 0..plWorld-1; characters add local lights after them. */
     private fun addWorldLights() {
         val fl = 0.85f + 0.15f * sin(t * 11f) * sin(t * 4.1f) + 0.08f * sin(t * 23f)
-        val red = lerp(1f, 1.5f, S.mood)
-        pointLight(-4.9f, -1.0f, 1.6f, 7.5f, 0xFF6A2A, 0.85f * fl * red)       // left brazier
-        pointLight(4.9f, -1.0f, 1.6f, 7.5f, 0xFF6A2A, 0.85f * (1.7f - fl) * red)  // right brazier (out of phase)
+        val red = lerp(1f, 1.45f, S.mood)
+        val px = Layout3D.WORLD_W / 2 + 0.35f
+        pointLight(-px - 0.3f, 0.5f, 2.3f, 7.0f, 0xFF8A3A, 0.95f * fl * red)          // candles on the left pillar
+        pointLight(px + 0.3f, 0.5f, 2.3f, 7.0f, 0xFF8A3A, 0.95f * (1.7f - fl) * red)   // right pillar (out of phase)
     }
 
     /** The sky is expensive per pixel and soft by nature: render it at a fraction of the resolution and stretch it. */
@@ -419,6 +429,19 @@ class Scene3D(private val gl: Gl) {
     private fun copy(a: FloatArray) = a.copyOf()
 
     // ================================================================== environment
+    private class Place(val x: Float, val z: Float, val s: Float, val ry: Float)
+    private val archPlaces = arrayOf(Place(-6.4f, -8f, 1.0f, 14f), Place(6.9f, -10f, 1.1f, -16f), Place(-12.5f, -18f, 1.7f, 8f), Place(13.5f, -22f, 1.9f, -10f))
+    private val lampPlaces = arrayOf(Place(-5.6f, -2.2f, 1f, 0f), Place(5.7f, -2.6f, 1f, 180f), Place(-8.2f, -6f, 1.1f, 0f), Place(8.6f, -7.5f, 1.1f, 180f))
+    private val fencePlaces = arrayOf(Place(-4.6f, -5.5f, 1f, 4f), Place(-7.0f, -5.7f, 1f, -3f), Place(-9.4f, -6.0f, 1f, 5f),
+        Place(4.7f, -5.6f, 1f, -5f), Place(7.1f, -5.8f, 1f, 3f), Place(9.5f, -6.1f, 1f, -4f))
+    private val candlePlaces = arrayOf(Place(-3.9f, -3.2f, 1f, 30f), Place(4.1f, -3.6f, 1f, -25f), Place(-1.2f, -4.4f, 1f, 10f))
+    private val braziers = arrayOf(Place(-5.7f, -4.2f, 1f, 0f), Place(5.8f, -4.6f, 1f, 0f))
+
+    private fun placed(mesh: Mesh, pl: Place, dy: Float = 0f, scale: Float = pl.s, rim: Int = 0x1B2C48, spec: Float = 0.25f, emis: Float = 1f, dim: Float = 1f) {
+        val mm = m(); Mat4.translate(mm, pl.x, groundY(pl.x, pl.z) + dy, pl.z); Mat4.rotate(mm, pl.ry, 0f, 1f, 0f); Mat4.scale(mm, scale, scale, scale)
+        drawV(mesh, mm, emis = emis, dim = dim, rim = rim, spec = spec)
+    }
+
     private fun drawEnvironment() {
         val g = m(); Mat4.translate(g, 0f, -2.5f, 2f)
         draw(mGround, g, 10, 0x0A120A, spec = 0.05f)
@@ -427,16 +450,42 @@ class Scene3D(private val gl: Gl) {
             val mm = m(); Mat4.translate(mm, p.x, gy - 0.05f, p.z); Mat4.rotate(mm, p.rot, 0f, 1f, 0f); Mat4.rotate(mm, p.tilt, 0f, 0f, 1f)
             when (p.kind) {
                 0 -> { Mat4.scale(mm, p.s, p.s, p.s); draw(mTomb, mm, 6, 0x5F665E, spec = 0.15f) }
-                1 -> { Mat4.scale(mm, p.s, p.s, p.s); draw(mCross, mm, 6, 0x52584F, spec = 0.15f) }
+                1 -> { Mat4.scale(mm, p.s * 0.9f, p.s * 0.9f, p.s * 0.9f); drawV(wCross, mm, rim = 0x1B2C48, spec = 0.2f) }
                 else -> { Mat4.scale(mm, p.s, p.s, p.s); draw(mTrees[(p.kind - 2) % mTrees.size], mm, 7, 0x2A1E14, rim = 0x200810, spec = 0.05f) }
             }
         }
-        // glowing jack-o'-lanterns on the ground near the cabinet
-        for ((k, x) in floatArrayOf(-4.4f, 4.3f, -6.5f).withIndex()) {
-            val z = if (k == 2) -3f else 0.3f
-            val mm = m(); Mat4.translate(mm, x, groundY(x, z) + 0.36f, z); Mat4.rotate(mm, if (x < 0) 20f else -20f, 0f, 1f, 0f)
-            Mat4.scale(mm, 0.45f, 0.45f, 0.45f)
-            drawPumpkin(mm, k * 1.7f, false)
+        for (a in archPlaces) placed(wArch, a, dy = -0.2f, spec = 0.15f)
+        for (f in fencePlaces) placed(wFence, f, spec = 0.4f)
+        for (l in lampPlaces) {
+            placed(wLamp, l, spec = 0.4f)
+            val fl = 0.8f + 0.2f * sin(t * 9f + l.x)
+            val gx = l.x + 0.30f * l.s * cos(Math.toRadians(l.ry.toDouble())).toFloat(); val gz = l.z - 0.30f * l.s * sin(Math.toRadians(l.ry.toDouble())).toFloat()
+            glow(gx, groundY(l.x, l.z) + 2.05f * l.s, gz, 1.5f * l.s, 0x9CFF57, 0.55f * fl, 0.5f)
+        }
+        for ((k, c) in candlePlaces.withIndex()) {
+            placed(wSkullCandle, c, spec = 0.35f)
+            val fl = 0.8f + 0.2f * sin(t * 12f + k * 2.1f) * sin(t * 5.3f + k)
+            val gy = groundY(c.x, c.z)
+            glow(c.x, gy + 0.82f, c.z, 0.35f * fl, 0xFFFFFF, 0.8f, 1f)
+            glow(c.x, gy + 0.82f, c.z, 1.3f * fl, 0xFF8A3A, 0.55f, 0.2f)
+            glow(c.x, gy + 0.55f, c.z + 0.2f, 0.5f, 0xFF7A20, 0.35f, 0.1f)    // the skull's burning eyes
+        }
+        for ((k, b) in braziers.withIndex()) {
+            val gy = groundY(b.x, b.z)
+            val ped = m(); Mat4.translate(ped, b.x, gy + 0.55f, b.z); Mat4.scale(ped, 0.8f, 1.1f, 0.8f)
+            draw(mBox, ped, 6, 0x4A4D52, spec = 0.12f)
+            val mm = m(); Mat4.translate(mm, b.x, gy + 1.1f, b.z); Mat4.scale(mm, 1.25f, 1.25f, 1.25f)
+            drawV(wBrazier, mm, emis = 1.1f + 0.25f * sin(t * 13f + k * 3f), rim = 0x301008, spec = 0.3f)
+            val fl = 0.8f + 0.2f * sin(t * 10f + k * 1.7f) * sin(t * 4.3f)
+            glow(b.x, gy + 1.95f, b.z, 1.0f * fl, 0xFFB050, 0.85f, 0.7f)
+            glow(b.x, gy + 2.0f, b.z, 3.2f * fl, 0xFF5A1A, 0.45f, 0f)
+        }
+        // hanging iron cages with burning skulls, swaying on chains from beyond the top of the frame
+        for ((k, x) in floatArrayOf(-5.1f, 5.3f).withIndex()) {
+            val sw = sin(t * 0.7f + k * 2f) * 5f
+            val mm = m(); Mat4.translate(mm, x, 3.4f, -1.5f); Mat4.rotate(mm, sw, 0f, 0f, 1f); Mat4.scale(mm, 1.7f, 1.7f, 1.7f)
+            drawV(wCage, mm, rim = 0x1B2C48, spec = 0.35f)
+            glowAt(mm, 0f, -0.85f, 0.1f, 0.9f, 0x9CFF57, 0.55f, 0.3f)
         }
     }
 
@@ -493,27 +542,33 @@ class Scene3D(private val gl: Gl) {
         // dark back panel so gaps between drums show the cabinet, not the graveyard
         val back = m(); Mat4.translate(back, 0f, 0f, -0.6f); Mat4.scale(back, ww + 0.4f, edgeY * 2 + 0.6f, 0.2f)
         draw(mBox, back, 0, 0x050806, spec = 0f)
-        // top and bottom bars
+        val rimC = 0x203A5E
+        val top = m(); Mat4.translate(top, 0f, edgeY + 0.17f, 1.15f); drawV(wLintel, top, rim = rimC, spec = 0.4f)
+        val bot = m(); Mat4.translate(bot, 0f, -(edgeY + 0.17f), 1.15f); drawV(wSill, bot, rim = rimC, spec = 0.4f)
+        // inner edge light strips: blood red above, sickly green below
         for (sgn in intArrayOf(1, -1)) {
-            val bar = m(); Mat4.translate(bar, 0f, sgn * (edgeY + 0.17f), 1.15f); Mat4.scale(bar, ww + 0.7f, 0.34f, 1.0f)
-            draw(mBox, bar, 8, 0x2C3830, rim = 0x184A10, spec = 1.2f, shine = 70f)
-            // neon tube along the inner edge
-            val tube = m(); Mat4.translate(tube, 0f, sgn * (edgeY + 0.0f), 1.68f); Mat4.rotate(tube, 90f, 0f, 0f, 1f); Mat4.scale(tube, 0.035f, ww + 0.5f, 0.035f)
-            draw(mCyl, tube, 9, 0, emis = 0x9CFF57)
-            var x = -ww / 2
-            while (x <= ww / 2 + 0.01f) { glow(x, sgn * edgeY, 1.7f, 0.55f, 0x76FF03, 0.35f, 0.2f); x += 0.45f }
+            val tube = m(); Mat4.translate(tube, 0f, sgn * (edgeY + 0.0f), 1.58f); Mat4.rotate(tube, 90f, 0f, 0f, 1f); Mat4.scale(tube, 0.028f, ww + 0.2f, 0.028f)
+            draw(mCyl, tube, 9, 0, emis = if (sgn > 0) 0xFF2236 else 0x76FF03, emisK = 0.8f)
+            var x = -ww / 2 + 0.3f
+            while (x <= ww / 2) { glow(x, sgn * edgeY, 1.62f, 0.42f, if (sgn > 0) 0xFF2236 else 0x76FF03, 0.22f, 0.15f); x += 0.6f }
         }
-        // side posts
+        // pillars with their candelabras
+        val px = ww / 2 + 0.35f
+        val pl = m(); Mat4.translate(pl, -px, -2.1f, 1.15f); drawV(wPillarL, pl, rim = rimC, spec = 0.35f, emis = 1.1f + 0.3f * S.mood)
+        val pr = m(); Mat4.translate(pr, px, -2.1f, 1.15f); drawV(wPillarR, pr, rim = rimC, spec = 0.35f, emis = 1.1f + 0.3f * S.mood)
         for (sgn in intArrayOf(-1, 1)) {
-            val post = m(); Mat4.translate(post, sgn * (ww / 2 + 0.3f), 0f, 1.15f); Mat4.scale(post, 0.42f, edgeY * 2 + 0.7f, 1.0f)
-            draw(mBox, post, 8, 0x26302A, rim = 0x184A10, spec = 1.2f, shine = 70f)
-            val tube = m(); Mat4.translate(tube, sgn * (ww / 2 + 0.08f), 0f, 1.68f); Mat4.scale(tube, 0.035f, edgeY * 2, 0.035f)
-            draw(mCyl, tube, 9, 0, emis = 0x9CFF57)
-            // skull ornaments on the top corners
-            val sk = m(); Mat4.translate(sk, sgn * (ww / 2 + 0.3f), edgeY + 0.62f, 1.4f); Mat4.scale(sk, 0.28f, 0.28f, 0.28f)
-            drawSkull(sk, t + sgn, false)
+            for ((k, off) in floatArrayOf(-0.07f, 0f, 0.07f).withIndex()) {
+                val fl = 0.78f + 0.22f * sin(t * (10f + k * 3.1f) + sgn * 2f) * sin(t * 4.7f + k)
+                val hgt = floatArrayOf(0.20f, 0.30f, 0.16f)[k]
+                val fx = sgn * px + off; val fy = -2.1f + 2.22f + hgt + 0.06f; val fz = 1.15f + 0.74f
+                glow(fx, fy, fz, 0.16f * fl, 0xFFFFFF, 0.9f, 1f)
+                glow(fx, fy, fz, 0.55f * fl, 0xFFA040, 0.6f, 0.15f)
+            }
+            glow(sgn * px, 0.55f, 1.95f, 2.6f, 0xFF7A20, 0.18f + 0.07f * sin(t * 7f + sgn), 0f)
+            // the skull crown's burning eyes
+            for (e in floatArrayOf(-1f, 1f)) glow(sgn * px + e * 0.065f - sgn * 0.02f, -2.1f + 3.88f, 1.15f + 0.3f, 0.2f, 0xFF2236, 0.8f, 0.4f)
         }
-        // reel separators
+        // reel separators: iron rods
         for (k in 1 until 5) {
             val x = Layout3D.reelX(k) - (Layout3D.REEL_W + Layout3D.GAP) / 2
             val sep = m(); Mat4.translate(sep, x, 0f, R + 0.05f); Mat4.scale(sep, 0.03f, edgeY * 2, 0.03f)
@@ -798,22 +853,29 @@ class Scene3D(private val gl: Gl) {
     // ================================================================== side characters & effects
     private val pt = FloatArray(3)
 
+    /** Draws a cast member through the registry; falls back to the legacy procedural drawer while a model does not exist yet. */
+    private fun castOr(sym: Int, mm: FloatArray, tt: Float, ex: Boolean, dim: Float, legacy: () -> Unit) {
+        if (Cast.get(sym) != null) drawCharacter(sym, mm, tt, ex, dim) else legacy()
+    }
+
     private fun drawSideCharacters() {
         val gy = -2.5f
-        // Hooded Watcher, left of the cabinet; Grim Reaper, right
+        // Plague Doctor (or the crimson watcher while that model is missing) on the left, Grim Reaper on the right
         val hover = sin(t * 0.9f) * 0.06f
-        val left = m(); Mat4.translate(left, -4.3f, gy + 0.75f + hover, -0.2f); Mat4.rotate(left, 28f, 0f, 1f, 0f); Mat4.scale(left, 1.95f, 1.95f, 1.95f)
-        drawReaper(left, t + 0.13f, S.hoodedExcited, 1f, scythe = false, crimson = true)
+        val left = m(); Mat4.translate(left, -4.75f, gy + 0.75f + hover, -0.7f); Mat4.rotate(left, 24f, 0f, 1f, 0f); Mat4.scale(left, 1.9f, 1.9f, 1.9f)
+        castOr(ReaperConfig.DOCTOR, left, t + 0.13f, S.hoodedExcited, 1f) { drawReaper(left, t + 0.13f, S.hoodedExcited, 1f, scythe = false, crimson = true) }
         if (!S.reaperAway) {
-            val right = m(); Mat4.translate(right, 4.3f, gy + 0.75f - hover, -0.2f); Mat4.rotate(right, -28f, 0f, 1f, 0f); Mat4.scale(right, 2.0f, 2.0f, 2.0f)
-            drawReaper(right, t + 0.71f, S.reaperExcited, 1f, scythe = true, crimson = false)
+            val right = m(); Mat4.translate(right, 4.75f, gy + 0.75f - hover, -0.7f); Mat4.rotate(right, -24f, 0f, 1f, 0f); Mat4.scale(right, 1.95f, 1.95f, 1.95f)
+            castOr(ReaperConfig.WILD, right, t + 0.71f, S.reaperExcited, 1f) { drawReaper(right, t + 0.71f, S.reaperExcited, 1f, scythe = true, crimson = false) }
         }
-        // a raven perched on the top bar, a ghost drifting behind the cabinet
-        val rv = m(); Mat4.translate(rv, 1.9f, Layout3D.R * sin(1.5f * Layout3D.STEP) + 0.34f, 1.25f); Mat4.rotate(rv, -15f, 0f, 1f, 0f); Mat4.scale(rv, 0.55f, 0.55f, 0.55f)
-        drawRaven(rv, t, false, 1f, perched = true)
-        val gx = sin(t * 0.13f) * 8f
-        val gh = m(); Mat4.translate(gh, gx, 1.2f + sin(t * 0.7f) * 0.4f, -7f); Mat4.scale(gh, 0.55f, 0.55f, 0.55f)
-        drawGhost(gh, t, false, 0.8f)
+        // a raven perched on the top beam; a wraith drifting far behind the cabinet once that model exists
+        val rv = m(); Mat4.translate(rv, 2.45f, Layout3D.R * sin(1.5f * Layout3D.STEP) + 0.37f, 1.2f); Mat4.rotate(rv, -15f, 0f, 1f, 0f); Mat4.scale(rv, 0.55f, 0.55f, 0.55f)
+        castOr(ReaperConfig.RAVEN, rv, t, false, 1f) { drawRaven(rv, t, false, 1f, perched = true) }
+        if (Cast.get(ReaperConfig.WRAITH) != null) {
+            val gx = sin(t * 0.13f) * 8f
+            val gh = m(); Mat4.translate(gh, gx, -0.4f + sin(t * 0.7f) * 0.4f, -7f); Mat4.scale(gh, 2.4f, 2.4f, 2.4f)
+            drawCharacter(ReaperConfig.WRAITH, gh, t, false, 0.7f)
+        }
     }
 
     private fun drawCoins() {
@@ -843,10 +905,19 @@ class Scene3D(private val gl: Gl) {
         val mm = m(); Mat4.translate(mm, p[0], p[1], p[2])
         val s = S.miniScale
         when (sym) {
-            ReaperConfig.RAVEN -> { Mat4.translate(mm, 0f, -0.6f * s, 0f); Mat4.scale(mm, 1.5f * s, 1.5f * s, 1.5f * s); drawRaven(mm, t, true, 1f, perched = false) }
-            ReaperConfig.PUMPKIN -> { Mat4.rotate(mm, sin(t * 3f) * 15f, 0f, 1f, 0f); Mat4.scale(mm, 0.75f * s, 0.75f * s, 0.75f * s); drawPumpkin(mm, t, true) }
-            ReaperConfig.SKULL -> { Mat4.rotate(mm, sin(t * 2.5f) * 18f, 0f, 1f, 0f); Mat4.scale(mm, 0.7f * s, 0.7f * s, 0.7f * s); drawSkull(mm, t, true) }
-            else -> { Mat4.translate(mm, 0f, -1.2f * s, 0f); Mat4.scale(mm, 1.9f * s, 1.9f * s, 1.9f * s); drawReaper(mm, t, true, 1f, scythe = true, crimson = false) }
+            ReaperConfig.RAVEN -> {
+                if (Cast.get(sym) != null) { Mat4.translate(mm, 0f, -0.7f * s, 0f); Mat4.scale(mm, 1.7f * s, 1.7f * s, 1.7f * s); drawCharacter(sym, mm, t, true) }
+                else { Mat4.translate(mm, 0f, -0.6f * s, 0f); Mat4.scale(mm, 1.5f * s, 1.5f * s, 1.5f * s); drawRaven(mm, t, true, 1f, perched = false) }
+            }
+            ReaperConfig.DEMON -> {
+                if (Cast.get(sym) != null) { Mat4.translate(mm, 0f, -0.9f * s, 0f); Mat4.scale(mm, 1.8f * s, 1.8f * s, 1.8f * s); drawCharacter(sym, mm, t, true) }
+                else { Mat4.rotate(mm, sin(t * 3f) * 15f, 0f, 1f, 0f); Mat4.scale(mm, 0.75f * s, 0.75f * s, 0.75f * s); drawPumpkin(mm, t, true) }
+            }
+            ReaperConfig.SKULL -> {
+                if (Cast.get(sym) != null) { Mat4.translate(mm, 0f, -0.7f * s, 0f); Mat4.scale(mm, 1.6f * s, 1.6f * s, 1.6f * s); drawCharacter(sym, mm, t, true) }
+                else { Mat4.rotate(mm, sin(t * 2.5f) * 18f, 0f, 1f, 0f); Mat4.scale(mm, 0.7f * s, 0.7f * s, 0.7f * s); drawSkull(mm, t, true) }
+            }
+            else -> { Mat4.translate(mm, 0f, -1.2f * s, 0f); Mat4.scale(mm, 1.9f * s, 1.9f * s, 1.9f * s); castOr(ReaperConfig.WILD, mm, t, true, 1f) { drawReaper(mm, t, true, 1f, scythe = true, crimson = false) } }
         }
         // projectiles: wild orbs or spinning coins arcing to their cells
         for (k in 0 until 6) {
@@ -876,7 +947,7 @@ class Scene3D(private val gl: Gl) {
         val z = -0.2f + (Layout3D.R + 1.4f + 0.2f) * e
         val s = 2.0f + 1.4f * e
         val mm = m(); Mat4.translate(mm, x, y - 1.6f * e, z); Mat4.rotate(mm, -22f * (1 - e) + S.reaperSwing, 0f, 0f, 1f); Mat4.scale(mm, s, s, s)
-        drawReaper(mm, t, true, 1f, scythe = true, crimson = false)
+        castOr(ReaperConfig.WILD, mm, t, true, 1f) { drawReaper(mm, t, true, 1f, scythe = true, crimson = false) }
     }
 
     private fun drawBigWin() {
@@ -884,7 +955,7 @@ class Scene3D(private val gl: Gl) {
         if (q < 0f) return
         val e = q * q * (3 - 2 * q)
         val mm = m(); Mat4.translate(mm, 0f, -6.2f + 4.6f * e, Layout3D.R + 0.4f); Mat4.scale(mm, 3.6f, 3.6f, 3.6f)
-        drawReaper(mm, t, true, 1f, scythe = true, crimson = false)
+        castOr(ReaperConfig.WILD, mm, t, true, 1f) { drawReaper(mm, t, true, 1f, scythe = true, crimson = false) }
     }
 
     private fun drawShowcase() {

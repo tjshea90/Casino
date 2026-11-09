@@ -230,20 +230,22 @@ class ReaperModel : CharacterModel {
         val root = copy(mm); Mat4.rotate(root, sway, 0f, 0f, 1f); Mat4.rotate(root, ex * 7f, 1f, 0f, 0f)
         val breathe = 1f + 0.012f * sin(t * 1.3f)
         Mat4.translate(root, 0f, 0f, 0f)
-        sc.drawV(body, root, dim = dim, rim = rim, spec = 0.2f, wave = 0.9f + ex * 1.2f)
 
         // head: slow look-around, snaps toward the camera when excited
         val yaw = sin(t * 0.43f) * 20f * (1f - ex) + ex * sin(t * 5.5f) * 6f
         val pitch = -3f + sin(t * 0.9f) * 2f - ex * 10f
         val head = copy(root)
         Mat4.translate(head, neck[0], neck[1], neck[2]); Mat4.rotate(head, yaw, 0f, 1f, 0f); Mat4.rotate(head, pitch, 1f, 0f, 0f); Mat4.translate(head, -neck[0], -neck[1] * breathe, -neck[2])
+        // the burning eyes light the bone around them (an ember glow that makes the face readable inside the dark hood);
+        // lights must be added BEFORE the meshes they should light are drawn
+        sc.beginLocalLights()
+        sc.pointLightAt(head, head0[0], head0[1] + 0.02f, head0[2] + 0.30f, 0.80f, 0xFF4A38, (0.22f + 0.7f * ex) * dim)
+        sc.drawV(body, root, dim = dim, rim = rim, spec = 0.2f, wave = 0.9f + ex * 1.2f)
         sc.drawV(hood, head, dim = dim, rim = rim, spec = 0.15f)
         sc.drawV(skull, head, dim = dim, rim = 0x10161C, spec = 0.45f)
         val blink = if (!(ex > 0.2f) && ((t * 0.21f) % 1f) < 0.025f) 0f else 1f
         val eyeK = (1.0f + 0.15f * sin(t * 2.3f) + ex * 1.6f + 0.3f * ex * sin(t * 19f)) * blink
         sc.drawV(eyes, head, emis = eyeK * 1.4f, dim = dim)
-        // the burning eyes light the bone around them (an ember glow that makes the face readable inside the dark hood)
-        sc.pointLightAt(head, head0[0], head0[1] + 0.02f, head0[2] + 0.30f, 0.80f, 0xFF4A38, (0.22f + 0.7f * ex) * dim)
         // jaw hangs open when excited
         val open = ex * (14f + 22f * abs(sin(t * 13f))) + 1.5f
         val jawM = copy(head)
