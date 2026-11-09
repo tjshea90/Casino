@@ -19,6 +19,7 @@ import android.view.MotionEvent
 import android.view.View
 import com.tjshea.neonreaper.audio.Audio
 import com.tjshea.neonreaper.audio.Audio.Sfx
+import com.tjshea.neonreaper.data.Achievements
 import com.tjshea.neonreaper.data.BuyPlay
 import com.tjshea.neonreaper.data.Feature
 import com.tjshea.neonreaper.data.SpinPlay
@@ -114,6 +115,10 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
     private var autoStartBalance = 0L
     private var lastRoundTokens = 0L
     private var nextReality = 0.0
+    // Reaper's Ledger / Soul Rank toasts (cosmetic)
+    private var toastTitle = ""; private var toastSub = ""; private var toastAt = -10.0
+    private val toastQueue = ArrayDeque<Pair<String, String>>()
+    private var lastRankIndex = -1
     private var tickStep = 0                               // count-up tick pitch step (musical scale)
     private var nextAntPlay = 0.0                          // when the anticipation loop sound is re-triggered
     private var bigHitAt = -1.0                            // when the win stinger "hits": banner slam, shake, flash
@@ -908,8 +913,46 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         if (abs(k - lastIntensity) > 0.01f) { lastIntensity = k; audio.setIntensity(k) }
     }
 
+    /** Ledger achievements and rank-ups pop up as a small plate under the relic bar, never over a cinematic. */
+    private fun updateToasts(t: Double) {
+        val rank = wallet.rank
+        if (lastRankIndex < 0) lastRankIndex = rank.index
+        else if (rank.index > lastRankIndex) { lastRankIndex = rank.index; toastQueue.addLast("SOUL RANK" to rank.title.uppercase()) }
+        val quiet = seance == null && (phase == Phase.IDLE || phase == Phase.PRESENT) && t >= winLockUntil
+        if (quiet && toastQueue.isEmpty() && wallet.newAchievements.isNotEmpty()) {
+            val id = wallet.newAchievements.removeFirst()
+            Achievements.ALL.firstOrNull { it.id == id }?.let { toastQueue.addLast("LEDGER: ${it.title.uppercase()}" to it.text) }
+        }
+        if (quiet && t - toastAt > 3.8 && toastQueue.isNotEmpty()) {
+            val (a, b) = toastQueue.removeFirst()
+            toastTitle = a; toastSub = b; toastAt = t
+            audio.play(if (a.startsWith("SOUL")) Sfx.RANK_UP else Sfx.ACHIEVEMENT, 0.9f)
+        }
+    }
+
+    private fun drawToast(c: Canvas, t: Double) {
+        val e = (t - toastAt).toFloat()
+        if (e < 0f || e > 3.5f) return
+        val slide = min(1f, e / 0.35f); val out = if (e > 3.1f) 1f - (e - 3.1f) / 0.4f else 1f
+        val w = 520 * u; val h = 60 * u
+        val top = relicRect.bottom + 8 * u - (1f - slide) * 70 * u
+        tmp.set(width / 2f - w / 2, top, width / 2f + w / 2, top + h)
+        pFill.color = Color.argb((235 * out).toInt(), 12, 12, 16); c.drawRoundRect(tmp, 14 * u, 14 * u, pFill)
+        pStroke.color = Neon.BRASS; pStroke.alpha = (255 * out).toInt(); pStroke.strokeWidth = 2 * u; c.drawRoundRect(tmp, 14 * u, 14 * u, pStroke); pStroke.alpha = 255
+        pText.typeface = serif; pText.color = Neon.BONE; pText.alpha = (255 * out).toInt()
+        fit(toastTitle, w * 0.9f, h * 0.38f)
+        pText.setShadowLayer(8 * u, 0f, 0f, Neon.RED)
+        c.drawText(toastTitle, tmp.centerX(), tmp.top + h * 0.45f, pText)
+        pText.clearShadowLayer()
+        pText.typeface = cond; pText.color = 0xFFB8AE92.toInt(); pText.alpha = (230 * out).toInt()
+        fit(toastSub, w * 0.92f, h * 0.24f)
+        c.drawText(toastSub, tmp.centerX(), tmp.top + h * 0.82f, pText)
+        pText.alpha = 255
+    }
+
     private fun updateFlow(t: Double) {
         checkReality(t)
+        updateToasts(t)
         updateAudioState(t)
         if (bigHitAt > 0 && t >= bigHitAt) {
             bigHitAt = -1.0
@@ -1127,6 +1170,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         }
         drawAnticipation(canvas, t)
         drawSeanceBanner(canvas, t)
+        drawToast(canvas, t)
         drawMessage(canvas, t)
         if (g3) publishScene(t)
         if (phase == Phase.IN_VAULT) postInvalidateDelayed(250) else postInvalidateOnAnimation()
@@ -1257,19 +1301,28 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         pText.typeface = serif
         pText.textSize = r.height() * 0.62f
         val y = r.centerY() - (pText.fontMetrics.ascent + pText.fontMetrics.descent) / 2
-        // neon flicker
+        // dying-neon flicker on NEON; REAPER burns steady blood red over a bone-metal face
         val flick = if ((t * 7).toInt() % 23 == 0) 0.4f else 1f
         val a = "NEON "; val b = "REAPER"
         val wa = pText.measureText(a); val wb = pText.measureText(b)
         val x0 = r.centerX() - (wa + wb) / 2
         pText.textAlign = Paint.Align.LEFT
-        for ((text, x, col) in listOf(Triple(a, x0, Neon.GREEN), Triple(b, x0 + wa, Neon.RED))) {
-            pText.color = col; pText.alpha = (255 * (if (col == Neon.GREEN) flick else 1f)).toInt()
-            pText.setShadowLayer(16 * u, 0f, 0f, col)
+        val top = y + pText.fontMetrics.ascent; val bot = y + pText.fontMetrics.descent
+        for ((text, x, glow) in listOf(Triple(a, x0, Neon.GREEN), Triple(b, x0 + wa, Neon.RED))) {
+            val green = glow == Neon.GREEN
+            // glow halo
+            pText.shader = null; pText.color = glow; pText.alpha = (255 * (if (green) flick else 1f)).toInt()
+            pText.setShadowLayer(18 * u, 0f, 0f, glow)
             c.drawText(text, x, y, pText)
             pText.clearShadowLayer()
-            pText.color = Color.WHITE; pText.alpha = (150 * (if (col == Neon.GREEN) flick else 1f)).toInt()
-            pText.style = Paint.Style.STROKE; pText.strokeWidth = 1.2f * u
+            // metal / neon-tube face
+            pText.shader = if (green) LinearGradient(0f, top, 0f, bot, intArrayOf(0xFFD8FFB0.toInt(), 0xFF6FD22B.toInt(), 0xFF1F5A0C.toInt()), floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP)
+                else LinearGradient(0f, top, 0f, bot, intArrayOf(0xFFF6E6D8.toInt(), 0xFFC83A3A.toInt(), 0xFF5E0A14.toInt()), floatArrayOf(0f, 0.45f, 1f), Shader.TileMode.CLAMP)
+            pText.alpha = (255 * (if (green) flick else 1f)).toInt()
+            c.drawText(text, x, y, pText)
+            pText.shader = null
+            pText.color = 0xFF000000.toInt(); pText.alpha = 170
+            pText.style = Paint.Style.STROKE; pText.strokeWidth = 1.4f * u
             c.drawText(text, x, y, pText)
             pText.style = Paint.Style.FILL; pText.alpha = 255
         }
