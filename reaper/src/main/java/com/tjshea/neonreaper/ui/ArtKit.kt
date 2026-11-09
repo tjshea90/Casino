@@ -391,6 +391,29 @@ internal object Kit {
         p.color = core; c.drawOval(x - r * 0.5f, y - r * squash * 0.5f, x + r * 0.5f, y + r * squash * 0.5f, p)
     }
 
+    /** Riveted iron name plate ("WILD") at the bottom of a square art box: bevelled, grimy, text glowing in [color]. */
+    fun plate(c: Canvas, s: Float, text: String, color: Int) {
+        val r = RectF(s * 0.27f, s * 0.82f, s * 0.73f, s * 0.955f)
+        c.drawRoundRect(RectF(r.left, r.top + s * 0.014f, r.right, r.bottom + s * 0.014f), s * 0.03f, s * 0.03f, fill(0xAA000000.toInt()))
+        val p = fill(); p.shader = LinearGradient(0f, r.top, 0f, r.bottom, intArrayOf(0xFF6A707A.toInt(), 0xFF2A2E35.toInt(), 0xFF14161B.toInt(), 0xFF22252B.toInt()), floatArrayOf(0f, 0.3f, 0.75f, 1f), Shader.TileMode.CLAMP)
+        c.drawRoundRect(r, s * 0.03f, s * 0.03f, p); p.shader = null
+        val rp = Path(); rp.addRoundRect(r, s * 0.03f, s * 0.03f, Path.Direction.CW)
+        weather(c, rp, s, 0.5f, 0.3f, 0xFF000000.toInt(), 0xFFB0B8C8.toInt(), 6)
+        edgeLight(c, rp, -s * 0.006f, -s * 0.006f, fill(0xAAD8DEEA.toInt()))
+        edgeLight(c, rp, s * 0.007f, s * 0.007f, fill(0xCC050608.toInt()))
+        c.drawRoundRect(r, s * 0.03f, s * 0.03f, stroke(0xFF050608.toInt(), s * 0.006f))
+        for (sx in floatArrayOf(r.left + s * 0.028f, r.right - s * 0.028f)) for (sy in floatArrayOf(r.top + s * 0.03f, r.bottom - s * 0.03f)) {
+            val rv = fill(); rv.shader = RadialGradient(sx - s * 0.003f, sy - s * 0.003f, s * 0.014f, intArrayOf(0xFFD8DEEA.toInt(), 0xFF5A606C.toInt(), 0xFF14161B.toInt()), floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP)
+            c.drawCircle(sx, sy, s * 0.0105f, rv)
+        }
+        val tp = Paint(Paint.ANTI_ALIAS_FLAG); tp.typeface = android.graphics.Typeface.create(android.graphics.Typeface.SERIF, android.graphics.Typeface.BOLD)
+        tp.textAlign = Paint.Align.CENTER; tp.textSize = r.height() * 0.66f; tp.letterSpacing = 0.08f
+        val ty = r.centerY() - (tp.fontMetrics.ascent + tp.fontMetrics.descent) / 2
+        tp.color = 0xFF050608.toInt(); c.drawText(text, r.centerX() + s * 0.004f, ty + s * 0.006f, tp)
+        tp.color = color; tp.setShadowLayer(s * 0.03f, 0f, 0f, color); c.drawText(text, r.centerX(), ty, tp); tp.clearShadowLayer()
+        tp.color = al(lift(color, 0.6f), 0.8f); c.save(); c.clipRect(r.left, r.top, r.right, r.centerY() - s * 0.01f); c.drawText(text, r.centerX(), ty, tp); c.restore()
+    }
+
     val IRON_D = 0xFF16181D.toInt()
     val BONE = 0xFFD9D2BE.toInt()
 }
