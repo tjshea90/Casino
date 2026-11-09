@@ -20,6 +20,7 @@ class MainActivity : Activity(), ReaperView.Host {
     override lateinit var audio: Audio
     private lateinit var root: FrameLayout
     private lateinit var game: ReaperView
+    internal fun debugGame(): ReaperView = game        // test hook
     private lateinit var dialogs: Dialogs
     private var vault: VaultView? = null
     private var glView: GameGLView? = null
