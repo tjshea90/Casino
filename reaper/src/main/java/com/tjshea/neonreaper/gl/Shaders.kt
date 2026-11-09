@@ -215,7 +215,7 @@ void main(){
       vec3 env = mix(vec3(0.02, 0.03, 0.03), vec3(0.34, 0.12, 0.12), clamp(R.y * 0.5 + 0.5, 0.0, 1.0)) + vec3(0.1, 0.45, 0.2) * pow(max(R.y, 0.0), 6.0);
       float scr = nz(vLocal * vec3(3.0, 1.0, 3.0), 1.2).b;
       albedo *= 0.32 + 0.2 * q.g; emis += env * vColor.rgb * (1.5 + 0.25 * scr); spec = 1.4; shine = 60.0;
-      N = perturb(N, vWorld, q.g, 0.025);
+
     } else if (mat == 4) {                             // leather: pebbled grain, dark creases
       vec4 l = nz(vLocal, 6.0);
       albedo *= 0.70 + 0.5 * l.a; spec *= 0.45; N = perturb(N, vWorld, l.a, 0.10);

@@ -58,6 +58,15 @@ class SceneRenderTest {
         s.miniSymbol = -1; s.projCell[0] = -1; java.util.Arrays.fill(s.coin, 0)
         s.bigWin = 0.8f; s.flash = 0.6f
         scene.render(s, 6f, W, H); hl.save(File("build/screens/gl_bigwin.png"))
+        // the Seance: blood-red mood, then the last reels slowing with two coffins landed (anticipation), then a shaking big win
+        stopped(s, grid); s.bigWin = -1f; s.flash = 0f
+        s.mood = 1f; s.hoodedExcited = true; s.reaperExcited = true; s.souls = 0.5f
+        scene.render(s, 8f, W, H); hl.save(File("build/screens/gl_seance.png"))
+        s.mood = 0f; s.anticipation = 0.9f; s.hoodedExcited = false; s.reaperExcited = false; s.souls = 0f
+        scene.render(s, 8.4f, W, H); hl.save(File("build/screens/gl_anticipation.png"))
+        s.anticipation = 0f; s.shake = 1f; s.bigWin = 0.9f
+        scene.render(s, 8.8f, W, H); hl.save(File("build/screens/gl_shake.png"))
+        s.shake = 0f; s.bigWin = -1f
         // HUD + 3D composites recorded by HudExportTest (run it first)
         File("build/hud").listFiles { f -> f.name.endsWith(".bin") }?.sorted()?.forEachIndexed { i, f ->
             val fr = SceneStateIO.read(f)

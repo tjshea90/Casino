@@ -1716,8 +1716,8 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         val bounce = if (he < 0f) 0f else min(1f, he * 8f) * (1f + 0.7f * max(0f, 1f - he * 4f)) * (1f + 0.035f * sin(he * 7f))
         c.save(); c.scale(bounce.coerceAtLeast(0.001f), bounce.coerceAtLeast(0.001f), width / 2f, height * 0.45f)
         pText.typeface = serif; pText.textSize = height * 0.14f
-        val col = if (shownTier >= 3) Neon.RED else Neon.GREEN
-        pText.color = col; pText.setShadowLayer(30 * u, 0f, 0f, col)
+        val glowC = when (shownTier) { 1 -> Neon.GREEN; 2 -> Neon.ORANGE; else -> Neon.RED }
+        pText.color = if (shownTier >= 4) Neon.RED else Neon.BONE; pText.setShadowLayer(34 * u, 0f, 0f, glowC)
         c.drawText(name, width / 2f, height * 0.48f, pText)
         pText.clearShadowLayer()
         pText.style = Paint.Style.STROKE; pText.strokeWidth = 2 * u; pText.color = Color.WHITE
