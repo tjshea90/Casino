@@ -41,7 +41,7 @@ internal class Ledger(private val ui: Ui, private val wallet: Wallet) {
     fun stats(actions: View? = null): View {
         val page = ui.vbox()
         val net = wallet.sessionNet
-        val cols = Columns(ctx, ui.dp(640), ui.dp(16))
+        val cols = Masonry(ctx, ui.dp(640), ui.dp(16))
 
         // ---- this session
         val session = ui.vbox()
@@ -83,15 +83,17 @@ internal class Ledger(private val ui: Ui, private val wallet: Wallet) {
         life.addView(ui.text("Theory: ${"%.0f".format(ReaperConfig.TARGET_RTP * 100)} % return to player, plain spins win ${ReaperConfig.HIT_FREQUENCY_TEXT} spins. " +
             "Real results swing around this, most of all in short sessions.", 12.5f, Dread.BONE_DIM), ui.lp(t = 8))
         cols.addView(life)
-        page.addView(cols, ui.lp())
 
         // ---- credit
-        page.addView(ui.section("Machine credit"), ui.lp(t = 16, b = 8))
-        page.addView(ui.hbox().apply {
+        val credit = ui.vbox()
+        credit.addView(ui.section("Machine credit"), ui.lp(b = 8))
+        credit.addView(ui.hbox().apply {
             addView(ui.stat("Balance", fmt(wallet.balance), Money.describe(wallet.balance), maxSp = 22f), ui.lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.3f, r = 4))
             addView(ui.stat("Deposited", fmt(wallet.totalDeposited), maxSp = 22f), ui.lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f, l = 4, r = 4))
             addView(ui.stat("Withdrawn", fmt(wallet.totalWithdrawn), maxSp = 22f), ui.lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f, l = 4))
         }, ui.lp())
+        cols.addView(credit)
+        page.addView(cols, ui.lp())
 
         if (actions != null) page.addView(actions, ui.lp(t = 16))
 

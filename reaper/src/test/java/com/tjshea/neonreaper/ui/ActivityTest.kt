@@ -100,6 +100,10 @@ class ActivityTest {
         poke(w, "totalWon", 6_100L)
         act.openReality({}, {}); shots.snap("reality_win")
 
+        act.openWithdraw(); val wd = latest()                  // the whole cash-out flow ends in a printed ticket
+        field(wd, "Password").setText(String(pw)); click(wd, "Cash out"); waitUntil { !wd.isShowing }
+        shots.snap("ticket")
+
         shots.finish()
     }
 
@@ -123,7 +127,8 @@ class ActivityTest {
         click(d2, "Start autoplay")
         assertEquals(50, plan!!.spins); assertEquals(0, plan!!.stopOnWinX); assertEquals(0L, plan!!.lossLimit)
 
-        Dialogs(act, w) {}.autoPicker { plan = null }
+        plan = null
+        Dialogs(act, w) {}.autoPicker { plan = it }
         val d3 = latest(); click(d3, "Cancel")
         assertFalse(d3.isShowing); assertNull("Cancel starts nothing", plan)
     }
@@ -263,6 +268,7 @@ class ActivityTest {
         val act = Robolectric.buildActivity(MainActivity::class.java).setup().get()
         val w = act.wallet
         w.setInitialPassword(pw)
+        poke(w, "status", Wallet.LoadStatus.TAMPERED)           // the dialog is only ever shown for a tampered wallet
         Dialogs(act, w) {}.tampered()
         val dlg = latest()
         dlg.onBackPressed(); assertTrue("cannot be dismissed", dlg.isShowing)
@@ -307,16 +313,22 @@ class ActivityTest {
     private fun views(dlg: Dialog, pred: (View) -> Boolean = { true }) = views(dlg.window!!.decorView, pred)
     private fun allText(dlg: Dialog): String = views(dlg) { it is TextView }.joinToString(" | ") { (it as TextView).text.toString() }
 
-    private fun textView(dlg: Dialog, label: String, exact: Boolean): TextView =
-        views(dlg) { it is TextView && it.visibility == View.VISIBLE && it.text.toString().let { t -> if (exact) t == label else t.startsWith(label, ignoreCase = true) } }
-            .firstOrNull() as? TextView ?: error("no '$label' in: ${allText(dlg)}")
-    private fun button(dlg: Dialog, label: String, exact: Boolean = false): Button = textView(dlg, label, exact) as Button
+    private fun matches(t: String, label: String, exact: Boolean) = if (exact) t == label else t.startsWith(label, ignoreCase = true)
+    private fun labelled(dlg: Dialog, label: String, exact: Boolean): List<TextView> =
+        views(dlg) { it is TextView && it.visibility == View.VISIBLE && matches(it.text.toString(), label, exact) }.map { it as TextView }
+    private fun button(dlg: Dialog, label: String, exact: Boolean = false): Button =
+        labelled(dlg, label, exact).firstOrNull { it is Button } as? Button ?: error("no button '$label' in: ${allText(dlg)}")
+
+    /** The control a tap on [v] reaches: the view itself or the nearest clickable parent, but never the sheet (it only swallows taps). */
+    private fun control(v: View): View? {
+        var x: View? = v
+        while (x != null && !x.isClickable) x = x.parent as? View
+        return x?.takeIf { it !is SheetLayout }
+    }
 
     /** Taps the control showing [label] (a button, a chip, or a link row that contains the text). */
     private fun click(dlg: Dialog, label: String, exact: Boolean = false) {
-        var v: View? = textView(dlg, label, exact)
-        while (v != null && !v.isClickable) v = v.parent as? View
-        val target = v ?: error("nothing clickable shows '$label'")
+        val target = labelled(dlg, label, exact).firstNotNullOfOrNull { control(it) } ?: error("nothing clickable shows '$label' in: ${allText(dlg)}")
         assertTrue("'$label' is enabled", target.isEnabled)
         target.performClick(); ShadowLooper.idleMainLooper()
     }

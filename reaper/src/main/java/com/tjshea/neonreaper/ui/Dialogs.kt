@@ -83,23 +83,23 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
         if (act.isFinishing || act.isDestroyed) return sh
         val dlg = Dialog(act, android.R.style.Theme_Material_Dialog_NoActionBar)
         sh.dlg = dlg
-        val tight = ui.tight
+        val tight = ui.tight; val short = ui.short
         val padH = dp(if (tight) 16 else 26)
         val panel = SheetLayout(act, dp(widthDp), dp(if (tight) 8 else 20)).apply {
             background = IronPanel(act)
             isClickable = true   // taps on the sheet never count as "outside"
-            setPadding(padH, dp(if (tight) 16 else 22), padH, dp(if (tight) 14 else 20))
+            setPadding(padH, dp(if (short) 12 else if (tight) 16 else 22), padH, dp(if (short) 10 else if (tight) 14 else 20))
         }
-        panel.addView(ui.heading(title, if (tight) 21f else 26f), ui.lp())
-        if (subtitle != null) panel.addView(ui.text(subtitle, 13.5f, Dread.BONE_DIM, center = true), ui.lp(t = 4))
-        panel.addView(ui.rule(), ui.lp(t = 6, b = 6))
-        if (tabs != null) panel.addView(tabs, ui.lp(b = 8))
+        panel.addView(ui.heading(title, if (short) 20f else if (tight) 21f else 26f), ui.lp())
+        if (subtitle != null) panel.addView(ui.text(subtitle, if (short) 12.5f else 13.5f, Dread.BONE_DIM, center = true), ui.lp(t = if (short) 1 else 4))
+        panel.addView(ui.rule(), ui.lp(t = if (short) 2 else 6, b = if (short) 2 else 6))
+        if (tabs != null) panel.addView(tabs, ui.lp(b = if (short) 4 else 8))
         val scroll = ui.scroll()
         scroll.addView(FrameLayout(act).apply { setPadding(0, dp(4), 0, dp(8)); addView(body) })
         sh.scroll = scroll
         panel.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         if (footer != null) {
-            panel.addView(RuleView(act, ornament = false), ui.lp(t = 2, b = 10))
+            panel.addView(RuleView(act, ornament = false), ui.lp(t = 2, b = if (short) 6 else 10))
             panel.addView(footer, ui.lp())
         }
         val root = FrameLayout(act).apply {
@@ -464,7 +464,7 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
         sheet(sh, "AUTOPLAY", subtitle = "Credit ${fmt(wallet.balance)} tokens  ·  stake ${wallet.stake}", widthDp = 660,
             body = ui.vbox(
                 ui.vbox(ui.section("Number of spins"), spinsChips, gap = 8),
-                ui.vbox(ui.section("Stop on a single win of (times your stake)"), winChips, gap = 8),
+                ui.vbox(ui.section("Stop on a single win of"), winChips, gap = 8),
                 ui.vbox(ui.section("Stop if my credit drops by"), lossChips, gap = 8),
                 ui.card(pad = 12).apply {
                     addView(summary, ui.lp())
@@ -511,6 +511,7 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
                 val need = price(f) - wallet.balance
                 c.addView(ui.text(if (need > 0) "Not enough credit: ${fmt(need)} more tokens needed." else "Not available right now.", 13.5f, Dread.ERROR), ui.lp(t = 8))
             }
+            c.addView(View(act), LinearLayout.LayoutParams(1, 0, 1f))   // pushes the button to the bottom of the (equal-height) card
             c.addView(ui.button(if (picked == f) "Selected" else "Buy for ${fmt(price(f))}", if (seance) Dread.Kind.PRIMARY else Dread.Kind.SECONDARY) {
                 picked = f; render()
             }.also { it.isEnabled = can && picked != f }, ui.lp(t = 12))
@@ -519,15 +520,15 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
 
         render = {
             cardsHost.removeAllViews()
-            cardsHost.addView(Columns(act, dp(640), dp(14), equalHeight = true).apply {
+            cardsHost.addView(Columns(act, dp(520), dp(14), equalHeight = true).apply {
                 addView(card(Feature.SEANCE)); addView(card(Feature.VAULT))
             })
             footerHost.removeAllViews()
             val f = picked
             if (f == null) {
-                footerHost.addView(ui.vbox(
-                    ui.text("Credit: ${fmt(wallet.balance)} tokens. Choose a feature, then confirm.", 13.5f, Dread.BONE_DIM, center = true),
-                    bar(ui.button("Cancel", Dread.Kind.SECONDARY) { sh.close() }), gap = 8))
+                val cancel = bar(ui.button("Cancel", Dread.Kind.SECONDARY) { sh.close() })
+                footerHost.addView(if (ui.short) cancel else ui.vbox(
+                    ui.text("Credit: ${fmt(wallet.balance)} tokens. Choose a feature, then confirm.", 13.5f, Dread.BONE_DIM, center = true), cancel, gap = 8))
             } else {
                 footerHost.addView(ui.vbox(
                     ui.text(ui.rich("Pay **${fmt(price(f))} tokens** for **${title(f)}**? Credit afterwards: **${fmt(wallet.balance - price(f))}**."), 14.5f, Dread.BONE, center = true),
@@ -562,6 +563,7 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
                 handler.removeCallbacks(flush); handler.postDelayed(flush, 600)   // keyboard / accessibility changes have no "stop" event
             }, { handler.removeCallbacks(flush); flush.run() })
             return ui.vbox(ui.hbox().apply {
+                setPadding(dp(15), 0, dp(15), 0)   // line the label and the value up with the ends of the track
                 addView(ui.caps(label, 11.5f), ui.lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
                 addView(value, ui.lp(ViewGroup.LayoutParams.WRAP_CONTENT))
             }, bar, gap = 2)
@@ -585,17 +587,18 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
             contentDescription = "$title. $sub"
         }
 
-        val left = ui.vbox(gap = 16)
-        left.addView(ui.vbox(ui.section("Graphics"), group("Quality", quality), group("Reduce flashing", flashing, "Softens lightning, bloom and screen shake."), gap = 10))
-        left.addView(ui.vbox(ui.section("Sound"), volume("Music volume", { wallet.musicVolume }, { wallet.musicVolume = it }),
-            volume("Effects volume", { wallet.sfxVolume }, { wallet.sfxVolume = it }), gap = 10))
-        val right = ui.vbox(gap = 16)
-        right.addView(ui.vbox(ui.section("Player protection"),
-            group("Reality check", reality, "A pause that shows your time played and net result."), gap = 10))
-        right.addView(ui.vbox(ui.section("The machine"),
-            link("Soul Rank & Reaper's Ledger", "Your rank and ${com.tjshea.neonreaper.data.Achievements.ALL.size} achievements") { rank() },
-            link("Statistics & history", "Session and lifetime figures") { if (!gate()) stats() },
-            link("How to play", "Pay table, features, rules") { info(wallet.stake) }, gap = 8))
+        val left = ui.vbox(
+            ui.vbox(ui.section("Graphics"), group("Quality", quality), group("Reduce flashing", flashing, "Softens lightning, bloom and screen shake."), gap = 10),
+            ui.vbox(ui.section("Sound"), volume("Music volume", { wallet.musicVolume }, { wallet.musicVolume = it }),
+                volume("Effects volume", { wallet.sfxVolume }, { wallet.sfxVolume = it }), gap = 8),
+            gap = 20)
+        val right = ui.vbox(
+            ui.vbox(ui.section("Player protection"), group("Reality check", reality, "A pause that shows your time played and net result."), gap = 10),
+            ui.vbox(ui.section("The machine"),
+                link("Soul Rank & Reaper's Ledger", "Your rank and ${com.tjshea.neonreaper.data.Achievements.ALL.size} achievements") { rank() },
+                link("Statistics & history", "Session and lifetime figures") { if (!gate()) stats() },
+                link("How to play", "Pay table, features, rules") { info(wallet.stake) }, gap = 8),
+            gap = 20)
         val cols = Columns(act, dp(620), dp(22)).apply { addView(left); addView(right) }
         sheet(sh, "SETTINGS", widthDp = 860, body = cols, footer = ui.button("Done") { sh.close() },
             onDismiss = { handler.removeCallbacks(flush); flush.run() })

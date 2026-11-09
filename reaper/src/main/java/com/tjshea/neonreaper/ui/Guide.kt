@@ -34,7 +34,7 @@ internal class Guide(private val ui: Ui, private val wallet: Wallet) {
 
     private fun hair(): View = View(ctx).apply {
         setBackgroundColor(Dread.withAlpha(Dread.IRON_LIGHT, 0x90))
-        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1.coerceAtLeast(ui.dp(1)))
+        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, max(1, ui.dp(1)))
     }
 
     private fun joinOr(items: List<String>): String =
@@ -100,14 +100,9 @@ internal class Guide(private val ui: Ui, private val wallet: Wallet) {
 
     // ================================================================== FEATURES
     fun features(stake: Int): View {
-        val page = ui.vbox()
-        val cols = Columns(ctx, ui.dp(640), ui.dp(16))
-        val left = ui.vbox(gap = 14); val right = ui.vbox(gap = 14)
-        left.addView(wildCard()); left.addView(miniCard())
-        right.addView(seanceCard()); right.addView(vaultCard())
-        cols.addView(left); cols.addView(right)
-        page.addView(cols, ui.lp())
-        page.addView(buyCard(stake), ui.lp(t = 14))
+        // two balanced columns on a wide sheet, this exact order in a single column
+        val page = Masonry(ctx, ui.dp(640), ui.dp(14))
+        page.addView(wildCard()); page.addView(seanceCard()); page.addView(miniCard()); page.addView(vaultCard()); page.addView(buyCard(stake))
         return page
     }
 

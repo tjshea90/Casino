@@ -160,7 +160,7 @@ internal class IronPanel(context: Context) : Drawable() {
         plate = LinearGradient(0f, b.top.toFloat(), 0f, b.bottom.toFloat(),
             intArrayOf(0xFF20232A.toInt(), Neon.IRON, Neon.INK), floatArrayOf(0f, 0.45f, 1f), Shader.TileMode.CLAMP)
         glow = RadialGradient(b.exactCenterX(), b.top + 34 * d, max(1f, b.width() * 0.62f),
-            intArrayOf(0x3AE0182F, 0x00E0182F), null, Shader.TileMode.CLAMP)
+            intArrayOf(0x30E0182F, 0x00E0182F), null, Shader.TileMode.CLAMP)
     }
 
     override fun draw(c: Canvas) {
@@ -515,6 +515,64 @@ internal class SheetLayout(context: Context, private val maxWidth: Int, private 
     }
 }
 
+/** A single-line figure that shrinks to fit its width (the framework's auto-size picks the minimum with a wrap_content height). */
+internal class FitText(context: Context, private val maxSp: Float, private val minSp: Float = 11f) : TextView(context) {
+    private val dm = context.resources.displayMetrics
+    private fun px(sp: Float) = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, sp, dm)
+
+    init { maxLines = 1 }
+
+    override fun onMeasure(wSpec: Int, hSpec: Int) {
+        val avail = MeasureSpec.getSize(wSpec) - compoundPaddingLeft - compoundPaddingRight
+        val s = text
+        var target = px(maxSp)
+        if (avail > 0 && s.isNotEmpty()) {
+            val p = android.text.TextPaint(paint)
+            p.textSize = target
+            val w = p.measureText(s, 0, s.length)
+            if (w > avail) target = max(px(minSp), target * avail / w)
+        }
+        if (kotlin.math.abs(textSize - target) > 0.5f) setTextSize(TypedValue.COMPLEX_UNIT_PX, target)
+        super.onMeasure(wSpec, hSpec)
+    }
+}
+
+/**
+ * Two columns when wide enough, one otherwise. Each child goes into the currently shorter column, in order, so the columns stay
+ * balanced and a single column still reads in the order the children were added.
+ */
+internal class Masonry(context: Context, private val thresholdPx: Int, private val gap: Int) : ViewGroup(context) {
+    private var colOf = IntArray(0)
+    private var yOf = IntArray(0)
+    private var colW = 0
+
+    override fun onMeasure(wSpec: Int, hSpec: Int) {
+        val avail = MeasureSpec.getSize(wSpec)
+        val cols = if (avail >= thresholdPx) 2 else 1
+        colW = (avail - (cols - 1) * gap) / cols
+        val heights = IntArray(cols)
+        colOf = IntArray(childCount); yOf = IntArray(childCount)
+        for (i in 0 until childCount) {
+            val c = getChildAt(i); if (c.visibility == GONE) continue
+            c.measure(MeasureSpec.makeMeasureSpec(colW, MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED))
+            var k = 0
+            for (j in 1 until cols) if (heights[j] < heights[k]) k = j
+            colOf[i] = k; yOf[i] = heights[k]
+            heights[k] += c.measuredHeight + gap
+        }
+        val h = max(0, (heights.maxOrNull() ?: 0) - gap)
+        setMeasuredDimension(avail, resolveSize(h, hSpec))
+    }
+
+    override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
+        for (i in 0 until childCount) {
+            val c = getChildAt(i); if (c.visibility == GONE) continue
+            val x = colOf[i] * (colW + gap)
+            c.layout(x, yOf[i], x + colW, yOf[i] + c.measuredHeight)
+        }
+    }
+}
+
 // ====================================================================== the builder
 
 /** Small view factory shared by every dialog, so spacing, type and colour stay consistent. */
@@ -526,6 +584,8 @@ internal class Ui(val ctx: Context) {
     val screenHdp: Int get() = ctx.resources.configuration.screenHeightDp
     /** Landscape phones and portrait phones: tighter paddings. */
     val tight: Boolean get() = screenHdp < 480 || screenWdp < 480
+    /** Landscape phones: every dp of header and footer counts. */
+    val short: Boolean get() = screenHdp < 480
 
     fun lp(w: Int = ViewGroup.LayoutParams.MATCH_PARENT, h: Int = ViewGroup.LayoutParams.WRAP_CONTENT, weight: Float = 0f,
            l: Number = 0, t: Number = 0, r: Number = 0, b: Number = 0) =
@@ -572,10 +632,9 @@ internal class Ui(val ctx: Context) {
 
     /** Large figure that shrinks instead of clipping. */
     fun figure(s: CharSequence, maxSp: Float = 28f, color: Int = Dread.BONE_HI, center: Boolean = false): TextView =
-        TextView(ctx).apply {
-            text = s; setTextColor(color); typeface = Dread.SERIF; maxLines = 1
+        FitText(ctx, maxSp).apply {
+            text = s; setTextColor(color); typeface = Dread.SERIF
             if (center) gravity = Gravity.CENTER_HORIZONTAL
-            setAutoSizeTextTypeUniformWithConfiguration(11, maxSp.toInt(), 1, TypedValue.COMPLEX_UNIT_SP)
         }
 
     /** "**bold**" segments become bright, bold text. */
@@ -603,8 +662,11 @@ internal class Ui(val ctx: Context) {
     /** Section caption with a rule that fades to the right. */
     fun section(s: CharSequence): View = LinearLayout(ctx).apply {
         orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
-        addView(caps(s, 12.5f).apply { if (Build.VERSION.SDK_INT >= 28) isAccessibilityHeading = true }, lp(ViewGroup.LayoutParams.WRAP_CONTENT))
-        addView(RuleView(ctx, ornament = false, fade = RuleView.FADE_RIGHT), lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f, l = 10))
+        addView(caps(s, 12.5f).apply {
+            setPadding(0, 0, dp(10), 0)
+            if (Build.VERSION.SDK_INT >= 28) isAccessibilityHeading = true
+        }, lp(ViewGroup.LayoutParams.WRAP_CONTENT))
+        addView(RuleView(ctx, ornament = false, fade = RuleView.FADE_RIGHT), lp(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
     }
 
     fun rule(): View = RuleView(ctx, ornament = true)
@@ -649,7 +711,7 @@ internal class Ui(val ctx: Context) {
             background = Dread.buttonBg(kind, d)
             stateListAnimator = null
             minWidth = 0; minimumWidth = 0
-            val mh = dp(if (small) 44 else 52)
+            val mh = dp(if (small) 44 else if (short) 48 else 52)
             minHeight = mh; minimumHeight = mh
             setPadding(dp(14), dp(6), dp(14), dp(6))
             setOnClickListener(onClick)
