@@ -31,14 +31,21 @@ object Cast {
 
     private val heroCache = HashMap<Int, CharacterModel?>()
 
+    /** Builds every model once (CPU only) so none of them causes a hitch the first time it appears on the reels. */
+    fun warm() {
+        for (sym in 0 until ReaperConfig.SYMBOL_COUNT) get(sym)
+        hero(ReaperConfig.WILD)
+    }
+
     /** The model used when ONE character is shown large (side stage, big win, mini feature, showcase): full detail where it exists. */
     fun hero(sym: Int): CharacterModel? = heroCache.getOrPut(sym) { if (sym == ReaperConfig.WILD) ReaperModel(low = false) else get(sym) }
 
     private fun create(sym: Int): CharacterModel? = when (sym) {
         ReaperConfig.WILD -> ReaperModel(low = true)
         ReaperConfig.DOCTOR -> DoctorModel()
-        ReaperConfig.DEMON -> DemonModel()
         ReaperConfig.SKULL -> SkullModel()
+        ReaperConfig.RAVEN -> RavenModel()
+        ReaperConfig.DEMON -> DemonModel()
         ReaperConfig.WRAITH -> WraithModel()
         ReaperConfig.SCATTER -> CoffinModel()
         else -> null

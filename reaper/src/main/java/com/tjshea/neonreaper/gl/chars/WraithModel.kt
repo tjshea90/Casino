@@ -232,7 +232,12 @@ class WraithModel : CharacterModel {
     }
 
     // ---------------------------------------------------------------------------------------------- animation
-    private fun copy(m: FloatArray) = m.copyOf()
+    // scratch matrices (draw runs on the GL thread only): a small ring so nothing is allocated per frame
+    private val pool = Array(8) { FloatArray(16) }
+    private var poolI = 0
+    private fun copy(m: FloatArray): FloatArray { val d = pool[poolI]; poolI = (poolI + 1) and 7; System.arraycopy(m, 0, d, 0, 16); return d }
+    private val SIDES = floatArrayOf(-1f, 1f)
+    private val emberP = FloatArray(6).also { e -> for (i in 0..1) { val sx = if (i == 0) -1f else 1f; val d = CharKit.unit(0.36f * sx, 0.12f, 0.92f); e[i * 3] = head0[0] + d[0] * 0.60f * hs; e[i * 3 + 1] = head0[1] + d[1] * 0.55f * hs + 0.005f; e[i * 3 + 2] = head0[2] + 0.60f * hs } }
 
     override fun draw(sc: Scene3D, mm: FloatArray, t: Float, ex: Float, dim: Float) {
         val rim = 0x2A5A90
@@ -272,7 +277,7 @@ class WraithModel : CharacterModel {
         sc.drawV(hair, hairM, emis = 0.70f + 0.5f * ex, alpha = 1.4f * fade, dim = dim, rim = rim, wave = 1.6f + 2.2f * ex)
         sc.drawV(head, headM, emis = emberK, alpha = fade, dim = dim, rim = 0x10202E, spec = 0.35f)
         sc.drawV(jaw, jawM, alpha = fade, dim = dim, rim = 0x10202E, spec = 0.4f)
-        for (sx in floatArrayOf(-1f, 1f)) {
+        for (sx in SIDES) {
             val am = copy(root)
             Mat4.translate(am, sx * shoulder[0], shoulder[1], shoulder[2])
             val flail = ex * sin(t * 7f + sx)
@@ -284,12 +289,9 @@ class WraithModel : CharacterModel {
         }
 
         // ---- glow sprites: a cold aura behind, the embers, a halo round the head, trailing wisps, sound rings from the mouth
-        sc.glowAt(root, 0f, 0.72f, -0.30f, 1.8f + 0.4f * wail, 0x4F86E0, (0.09f + 0.06f * sin(t * 1.1f) + 0.22f * ex) * dim, 0f)
+        sc.glowAt(root, 0f, 0.72f, -0.03f, 1.8f + 0.4f * wail, 0x4F86E0, (0.09f + 0.06f * sin(t * 1.1f) + 0.22f * ex) * dim, 0f)
         sc.glowAt(headM, 0f, 1.12f, 0.0f, 0.5f + 0.2f * wail, 0x9CC4FF, (0.10f + 0.16f * ex) * dim, 0f)
-        for (sx in floatArrayOf(-1f, 1f)) {
-            val d = CharKit.unit(0.36f * sx, 0.12f, 0.92f)
-            sc.glowAt(headM, head0[0] + d[0] * 0.60f * hs, head0[1] + d[1] * 0.55f * hs + 0.005f, head0[2] + 0.60f * hs, 0.035f + 0.03f * emberK, 0xFF2030, 0.9f * dim, 0.5f)
-        }
+        for (i in 0..1) sc.glowAt(headM, emberP[i * 3], emberP[i * 3 + 1], emberP[i * 3 + 2], 0.035f + 0.03f * emberK, 0xFF2030, 0.9f * dim, 0.5f)
         for (k in 0 until 3) {
             val ph = t * 0.4f + k * 2.1f
             sc.glowAt(root, sin(ph) * 0.20f, 0.10f + 0.10f * k + 0.05f * sin(ph * 1.7f), -0.02f + 0.10f * cos(ph), 0.45f, 0x5F94E8, (0.06f + 0.04f * ex) * dim, 0f)

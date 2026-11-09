@@ -1,6 +1,7 @@
 package com.tjshea.neonreaper.gl.chars
 
 import com.tjshea.neonreaper.gl.Bones
+import com.tjshea.neonreaper.gl.Mat4
 import com.tjshea.neonreaper.gl.MeshData
 import com.tjshea.neonreaper.gl.PartBuilder
 import com.tjshea.neonreaper.gl.Sculpt
@@ -12,6 +13,7 @@ import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sqrt
 
@@ -375,5 +377,44 @@ internal object CharKit {
         val st = MeshData.STRIDE
         for (q in 0 until m.vertexCount) { val f = k(m.v[q * st + 1]); m.v[q * st + 8] *= f; m.v[q * st + 9] *= f; m.v[q * st + 10] *= f }
         return m
+    }
+    // ------------------------------------------------------------------------------------------ feathers
+    /**
+     * A feather: root at the origin, length along +Y, width along X, outer face +Z. [segs] rows, widest at ~55 %, a pointed tip, a bowed
+     * vane ([curl]) and tip droop; [ragged] (0..1) tears notches out of the vane edges. Vertex colour runs from a darker root
+     * ([base]) to [tip] (0xRRGGBB), so one mesh can hold black plumage with blood-dark tips; add it with a white tint.
+     */
+    fun feather(len: Float, w: Float, curl: Float, droop: Float, ragged: Float, seed: Int, base: Int, tip: Int, segs: Int = 6): MeshData {
+        val m = MeshData()
+        val rnd = java.util.Random(seed.toLong())
+        fun ch(c: Int, s: Int) = ((c shr s) and 255) / 255f
+        val left = IntArray(segs + 1); val quill = IntArray(segs + 1); val right = IntArray(segs + 1)
+        for (k in 0..segs) {
+            val u = k.toFloat() / segs
+            val prof = 0.16f + 0.84f * sin(PI.toFloat() * u.pow(0.8f)).pow(0.9f)
+            val kl = if (u > 0.5f && rnd.nextFloat() < ragged) 0.35f + 0.35f * rnd.nextFloat() else 1f
+            val kr = if (u > 0.5f && rnd.nextFloat() < ragged) 0.35f + 0.35f * rnd.nextFloat() else 1f
+            val wl = w * 0.5f * prof * kl; val wr = w * 0.5f * prof * kr
+            val y = len * u; val zd = -droop * u * u
+            val dark = 0.55f + 0.45f * u; val tk = u.pow(1.6f)
+            val r = (ch(base, 16) * (1f - tk) + ch(tip, 16) * tk) * dark
+            val g = (ch(base, 8) * (1f - tk) + ch(tip, 8) * tk) * dark
+            val b = (ch(base, 0) * (1f - tk) + ch(tip, 0) * tk) * dark
+            left[k] = m.vertex(-wl, y, zd - curl * wl, 0f, 0f, 1f, 0f, u, r, g, b)
+            quill[k] = m.vertex(0f, y, zd, 0f, 0f, 1f, 0.5f, u, r, g, b)
+            right[k] = m.vertex(wr, y, zd - curl * wr, 0f, 0f, 1f, 1f, u, r, g, b)
+        }
+        for (k in 0 until segs) {
+            m.quad(left[k], quill[k], quill[k + 1], left[k + 1]); m.quad(quill[k], right[k], right[k + 1], quill[k + 1])
+        }
+        val tipV = m.vertex(0f, len * 1.07f, -droop * 1.1f, 0f, 0f, 1f, 0.5f, 1f, ch(tip, 16) * 0.9f, ch(tip, 8) * 0.9f, ch(tip, 0) * 0.9f)
+        m.tri(left[segs], quill[segs], tipV); m.tri(quill[segs], right[segs], tipV)
+        return m.finish()
+    }
+
+    /** Mirror image of [src] across the XY plane (z -> -z) with windings repaired: the left wing from the right wing. */
+    fun mirrorZ(src: MeshData): MeshData {
+        val mm = Mat4.identity(); Mat4.scale(mm, 1f, 1f, -1f)
+        return MeshData().append(src, mm).fixWinding()
     }
 }
