@@ -308,19 +308,31 @@ internal object Kit {
         c.drawPath(p, pt)
     }
 
-    /** Dead-bone little skull used as an ornament (centre, radius). */
+    /**
+     * Gaunt little skull (ornament): narrow jaw, slanted sunken sockets with a slit of [glow] in each, heart-shaped nose, teeth, a crack.
+     * Centre (cx,cy), cranium radius r.
+     */
     fun miniSkull(c: Canvas, cx: Float, cy: Float, r: Float, bone: Int, glow: Int, glowOn: Boolean = true) {
+        c.save(); c.translate(cx - r, cy - r)
+        val u = r * 2f
+        val skull = sym(u, "M.5,0 C.1,0 .0,.28 .04,.54 C.06,.64 .15,.68 .2,.74 L.22,.9 Q.26,.99 .36,.99 L.5,.99")
         val p = fill()
-        p.shader = RadialGradient(cx - r * 0.35f, cy - r * 0.45f, r * 1.6f, intArrayOf(lift(bone, 0.35f), bone, mul(bone, 0.35f)), floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP)
-        val skull = Path(); skull.addOval(RectF(cx - r, cy - r, cx + r, cy + r * 0.55f), Path.Direction.CW)
-        skull.addRoundRect(RectF(cx - r * 0.58f, cy + r * 0.25f, cx + r * 0.58f, cy + r * 0.95f), r * 0.2f, r * 0.2f, Path.Direction.CW)
+        p.shader = RadialGradient(u * 0.36f, u * 0.28f, u * 0.85f, intArrayOf(lift(bone, 0.4f), bone, mul(bone, 0.42f), mul(bone, 0.2f)), floatArrayOf(0f, 0.42f, 0.8f, 1f), Shader.TileMode.CLAMP)
         c.drawPath(skull, p); p.shader = null
-        p.color = 0xFF070505.toInt()
-        c.drawOval(cx - r * 0.62f, cy - r * 0.32f, cx - r * 0.12f, cy + r * 0.28f, p)
-        c.drawOval(cx + r * 0.12f, cy - r * 0.32f, cx + r * 0.62f, cy + r * 0.28f, p)
-        val nose = Path(); nose.moveTo(cx, cy + r * 0.2f); nose.lineTo(cx - r * 0.12f, cy + r * 0.5f); nose.lineTo(cx + r * 0.12f, cy + r * 0.5f); nose.close(); c.drawPath(nose, p)
-        if (glowOn) { p.color = glow; c.drawCircle(cx - r * 0.37f, cy - r * 0.02f, r * 0.14f, p); c.drawCircle(cx + r * 0.37f, cy - r * 0.02f, r * 0.14f, p) }
-        val tp = stroke(0xCC070505.toInt(), max(0.8f, r * 0.07f)); for (k in -1..1) c.drawLine(cx + k * r * 0.28f, cy + r * 0.62f, cx + k * r * 0.28f, cy + r * 0.92f, tp)
+        c.drawPath(skull, stroke(0xCC050303.toInt(), max(0.8f, r * 0.07f)))
+        val sock = path(u, "M.17,.4 Q.3,.34 .46,.5 Q.47,.68 .34,.69 Q.18,.66 .17,.4 Z")
+        p.color = 0xFF050303.toInt(); c.drawPath(sock, p); c.drawPath(mirrored(sock, u / 2), p)
+        val nose = path(u, "M.5,.6 L.44,.76 Q.47,.74 .5,.77 Q.53,.74 .56,.76 Z"); c.drawPath(nose, p)
+        if (glowOn) {
+            val sl = fill(glow)
+            for (sx in floatArrayOf(0.34f, 0.66f)) { halo(c, u * sx, u * 0.55f, r * 0.55f, glow, 0.7f); c.drawOval(u * sx - r * 0.16f, u * 0.55f - r * 0.07f, u * sx + r * 0.16f, u * 0.55f + r * 0.07f, sl) }
+        }
+        val tp = stroke(0xDD050303.toInt(), max(0.7f, r * 0.06f))
+        for (k in -2..2) c.drawLine(u * (0.5f + k * 0.085f), u * 0.84f, u * (0.5f + k * 0.085f), u * 0.97f, tp)
+        c.drawLine(u * 0.3f, u * 0.84f, u * 0.7f, u * 0.84f, tp)
+        val cr = Path(); cr.moveTo(u * 0.62f, u * 0.04f); cr.lineTo(u * 0.58f, u * 0.14f); cr.lineTo(u * 0.65f, u * 0.22f); cr.lineTo(u * 0.6f, u * 0.32f)
+        c.drawPath(cr, stroke(0xAA050303.toInt(), max(0.6f, r * 0.045f), Paint.Cap.ROUND, Paint.Join.MITER))
+        c.restore()
     }
 
     /** Chain of alternating links along a polyline of pixel points; returns nothing, draws metal rings. */
