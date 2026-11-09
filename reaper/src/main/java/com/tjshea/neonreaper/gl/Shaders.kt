@@ -44,11 +44,12 @@ float fbm(vec3 p){ float a = 0.5, s = 0.0; for (int k = 0; k < 4; k++){ s += a*n
 
     // ------------------------------------------------------------------ lit materials
     const val LIT_VS = """#version 300 es
-layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNormal; layout(location=2) in vec2 aUv;
+layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNormal; layout(location=2) in vec2 aUv; layout(location=3) in vec4 aColor;
 uniform mat4 uMvp; uniform mat4 uModel; uniform mat3 uNormalMat;
 uniform float uTime; uniform float uWave;
-out vec3 vWorld; out vec3 vNormal; out vec2 vUv; out vec3 vLocal;
+out vec3 vWorld; out vec3 vNormal; out vec2 vUv; out vec3 vLocal; out vec4 vColor;
 void main(){
+  vColor = aColor;
   vec3 p = aPos;
   if (uWave > 0.0) {                       // cloth / ghost hem sway, stronger toward the bottom
     float h = clamp(0.4 - p.y, 0.0, 2.0);
@@ -63,8 +64,12 @@ void main(){
 
     val LIT_FS = """#version 300 es
 precision highp float;
-in vec3 vWorld; in vec3 vNormal; in vec2 vUv; in vec3 vLocal;
+in vec3 vWorld; in vec3 vNormal; in vec2 vUv; in vec3 vLocal; in vec4 vColor;
 uniform vec3 uColor; uniform vec3 uEmissive; uniform vec3 uRim; uniform float uSpec; uniform float uShine;
+uniform sampler2D uNoise;                                   // R soft fbm, G fine fbm, B ridged, A cellular (see NoiseTex)
+uniform vec4 uPL0; uniform vec4 uPL1; uniform vec4 uPL2; uniform vec4 uPL3;   // point lights: xyz world position, w radius
+uniform vec3 uPC0; uniform vec3 uPC1; uniform vec3 uPC2; uniform vec3 uPC3;   // point light colours (0 = unused)
+uniform vec3 uMood;                                         // final colour multiplier (blood-red Seance, etc.), default 0 -> treated as 1
 uniform vec3 uLightDir; uniform vec3 uLightColor; uniform vec3 uFill; uniform vec3 uAmbientTop; uniform vec3 uAmbientBottom;
 uniform vec3 uCamPos; uniform vec3 uFogColor; uniform float uFogDensity; uniform float uFlash;
 uniform float uTime; uniform int uMode; uniform vec4 uParam; uniform float uAlpha;
@@ -78,6 +83,25 @@ float inTri(vec2 p, vec2 a, vec2 b, vec2 c){
   float d3 = (p.x-a.x)*(c.y-a.y)-(c.x-a.x)*(p.y-a.y);
   bool neg = (d1<0.0)||(d2<0.0)||(d3<0.0); bool pos = (d1>0.0)||(d2>0.0)||(d3>0.0);
   return (neg && pos) ? 0.0 : 1.0; }
+// bump mapping from the screen-space derivatives of a height value (one texture fetch, no extra noise evaluations)
+vec3 perturb(vec3 N, vec3 P, float h, float k){
+  vec3 dpx = dFdx(P), dpy = dFdy(P);
+  float dhx = dFdx(h), dhy = dFdy(h);
+  vec3 r1 = cross(dpy, N), r2 = cross(N, dpx);
+  float det = dot(dpx, r1);
+  vec3 g = sign(det) * (dhx * r1 + dhy * r2);
+  return normalize(abs(det) * N - k * g);
+}
+vec4 nz(vec3 p, float s){ return texture(uNoise, p.xy * s + p.zy * (s * 0.71) + vec2(p.z, p.x) * (s * 0.37)); }
+vec3 plight(vec4 pl, vec3 pc, vec3 N, vec3 P, vec3 V, float spec, float shine){
+  if (pc.x + pc.y + pc.z <= 0.0) return vec3(0.0);
+  vec3 d = pl.xyz - P; float dist = length(d);
+  float att = clamp(1.0 - dist / pl.w, 0.0, 1.0); att *= att;
+  vec3 L = d / max(dist, 0.001);
+  float ndl = max(dot(N, L) * 0.85 + 0.15, 0.0);
+  vec3 H = normalize(L + V);
+  return pc * att * (ndl + pow(max(dot(N, H), 0.0), shine) * spec);
+}
 void main(){
   vec3 N = normalize(vNormal); if (!gl_FrontFacing) N = -N;
   if (uParam.z > 0.5) {                               // cowl: smooth elliptical face opening toward +Z
@@ -169,6 +193,62 @@ void main(){
     vec3 gold = vec3(1.0,0.72,0.2);
     albedo = gold; spec = 1.2; shine = 60.0;
     if (r < 0.78 && abs(N.z) > 0.6) { albedo = vec3(0.1,0.45,0.1); emis += vec3(0.25,1.0,0.2) * (0.5 + 0.5*uParam.x) * (1.0 - r); }
+  } else if (uMode == 20) {                           // VERTEX MATERIAL: merged character / prop meshes
+    albedo = vColor.rgb;
+    int mat = int(vColor.a * 15.0 + 0.5);
+    vec4 q = nz(vLocal, 2.6);
+    if (mat == 1) {                                    // cloth: mottled weave, soft sheen at grazing angles
+      float fold = nz(vLocal * vec3(1.0, 0.45, 1.0), 1.7).g;
+      albedo *= 0.55 + 0.9 * (0.6 * q.r + 0.4 * fold); spec *= 0.15;
+      N = perturb(N, vWorld, fold, 0.9);
+    } else if (mat == 2) {                             // bone: pitted, cracked, stained in the crevices
+      vec4 b = nz(vLocal, 3.4);
+      float pit = smoothstep(0.55, 0.15, b.a);
+      float crack = smoothstep(0.80, 0.97, nz(vLocal, 1.35).b);
+      albedo *= 0.78 + 0.35 * b.g; albedo = mix(albedo, albedo * vec3(0.42, 0.34, 0.26), pit * 0.7);
+      albedo = mix(albedo, vec3(0.03, 0.02, 0.02), crack * 0.85);
+      spec *= 0.7; N = perturb(N, vWorld, b.g - pit * 0.6 - crack * 0.8, 0.8);
+    } else if (mat == 3) {                             // metal: dark steel, fake environment, scratches
+      vec3 R = reflect(-V, N);
+      vec3 env = mix(vec3(0.02, 0.03, 0.03), vec3(0.34, 0.12, 0.12), clamp(R.y * 0.5 + 0.5, 0.0, 1.0)) + vec3(0.1, 0.45, 0.2) * pow(max(R.y, 0.0), 6.0);
+      float scr = nz(vLocal * vec3(8.0, 1.0, 8.0), 3.0).b;
+      albedo *= 0.32 + 0.25 * q.g; emis += env * vColor.rgb * (1.5 + 0.7 * scr); spec = 1.4; shine = 60.0;
+      N = perturb(N, vWorld, q.g, 0.25);
+    } else if (mat == 4) {                             // leather: pebbled grain, dark creases
+      vec4 l = nz(vLocal, 6.0);
+      albedo *= 0.55 + 0.7 * l.a; spec *= 0.45; N = perturb(N, vWorld, l.a, 0.7);
+    } else if (mat == 5) {                             // emissive (eyes, flames, runes): self-lit, flickers with uParam.x
+      frag = vec4(vColor.rgb * uParam.x * (0.85 + 0.3 * q.r), uAlpha); return;
+    } else if (mat == 6) {                             // stone: mottled, veined, mossy at the bottom
+      vec4 b = nz(vWorld * 0.8, 1.6);
+      albedo *= 0.55 + 0.85 * b.r; albedo = mix(albedo, albedo * 0.3, smoothstep(0.82, 0.98, b.b) * 0.9);
+      N = perturb(N, vWorld, b.g + b.a * 0.4, 0.7); spec *= 0.35;
+    } else if (mat == 7) {                             // demon flesh: glossy, with glowing ember veins in the crevices
+      vec4 v = nz(vLocal, 3.0);
+      float vein = smoothstep(0.80, 0.97, v.b);
+      albedo *= 0.65 + 0.5 * v.g; emis += vec3(1.0, 0.16, 0.05) * vein * (0.9 + 0.7 * uParam.x);
+      spec = 1.1; shine = 40.0; N = perturb(N, vWorld, v.g, 0.35);
+    } else if (mat == 8) {                             // glass lens / polished gem: mirror-like with a coloured core glow
+      vec3 R = reflect(-V, N);
+      emis += (vec3(0.05, 0.08, 0.1) + vec3(0.5, 0.55, 0.65) * pow(max(R.y, 0.0), 3.0)) * 0.6 + vColor.rgb * uParam.x * 0.6;
+      spec = 1.8; shine = 90.0;
+    } else if (mat == 9) {                             // wood: ridged grain along the local Y axis
+      float gr = nz(vLocal * vec3(9.0, 0.7, 9.0), 1.0).b;
+      albedo *= 0.55 + 0.7 * gr; N = perturb(N, vWorld, gr, 0.5); spec *= 0.25;
+    } else if (mat == 10) {                            // ectoplasm: translucent with a strong fresnel glow, drifting wisps
+      float fres = pow(1.0 - max(dot(N, V), 0.0), 2.0);
+      float w = nz(vLocal + vec3(0.0, uTime * 0.25, 0.0), 1.4).r;
+      alpha = uAlpha * (0.28 + 0.72 * fres) * (0.6 + 0.8 * w);
+      emis += vColor.rgb * (0.45 + 1.1 * fres) * (0.7 + 0.5 * w);
+      albedo *= 0.5;
+    } else if (mat == 11) {                            // feathers / hair: dark with a sharp sheen
+      float f = nz(vLocal * vec3(10.0, 2.0, 10.0), 1.0).g;
+      albedo *= 0.6 + 0.6 * f; spec = 1.3; shine = 55.0;
+    } else if (mat == 12) {                            // wax / candle: soft, warm, translucent-looking
+      albedo *= 0.85 + 0.25 * q.r; spec *= 0.5; emis += albedo * 0.18;
+    } else {                                           // matte with a little mottling
+      albedo *= 0.82 + 0.3 * q.g;
+    }
   } else if (uMode == 9) {
     frag = vec4(uEmissive, uAlpha); return;
   }
@@ -179,7 +259,10 @@ void main(){
   vec3 H = normalize(uLightDir + V);
   float sp = pow(max(dot(N, H), 0.0), shine) * spec;
   float rim = pow(1.0 - max(dot(N, V), 0.0), 3.0);
-  vec3 col = albedo * (amb + uLightColor*ndl*(1.0+uFlash*2.0) + uFill*fill) + uLightColor*sp + uRim*rim + emis;
+  vec3 pls = plight(uPL0, uPC0, N, vWorld, V, spec, shine) + plight(uPL1, uPC1, N, vWorld, V, spec, shine)
+           + plight(uPL2, uPC2, N, vWorld, V, spec, shine) + plight(uPL3, uPC3, N, vWorld, V, spec, shine);
+  vec3 col = albedo * (amb + uLightColor*ndl*(1.0+uFlash*2.0) + uFill*fill + pls) + uLightColor*sp + uRim*rim + emis;
+  if (uMood.x + uMood.y + uMood.z > 0.0) col *= uMood;
   // fog
   float d = length(vWorld - uCamPos);
   float fog = 1.0 - exp(-pow(d*uFogDensity, 1.6));

@@ -119,11 +119,18 @@ object ReaperConfig {
 
     /** Published figures (verified by FullGameTest): base-game win frequency; every win returns at least the stake. */
     const val HIT_FREQUENCY_TEXT = "about 1 in 3"
+    /** Range the measured plain-spin win frequency must stay inside (FullGameTest / RtpExactTest). */
+    val HIT_RATE_RANGE = 0.27..0.33
+    /** Published bonus frequencies (average spins between bonuses) and the range the simulation must stay inside. */
+    const val VAULT_EVERY_TEXT = "135"
+    val VAULT_EVERY_RANGE = 115.0..155.0
+    const val SEANCE_EVERY_TEXT = "195"
+    val SEANCE_EVERY_RANGE = 165.0..230.0
 
     // ---- relics & Soul Vault bonus ----
     const val RELIC_COUNT = 5
-    /** Chance per spin to collect the next relic: a relic about every 25 spins, a Soul Vault bonus about every 125. */
-    const val RELIC_CHANCE = 5.0 / 125.0
+    /** Chance per spin to collect the next relic: a relic about every 27 spins, a Soul Vault bonus about every 135. */
+    const val RELIC_CHANCE = 5.0 / 135.0
     val RELIC_NAMES = arrayOf("Scythe", "Hourglass", "Skull Candle", "Raven Feather", "Cursed Tome")
 
     const val VAULT_COLS = 5

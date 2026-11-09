@@ -309,7 +309,26 @@ class Scene3D(private val gl: Gl) {
         lit.f3("uCamPos", camX, camY, camZ)
         lit.f3("uFogColor", 0.05f, 0.08f, 0.05f); lit.f("uFogDensity", 0.035f)
         lit.f("uFlash", fl); lit.f("uTime", t)
-        lit.i("uTex", 0)
+        lit.i("uTex", 0); lit.i("uNoise", 1)
+        uploadPointLights()
+    }
+
+    // ---- point lights (candles, eyes, flashes): up to 4 per frame, uploaded once in setupLit()
+    private val plPos = FloatArray(16); private val plCol = FloatArray(12); private var plN = 0
+
+    /** Adds a point light for this frame (world position, radius, colour 0xRRGGBB scaled by [k]). Extra lights beyond 4 are ignored. */
+    private fun pointLight(x: Float, y: Float, z: Float, radius: Float, color: Int, k: Float = 1f) {
+        if (plN >= 4) return
+        plPos[plN * 4] = x; plPos[plN * 4 + 1] = y; plPos[plN * 4 + 2] = z; plPos[plN * 4 + 3] = radius
+        plCol[plN * 3] = ((color shr 16) and 255) / 255f * k; plCol[plN * 3 + 1] = ((color shr 8) and 255) / 255f * k; plCol[plN * 3 + 2] = (color and 255) / 255f * k
+        plN++
+    }
+
+    private fun uploadPointLights() {
+        for (i in 0 until 4) {
+            lit.f4("uPL$i", plPos[i * 4], plPos[i * 4 + 1], plPos[i * 4 + 2], plPos[i * 4 + 3])
+            if (i < plN) lit.f3("uPC$i", plCol[i * 3], plCol[i * 3 + 1], plCol[i * 3 + 2]) else lit.f3("uPC$i", 0f, 0f, 0f)
+        }
     }
 
     // ---- material draw helper
