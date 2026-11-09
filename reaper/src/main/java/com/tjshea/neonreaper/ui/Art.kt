@@ -203,7 +203,7 @@ object Art {
             ReaperConfig.PUMPKIN -> lantern(c, s)
             ReaperConfig.GHOST -> tomb(c, s)
             ReaperConfig.SCATTER -> coffin(c, s)
-            else -> royal(c, s, sym)
+            else -> Royals.paint(c, s, sym)
         }
     }
 

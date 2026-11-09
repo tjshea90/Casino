@@ -629,6 +629,7 @@ class Characters(val w: Int, val h: Int, private val plates: Boolean = true) {
     )
 
     private fun buildRoyal(c: Canvas, sym: Int) {
+        if (Royals.has(sym)) { val sq = min(W, H); c.save(); c.translate((W - sq) / 2, (H - sq) / 2); Royals.paint(c, sq, sym); c.restore(); return }
         val (label, col) = ROYAL.getValue(sym)
         val tp = q().apply {
             typeface = serif; textAlign = Paint.Align.CENTER
