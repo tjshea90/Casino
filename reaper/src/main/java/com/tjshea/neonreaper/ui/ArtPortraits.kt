@@ -50,7 +50,7 @@ internal object Portraits {
         when (sym) {
             ReaperConfig.WILD -> reaperJaw(c, s)
             ReaperConfig.SKULL -> SkullChar.jaw(c, s)
-            ReaperConfig.RAVEN -> Raven.beakLow(c, s)
+            ReaperConfig.RAVEN -> Raven.jawSprite(c, s)
         }
     }
 
@@ -242,7 +242,7 @@ internal object Portraits {
     /** Sleeve from the shoulder and bony fingers gripping the staff (knuckle joints, shaded undersides). */
     private fun hand(c: Canvas, s: Float) {
         // ragged sleeve cuff, then a fist: four knuckled fingers wrapped over the staff, thumb on the near side
-        val cuff = Kit.path(s, "M.73,.58 C.79,.585 .86,.585 .91,.60 L.91,.665 L.86,.675 L.77,.665 C.75,.64 .73,.61 .73,.58 Z")
+        val cuff = Kit.path(s, "M.70,.585 C.75,.57 .82,.575 .865,.605 L.875,.68 L.835,.70 L.80,.685 L.765,.70 L.73,.675 C.71,.64 .70,.61 .70,.585 Z")
         val cp = Kit.fill(); cp.shader = LinearGradient(s * 0.70f, 0f, s * 0.9f, 0f, 0xFF2C2C3C.toInt(), 0xFF0A0A0F.toInt(), Shader.TileMode.CLAMP)
         c.drawPath(cuff, cp); c.drawPath(cuff, Kit.stroke(0xFF050507.toInt(), s * 0.005f))
         val tone = 0xFFD6CDB2.toInt()
