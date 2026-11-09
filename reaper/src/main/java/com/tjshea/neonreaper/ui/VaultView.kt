@@ -231,6 +231,9 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         Art.neonStroke(c, path, Neon.GREEN, 2.5f * u)
     }
 
+    private var orbStep = 0; private var tallyStep = 0
+    private fun jackpotSfx(i: Int) = when (i.coerceIn(0, 3)) { 0 -> Sfx.JACKPOT_MINI; 1 -> Sfx.JACKPOT_MINOR; 2 -> Sfx.JACKPOT_MAJOR; else -> Sfx.JACKPOT_GRAND }
+
     // ================================================================== timeline
     private fun process() {
         while (evIndex < events.size && events[evIndex].time <= vt) {
@@ -239,7 +242,8 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
                 Kind.RESPIN_START -> {
                     spinStepStart = e.time
                     for (c in 0 until SoulVault.CELLS) revealAt[c] = if (cells[c] == null) e.time + 0.9 + (c % VAULT_COLS) * 0.17 else -1.0
-                    audio.play(Sfx.SPIN, 0.4f, 0.8f)
+                    audio.play(Sfx.SPIN_START, 0.5f)
+                    orbStep = 0
                 }
                 Kind.COLSTOP -> audio.play(Sfx.STOP, 0.55f, 1.1f)
                 Kind.LAND -> {
@@ -248,7 +252,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
                     landedAt[e.cell] = vt
                     revealAt[e.cell] = -1.0
                     when (o.kind) {
-                        Orb.SOUL -> { cellValue[e.cell] = o.value; audio.play(Sfx.ORB, 0.8f, 0.9f + fx.nextFloat() * 0.3f) }
+                        Orb.SOUL -> { cellValue[e.cell] = o.value; audio.play(Sfx.ORB_LAND, 0.8f, Audio.scaleRate(orbStep.coerceAtMost(9))); orbStep++ }
                         Orb.REAPER -> {
                             cellValue[e.cell] = 0
                             collectFrom = e.collected; collectTo = e.cell; collectAt = vt
@@ -257,7 +261,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
                         else -> {
                             cellValue[e.cell] = o.value
                             jackpotName = jpNames[o.kind - 1]; jackpotFlash = vt
-                            audio.play(Sfx.JACKPOT)
+                            audio.play(jackpotSfx(o.kind - 1))
                         }
                     }
                 }
@@ -270,10 +274,15 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
                 Kind.TALLY -> {
                     tallied[e.cell] = true
                     totalMult += result.cells[e.cell]!!.value
-                    audio.play(if (result.cells[e.cell]!!.kind == Orb.SOUL) Sfx.TICK else Sfx.JACKPOT, 0.6f, 1.2f)
+                    val k = result.cells[e.cell]!!.kind
+                    if (k == Orb.SOUL) { audio.play(Sfx.WIN_TICK, 0.5f, Audio.scaleRate(tallyStep.coerceAtMost(9))); tallyStep++ } else audio.play(jackpotSfx(k - 1), 0.7f)
                 }
-                Kind.GRAND -> { grandAt = vt; totalMult += ReaperConfig.GRAND; audio.play(Sfx.BIG_WIN); audio.play(Sfx.JACKPOT) }
-                Kind.SUMMARY -> { summaryAt = vt; audio.play(Sfx.WIN_MED); if (result.payTokens >= result.bet * 50L) audio.play(Sfx.GROWL) }
+                Kind.GRAND -> { grandAt = vt; totalMult += ReaperConfig.GRAND; audio.play(Sfx.JACKPOT_GRAND) }
+                Kind.SUMMARY -> {
+                    summaryAt = vt
+                    val x = result.payTokens.toDouble() / result.bet
+                    audio.play(when { x >= 100 -> Sfx.WIN_APOCALYPSE; x >= 50 -> Sfx.WIN_EPIC; x >= 25 -> Sfx.WIN_MEGA; x >= 10 -> Sfx.WIN_BIG; x >= 3 -> Sfx.WIN_MED; x >= 1 -> Sfx.WIN else -> Sfx.WIN_SMALL })
+                }
             }
         }
         // reaper collector: value grows while beams fly

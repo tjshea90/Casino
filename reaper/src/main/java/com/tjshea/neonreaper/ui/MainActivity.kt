@@ -103,14 +103,16 @@ class MainActivity : Activity(), ReaperView.Host {
     private fun ready() = wallet.status == Wallet.LoadStatus.OK && wallet.hasPassword
     private fun gate() { if (wallet.status == Wallet.LoadStatus.TAMPERED) dialogs.tampered() else dialogs.setupPassword() }
 
-    override fun openDeposit() { if (ready()) dialogs.deposit() else gate() }
-    override fun openWithdraw() { if (ready()) dialogs.withdraw() else gate() }
-    override fun openInfo() = dialogs.info(wallet.stake)
-    override fun openStats() { if (ready()) dialogs.stats() else gate() }
-    override fun openAutoPicker(onPicked: (AutoPlan) -> Unit) = dialogs.autoPicker(onPicked)
-    override fun openBuy(stake: Int, onChoice: (com.tjshea.neonreaper.data.Feature) -> Unit) { if (ready()) dialogs.buyFeature(stake, onChoice) else gate() }
-    override fun openSettings() = dialogs.settings { applySettings() }
-    override fun openRank() = dialogs.rank()
+    private fun uiOpen() = audio.play(Audio.Sfx.UI_OPEN, 0.8f)
+
+    override fun openDeposit() { uiOpen(); if (ready()) dialogs.deposit() else gate() }
+    override fun openWithdraw() { uiOpen(); if (ready()) dialogs.withdraw() else gate() }
+    override fun openInfo() { uiOpen(); dialogs.info(wallet.stake) }
+    override fun openStats() { uiOpen(); if (ready()) dialogs.stats() else gate() }
+    override fun openAutoPicker(onPicked: (AutoPlan) -> Unit) { uiOpen(); dialogs.autoPicker(onPicked) }
+    override fun openBuy(stake: Int, onChoice: (com.tjshea.neonreaper.data.Feature) -> Unit) { uiOpen(); if (ready()) dialogs.buyFeature(stake, onChoice) else gate() }
+    override fun openSettings() { uiOpen(); dialogs.settings { applySettings() } }
+    override fun openRank() { uiOpen(); dialogs.rank() }
     override fun openReality(onContinue: () -> Unit, onStop: () -> Unit) = dialogs.reality(onContinue, onStop)
 
     /** Pushes the saved settings (volumes, quality) into the audio and graphics layers. */
@@ -129,7 +131,7 @@ class MainActivity : Activity(), ReaperView.Host {
     override fun onResume() {
         super.onResume()
         glView?.onResume()
-        audio.playTrack(currentTrack)
+        audio.playTrack(if (vault != null) Audio.Track.VAULT else game.musicTrack)
     }
 
     override fun onDestroy() {

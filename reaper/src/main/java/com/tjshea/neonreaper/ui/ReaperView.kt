@@ -114,6 +114,17 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
     private var autoStartBalance = 0L
     private var lastRoundTokens = 0L
     private var nextReality = 0.0
+    private var tickStep = 0                               // count-up tick pitch step (musical scale)
+    private var nextAntPlay = 0.0                          // when the anticipation loop sound is re-triggered
+    private var bigHitAt = -1.0                            // when the win stinger "hits": banner slam, shake, flash
+    private var trackSwitchAt = -1.0; private var trackSwitchTo: Audio.Track? = null
+    private var lastIntensity = -1f
+    /** The score that should be playing now (used by the activity when the app returns from the background). */
+    val musicTrack: Audio.Track get() = when {
+        seance != null || phase == Phase.SEANCE_TRIGGER || phase == Phase.SEANCE_END -> Audio.Track.SEANCE
+        phase == Phase.IN_VAULT -> Audio.Track.VAULT
+        else -> Audio.Track.BASE
+    }
 
     // reels
     private val tape = arrayOfNulls<IntArray>(REELS)
@@ -592,18 +603,25 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
             audio.play(Sfx.SLASH); audio.play(Sfx.THUNDER, 0.5f)
             lightningAt = t; makeBolt(); shakeUntil = t + 0.35
         }
-        if (antFrom >= 1 && !antSoundPlayed && t >= antStart) { antSoundPlayed = true; audio.play(Sfx.ANTICIPATE); audio.play(Sfx.HEARTBEAT, 0.8f) }
+        if (antFrom >= 1 && !antResolved && t >= antStart && t >= nextAntPlay) {
+            nextAntPlay = t + 2.3; audio.play(Sfx.ANTICIPATE)
+            if (!antSoundPlayed) { antSoundPlayed = true; audio.play(Sfx.HEARTBEAT, 0.7f) }
+        }
         for (r in 0 until REELS) {
             if (!landed[r] && t >= runEnd[r]) {
                 landed[r] = true
                 if (scatReel[r]) {
                     var n = 0; for (q in 0..r) if (scatReel[q]) n++
-                    audio.play(Sfx.SCATTER_LAND, 0.95f, 0.85f + 0.14f * n); shakeUntil = t + 0.25
+                    audio.play(Sfx.SCATTER_LAND, 0.95f, Audio.scaleRate((n - 1).coerceAtMost(9))); shakeUntil = t + 0.25
                     performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-                } else if (!isWildReel[r]) { audio.play(Sfx.STOP, 0.75f); performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP) }
-                if (isWildReel[r]) performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                } else if (!isWildReel[r]) {
+                    val heavy = o.grid[r].any { it == WILD || it == ReaperConfig.SCATTER }
+                    audio.play(if (heavy) Sfx.REEL_THUD else Sfx.STOP, 0.75f); performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                }
+                if (isWildReel[r]) { audio.play(Sfx.WILD_LAND, 0.8f); performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP) }
                 if (!antResolved && r == REELS - 1) {
                     antResolved = true
+                    audio.stop(Sfx.ANTICIPATE)
                     audio.play(if (o.scatterCount >= 3) Sfx.ANTICIPATE_HIT else Sfx.ANTICIPATE_MISS)
                 }
             }
@@ -679,7 +697,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         }
         if (o.scatterCount >= 3 && curFree == null) { audio.play(Sfx.COFFIN_OPEN, 0.8f); shakeUntil = t + 0.5 }
         if (win > 0) {
-            rollTarget = win; rollStart = t
+            rollTarget = win; rollStart = t; tickStep = 0
             // small wins show instantly; bigger ones count up (suspense, but never slow)
             rollDur = when {
                 tier > 0 -> 2.2 + tier * 0.9
@@ -692,18 +710,17 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
             winLockUntil = t + rollDur + 0.9
             // the best character in the win gets to growl / chatter / caw
             val star = o.lineWins.map { it.symbol }.filter { it <= ReaperConfig.WRAITH }.minOrNull()
-            star?.let { sym -> charSound(sym)?.let { snd -> audio.play(snd, 0.85f) } }
+            star?.let { sym -> charSound(sym)?.let { snd -> audio.play(snd, 0.55f) } }
             when {
                 tier > 0 -> {
-                    audio.play(when (tier) { 1 -> Sfx.WIN_BIG; 2 -> Sfx.WIN_MEGA; 3 -> Sfx.WIN_EPIC; else -> Sfx.WIN_APOCALYPSE })
-                    audio.play(Sfx.FANFARE, 0.7f); audio.duck(rollDur.toFloat() + 2f, 0.3f)
-                    soulRate = 30f + tier * 20f; shakeUntil = t + 0.6; sideLaughUntil = t + 3; enter(Phase.BIG_WIN); return
+                    // one stinger per tier (build-up, hit, tail); the banner slam / shake / flash are timed to its hit
+                    val st = when (tier) { 1 -> Sfx.WIN_BIG; 2 -> Sfx.WIN_MEGA; 3 -> Sfx.WIN_EPIC; else -> Sfx.WIN_APOCALYPSE }
+                    audio.play(st)
+                    bigHitAt = t + Audio.hitSeconds(st).toDouble()
+                    soulRate = 30f + tier * 20f; sideLaughUntil = t + 3; enter(Phase.BIG_WIN); return
                 }
                 showcaseSym >= 0 -> { audio.play(Sfx.WIN_MED); enter(Phase.SHOWCASE); return }
-                else -> {
-                    audio.play(if (x >= 3) Sfx.WIN_MED else if (x >= 2) Sfx.WIN else Sfx.WIN_SMALL, 0.9f)
-                    if (x < 2) audio.play(Sfx.COINS, 0.5f)
-                }
+                else -> audio.play(if (x >= 3) Sfx.WIN_MED else if (x >= 2) Sfx.WIN else Sfx.WIN_SMALL, 0.9f)
             }
             if (x >= 4) soulRate = 18f
         } else {
@@ -743,7 +760,8 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
 
     // ================================================================== THE SÉANCE, feature buy, autoplay limits, reality check
     private fun startVaultTrigger() {
-        audio.play(Sfx.BELL); audio.play(Sfx.VAULT_DOOR)
+        audio.play(Sfx.VAULT_DOOR)
+        trackSwitchTo = Audio.Track.VAULT; trackSwitchAt = now() + Audio.hitSeconds(Sfx.VAULT_DOOR)
         enter(Phase.VAULT_TRIGGER)
     }
 
@@ -753,7 +771,8 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         seanceIdx = 0; seanceLeft = se.startSpins; seanceMult = 1; seanceCum = 0; seanceRevealed = 0; seanceBase = 0
         settleRoll(); rollTarget = 0
         pendingSeance = se.payTokens; pendingWin = 0; curFree = null; play = null
-        audio.play(Sfx.COFFIN_OPEN); audio.play(Sfx.SEANCE_START); audio.duck(4.5f, 0.25f)
+        audio.play(Sfx.SEANCE_START)
+        trackSwitchTo = Audio.Track.SEANCE; trackSwitchAt = now() + Audio.hitSeconds(Sfx.SEANCE_START)
         soulRate = 70f; shakeUntil = now() + 0.9
         performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
         enter(Phase.SEANCE_TRIGGER)
@@ -777,7 +796,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         freeWin = raw.coerceAtMost((ReaperConfig.MAX_WIN_TOKENS - seanceRevealed).coerceAtLeast(0L))
         // the credit meter keeps everything unrevealed hidden, apart from this spin's win which its count-up reveals
         pendingSeance = (se.payTokens - seanceRevealed - freeWin).coerceAtLeast(0L)
-        audio.play(Sfx.SEANCE_MULT_UP, 0.8f, (0.75f + 0.09f * f.multiplier).coerceAtMost(2f))
+        if (f.multiplier > 1) audio.play(Sfx.SEANCE_MULT_UP, 0.8f, Audio.scaleRate((f.multiplier - 2).coerceIn(0, 9)))
         settleRoll()
         animateSpin(SpinPlay(f.outcome, -1, null, null), f)
     }
@@ -787,10 +806,10 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         settleRoll(); rollTarget = 0
         pendingSeance = 0; pendingWin = 0; curFree = null; play = null
         wallet.markSeanceSeen()
-        audio.play(Sfx.SEANCE_END); audio.duck(4f, 0.3f)
+        audio.play(Sfx.SEANCE_END)
+        trackSwitchTo = Audio.Track.BASE; trackSwitchAt = now() + 1.2
         // the money was revealed spin by spin: this recap only counts the total up, the credit meter is already right
         seanceEndTotal = se.payTokens; seanceEndAt = now()
-        if (se.payTokens > 0) { audio.play(Sfx.COINS, 0.8f); audio.play(Sfx.FANFARE, 0.6f) }
         soulRate = if (se.payTokens > 0) 40f else 0f
         enter(Phase.SEANCE_END)
     }
@@ -851,16 +870,40 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         }
     }
 
+    /** Score switching under the stingers and the adaptive intensity (idle 0.05, spinning 0.35, tension / features 0.7, big wins 1). */
+    private fun updateAudioState(t: Double) {
+        val to = trackSwitchTo
+        if (to != null && t >= trackSwitchAt) { audio.playTrack(to); trackSwitchTo = null }
+        val tension = antFrom >= 1 && !antResolved && t >= antStart
+        val k = when {
+            phase == Phase.BIG_WIN -> 1f
+            phase == Phase.SEANCE_TRIGGER -> 0.8f
+            phase == Phase.SEANCE_END -> 0.6f
+            seance != null -> if (tension) 0.9f else (0.5f + 0.05f * seanceMult).coerceAtMost(1f)
+            phase == Phase.VAULT_TRIGGER || phase == Phase.SHOWCASE -> 0.7f
+            phase == Phase.SPINNING || phase == Phase.MINI_ACTION -> if (tension) 0.7f else if (miniType != ReaperConfig.MINI_NONE) 0.6f else 0.35f
+            phase == Phase.PRESENT -> if (tier > 0 || rollTarget > 0) 0.25f else 0.1f
+            else -> 0.05f
+        }
+        if (abs(k - lastIntensity) > 0.01f) { lastIntensity = k; audio.setIntensity(k) }
+    }
+
     private fun updateFlow(t: Double) {
         checkReality(t)
+        updateAudioState(t)
+        if (bigHitAt > 0 && t >= bigHitAt) {
+            bigHitAt = -1.0
+            shakeUntil = t + 0.7
+            if (!calm()) { lightningAt = t; makeBolt() }
+        }
         if (!countEndPlayed && rollTarget > 0 && t - rollStart >= rollDur) {
             countEndPlayed = true
-            audio.play(Sfx.COUNT_END); audio.play(Sfx.COINS, 0.7f)
+            audio.play(Sfx.COUNT_END)
             soulRate = max(soulRate, 12f)
         }
         if (rollTarget > 0 && t - rollStart < rollDur) {
             val q = ((t - rollStart) / rollDur).toFloat()
-            if (t - lastTick > 0.07 + 0.08 * q) { lastTick = t; audio.play(Sfx.TICK, 0.35f, 0.8f + 0.8f * q) }
+            if (t - lastTick > 0.07 + 0.08 * q) { lastTick = t; audio.play(Sfx.WIN_TICK, 0.5f, Audio.scaleRate(tickStep.coerceAtMost(9))); tickStep++ }
             if (phase != Phase.IN_VAULT && vaultWinShown == 0L) pendingWin = rollTarget - rollValue(t)
             else if (vaultWinShown > 0) pendingVault = rollTarget - rollValue(t)
         } else if (phase != Phase.SPINNING && (pendingWin != 0L || (vaultWinShown > 0 && pendingVault != 0L))) {
@@ -870,7 +913,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         if (relicFly >= 0 && t >= relicStart + relicDur) {
             relicFly = -1
         }
-        if (relicFly >= 0 && !relicSoundPlayed && t >= relicStart) { relicSoundPlayed = true; audio.play(Sfx.RELIC) }
+        if (relicFly >= 0 && !relicSoundPlayed && t >= relicStart) { relicSoundPlayed = true; audio.play(Sfx.RELIC_FLY) }
         if (relicFly < 0) relicSoundPlayed = false
         when (phase) {
             Phase.BIG_WIN -> if (t - rollStart > rollDur + 2.0) { soulRate = 0f; enter(Phase.PRESENT); presentStart = t - 10; nextAt = t + 0.8 }
@@ -977,7 +1020,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
     }
 
     private fun onButton(id: String) {
-        if (id != "spin") audio.play(Sfx.CLICK)
+        if (id != "spin" && id != "stake") audio.play(Sfx.CLICK)
         when (id) {
             "spin" -> when {
                 phase == Phase.SPINNING -> slamStop()
@@ -994,6 +1037,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
             "stake" -> if (!busy) {
                 wallet.stakeIndex = (wallet.stakeIndex + 1) % ReaperConfig.STAKES.size
                 wallet.save()
+                audio.play(Sfx.STAKE_CHANGE, 1f, Audio.scaleRate(wallet.stakeIndex.coerceIn(0, 9)))
                 if (phase == Phase.PRESENT) { play = null; enter(Phase.IDLE) }
             }
             "deposit" -> if (!busy && autoLeft == 0) host.openDeposit() else showMessage("Wait for the reels to stop")
