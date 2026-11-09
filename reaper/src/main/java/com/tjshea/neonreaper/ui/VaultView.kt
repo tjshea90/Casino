@@ -176,8 +176,8 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
     private lateinit var sealBmp: Array<Bitmap>
     private lateinit var reaperOrb: Bitmap
     private lateinit var reaperFig: Bitmap
-    private lateinit var handBmp: Bitmap
     private lateinit var flameBmp: Array<Bitmap>
+    private lateinit var fireBmp: Array<Bitmap>
     private lateinit var fogBmp: Bitmap
     private lateinit var pipOn: Bitmap
     private lateinit var pipOff: Bitmap
@@ -188,6 +188,8 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
     private lateinit var mistBmp: Bitmap
     private lateinit var chainBmp: Bitmap
     private var introTitle: Bitmap? = null
+    private var doorBmp: Bitmap? = null
+    private var doorSlammed = false
     private var introPlate: Bitmap? = null
     private var grandTitle: Bitmap? = null
     private var summaryTitle: Bitmap? = null
@@ -233,7 +235,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
     private val emN = 40
     private val emX = FloatArray(emN); private val emY = FloatArray(emN); private val emVx = FloatArray(emN)
     private val emVy = FloatArray(emN); private val emLife = FloatArray(emN); private val emSz = FloatArray(emN)
-    private val rainN = 64
+    private val rainN = 110
     private val rnX = FloatArray(rainN); private val rnY = FloatArray(rainN); private val rnVy = FloatArray(rainN)
     private val rnSz = FloatArray(rainN); private val rnPh = FloatArray(rainN); private val rnOn = BooleanArray(rainN)
     private var rainLevel = 0f
@@ -244,6 +246,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
     private val spN = 24
     private val spX = FloatArray(spN); private val spY = FloatArray(spN); private val spT = DoubleArray(spN) { -1.0 }
     private val spGold = BooleanArray(spN)
+    private var bumpAt = -10.0
 
     init {
         isClickable = true
@@ -407,8 +410,8 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         if (!portrait) {
             u = min(W / 1280f, H / 800f)
             ox = (W - 1280f * u) / 2f; oy = (H - 800f * u) / 2f
-            altarRect.set(rx(302f), ry(186f), rx(978f), ry(668f))
-            gridRect.set(rx(320f), ry(220f), rx(960f), ry(652f))
+            altarRect.set(rx(302f), ry(184f), rx(978f), ry(666f))
+            gridRect.set(rx(320f), ry(226f), rx(960f), ry(650f))
             jpRect[3].set(rx(32f), ry(40f), rx(268f), ry(212f))
             jpRect[2].set(rx(32f), ry(224f), rx(268f), ry(350f))
             jpRect[1].set(rx(32f), ry(362f), rx(268f), ry(488f))
@@ -421,19 +424,19 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             hoodX = W / 2f; hoodY = ry(128f); figK = 78f * u
             pillarL.set(rx(262f), ry(236f), rx(298f), ry(722f)); pillarR.set(rx(982f), ry(236f), rx(1018f), ry(722f))
             fireN = 0
-            addFire(rx(150f), ry(742f), 1.25f * u); addFire(rx(1130f), ry(750f), 1.25f * u)
+            addFire(rx(150f), ry(758f), 1.15f * u); addFire(rx(1130f), ry(762f), 1.15f * u)
             addFire(rx(280f), ry(262f), 0.8f * u); addFire(rx(1000f), ry(262f), 0.8f * u)
         } else {
             u = min(W / 800f, H / 1280f)
             ox = (W - 800f * u) / 2f; oy = H - 1280f * u
             for (i in 0 until 4) jpRect[i].set(rx(41f + i * 182f), ry(330f), rx(41f + i * 182f + 172f), ry(458f))
-            altarRect.set(rx(40f), ry(478f), rx(760f), ry(996f))
-            gridRect.set(rx(56f), ry(510f), rx(744f), ry(982f))
+            altarRect.set(rx(40f), ry(472f), rx(760f), ry(996f))
+            gridRect.set(rx(56f), ry(512f), rx(744f), ry(982f))
             totalRect.set(rx(40f), ry(1010f), rx(760f), ry(1100f))
             respinRect.set(rx(40f), ry(1120f), rx(286f), ry(1256f))
             betRect.set(rx(514f), ry(1120f), rx(760f), ry(1256f))
-            val sr = 74f * u
-            spinBtn.set(rx(400f) - sr, ry(1188f) - sr, rx(400f) + sr, ry(1188f) + sr)
+            val sr = 68f * u
+            spinBtn.set(rx(400f) - sr, ry(1174f) - sr, rx(400f) + sr, ry(1174f) + sr)
             hoodX = W / 2f; hoodY = ry(205f); figK = 100f * u
             pillarL.set(rx(0f), ry(300f), rx(34f), ry(1280f)); pillarR.set(rx(766f), ry(300f), rx(800f), ry(1280f))
             fireN = 0
@@ -460,7 +463,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             fogX[i] = fx.nextFloat() * (W + fogW[i]) - fogW[i]
             fogY[i] = H * (0.18f + 0.80f * fx.nextFloat())
             fogV[i] = (if (fx.nextBoolean()) 1f else -1f) * (4f + fx.nextFloat() * 9f) * u
-            fogA[i] = 0.05f + fx.nextFloat() * 0.07f
+            fogA[i] = 0.07f + fx.nextFloat() * 0.09f
         }
         for (i in 0 until spN) spT[i] = -1.0
     }
@@ -470,7 +473,8 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         for (b in owned) if (!b.isRecycled) b.recycle()
         owned.clear()
         for (i in plates.indices) plates[i] = null
-        introTitle = null; introPlate = null; grandTitle = null; summaryTitle = null; summaryPlate = null; summaryTier = -1
+        introTitle = null; introPlate = null; grandTitle = null; summaryTitle = null; summaryPlate = null; summaryTier = -1; doorBmp = null
+        for (k in jpTitle.indices) jpTitle[k] = null
     }
 
     private fun mk(w: Int, h: Int, draw: (Canvas) -> Unit): Bitmap {
@@ -491,16 +495,17 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         noise = makeNoise()
         glowBmp = mk(128, 128) { c ->
             val p = Paint(Paint.ANTI_ALIAS_FLAG)
-            p.shader = RadialGradient(64f, 64f, 64f, intArrayOf(0xFFFFFFFF.toInt(), 0x6EFFFFFF, 0x1CFFFFFF, 0x00FFFFFF), floatArrayOf(0f, 0.3f, 0.65f, 1f), Shader.TileMode.CLAMP)
+            p.alpha = 255; p.shader = RadialGradient(64f, 64f, 64f, intArrayOf(0xFFFFFFFF.toInt(), 0x6EFFFFFF, 0x1CFFFFFF, 0x00FFFFFF), floatArrayOf(0f, 0.3f, 0.65f, 1f), Shader.TileMode.CLAMP)
             c.drawCircle(64f, 64f, 64f, p)
         }
         fogBmp = mk(256, 128) { c ->
             val p = Paint(Paint.ANTI_ALIAS_FLAG)
             c.save(); c.scale(1f, 0.5f)
-            p.shader = RadialGradient(128f, 128f, 128f, intArrayOf(0x88FFFFFF.toInt(), 0x40FFFFFF, 0x00FFFFFF), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
+            p.alpha = 255; p.shader = RadialGradient(128f, 128f, 128f, intArrayOf(0x88FFFFFF.toInt(), 0x40FFFFFF, 0x00FFFFFF), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
             c.drawCircle(128f, 128f, 128f, p); c.restore()
         }
         flameBmp = Array(6) { flameFrame(it) }
+        fireBmp = Array(6) { fireSheet(it) }
         chainBmp = chainSprite((14 * u).toInt().coerceAtLeast(8), (220 * u).toInt().coerceAtLeast(40))
         bgBack = bakeBack(w, h)
         altarBmp = bakeAltar()
@@ -516,7 +521,6 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             sealSprite(ss, GOLD, GOLD_HOT, GOLD_DEEP, GOLD_HOT, 0xFF5A3A08.toInt(), true))
         reaperOrb = reaperOrbSprite(os)
         reaperFig = bakeFigure()
-        handBmp = bakeHand()
         val pip = (min(respinRect.width(), respinRect.height()) * 0.34f).toInt().coerceAtLeast(16)
         pipOn = skullPip(pip, true); pipOff = skullPip(pip, false)
         spinOn = spinSprite((spinBtn.width() * 1.25f).toInt(), true)
@@ -525,10 +529,11 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         crescent = crescentSprite((70 * u).toInt().coerceAtLeast(24))
         mistBmp = mk(max(8, cellW.toInt()), max(8, cellH.toInt())) { c ->
             val p = Paint(Paint.ANTI_ALIAS_FLAG)
-            p.shader = LinearGradient(0f, 0f, 0f, cellH, intArrayOf(0x00000000, 0x4476FF03, 0x00000000), null, Shader.TileMode.CLAMP)
+            p.alpha = 255; p.shader = LinearGradient(0f, 0f, 0f, cellH, intArrayOf(0x00000000, 0x3076FF03, 0x00000000), null, Shader.TileMode.CLAMP)
             c.drawRect(0f, 0f, cellW, cellH, p)
         }
         bakePlates()
+        bakeIntro()
     }
 
     private fun makeNoise(): Bitmap {
@@ -576,13 +581,13 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
         p.color = 0xFF040506.toInt(); c.drawRect(0f, 0f, W, H, p)
         masonry(c, 0f, 0f, W, H, 5, 20)
-        p.shader = BitmapShader(noise, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT); p.alpha = 110
+        p.alpha = 255; p.shader = BitmapShader(noise, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT); p.alpha = 110
         c.drawRect(0f, 0f, W, H, p); p.shader = null; p.alpha = 255
         // damp streaks running down the walls
         val r = Random(21)
         for (k in 0 until 14) {
             val x = r.nextFloat() * W; val sw = (10f + r.nextFloat() * 34f) * u; val sh = (140f + r.nextFloat() * 380f) * u
-            p.shader = LinearGradient(0f, 0f, 0f, sh, 0x66000000, 0x00000000, Shader.TileMode.CLAMP)
+            p.alpha = 255; p.shader = LinearGradient(0f, 0f, 0f, sh, 0x66000000, 0x00000000, Shader.TileMode.CLAMP)
             c.save(); c.translate(x, 0f); c.drawRect(0f, 0f, sw, sh, p); c.restore()
         }
         p.shader = null
@@ -592,13 +597,13 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         val yApex = if (portrait) ry(-10f) else ry(-6f)
         val yBottom = if (portrait) ry(1000f) else ry(700f)
         val arch = Path(); archPath(arch, ax0, ax1, yBottom, ySpring, yApex)
-        p.shader = LinearGradient(0f, yApex, 0f, yBottom, intArrayOf(0xFF0A1311.toInt(), 0xFF060A09.toInt(), 0xFF030404.toInt()), null, Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = LinearGradient(0f, yApex, 0f, yBottom, intArrayOf(0xFF0A1311.toInt(), 0xFF060A09.toInt(), 0xFF030404.toInt()), null, Shader.TileMode.CLAMP)
         c.drawPath(arch, p); p.shader = null
         c.save(); c.clipPath(arch)
         // sickly haze behind the figure + violet wash high up
-        p.shader = RadialGradient(hoodX, hoodY, figK * 5.2f, intArrayOf(0x70317A62, 0x302A5A5A, 0x00000000), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = RadialGradient(hoodX, hoodY - figK * 0.2f, figK * 4.4f, intArrayOf(0x5A2F7A62, 0x28234F4A, 0x00000000), floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP)
         c.drawRect(ax0, yApex, ax1, yBottom, p)
-        p.shader = RadialGradient(hoodX, hoodY - figK * 1.2f, figK * 4.0f, intArrayOf(0x44503A7E, 0x00000000), null, Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = RadialGradient(hoodX, hoodY - figK * 1.2f, figK * 4.0f, intArrayOf(0x44503A7E, 0x00000000), null, Shader.TileMode.CLAMP)
         c.drawRect(ax0, yApex, ax1, yBottom, p); p.shader = null
         // faint masonry inside the recess
         p.color = 0x22000000; c.drawRect(ax0, yApex, ax1, yBottom, p)
@@ -626,7 +631,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         doorLeaf(c, 0f, true); doorLeaf(c, W, false)
         // ---- floor: dark flagstones fading in under the altar
         val fy = if (portrait) ry(996f) else ry(690f)
-        p.shader = LinearGradient(0f, fy - 30f * u, 0f, H, intArrayOf(0x00000000, 0xFF0B0D0C.toInt(), 0xFF030404.toInt()), floatArrayOf(0f, 0.25f, 1f), Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = LinearGradient(0f, fy - 30f * u, 0f, H, intArrayOf(0x00000000, 0xFF0B0D0C.toInt(), 0xFF030404.toInt()), floatArrayOf(0f, 0.25f, 1f), Shader.TileMode.CLAMP)
         c.drawRect(0f, fy - 30f * u, W, H, p); p.shader = null
         p.style = Paint.Style.STROKE; p.strokeWidth = 1.4f * u; p.color = 0x55000000
         var yy = fy
@@ -639,24 +644,24 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         for (i in 0 until fireN) if (fireS[i] > 0.9f * u) brazier(c, fireX[i], fireY[i], fireS[i]) else candelabra(c, fireX[i], fireY[i], fireS[i])
         // static warm light pools around the fires
         for (i in 0 until fireN) {
-            p.shader = RadialGradient(fireX[i], fireY[i] - 30f * u, 300f * u * (fireS[i] / u).coerceAtLeast(0.7f), intArrayOf(0x40FF8A30, 0x18C05A1A, 0x00000000), floatArrayOf(0f, 0.45f, 1f), Shader.TileMode.CLAMP)
+            p.alpha = 255; p.shader = RadialGradient(fireX[i], fireY[i] - 30f * u, 300f * u * (fireS[i] / u).coerceAtLeast(0.7f), intArrayOf(0x40FF8A30, 0x18C05A1A, 0x00000000), floatArrayOf(0f, 0.45f, 1f), Shader.TileMode.CLAMP)
             c.drawRect(0f, 0f, W, H, p)
         }
         p.shader = null
         // vignette (everything dynamic is drawn on top of this, so the edges stay dark and the centre readable)
-        p.shader = RadialGradient(W / 2f, H * 0.46f, max(W, H) * 0.72f, intArrayOf(0x00000000, 0x30000000, 0xE0000000.toInt()), floatArrayOf(0.35f, 0.7f, 1f), Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = RadialGradient(W / 2f, H * 0.46f, max(W, H) * 0.72f, intArrayOf(0x00000000, 0x30000000, 0xE0000000.toInt()), floatArrayOf(0.35f, 0.7f, 1f), Shader.TileMode.CLAMP)
         c.drawRect(0f, 0f, W, H, p); p.shader = null
     }
 
     private fun pillar(c: Canvas, r: RectF) {
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
-        p.shader = LinearGradient(r.left, 0f, r.right, 0f, intArrayOf(0xFF0A0C0B.toInt(), 0xFF3B413C.toInt(), 0xFF202421.toInt(), 0xFF080A09.toInt()), floatArrayOf(0f, 0.3f, 0.62f, 1f), Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = LinearGradient(r.left, 0f, r.right, 0f, intArrayOf(0xFF0A0C0B.toInt(), 0xFF3B413C.toInt(), 0xFF202421.toInt(), 0xFF080A09.toInt()), floatArrayOf(0f, 0.3f, 0.62f, 1f), Shader.TileMode.CLAMP)
         c.drawRect(r, p); p.shader = null
         p.color = 0x33000000
         for (k in 1..2) c.drawRect(r.left + r.width() * k / 3f - 1f * u, r.top, r.left + r.width() * k / 3f + 1f * u, r.bottom, p)
         // capital: brass band + stone block
         val cap = 16f * u
-        p.shader = LinearGradient(0f, r.top, 0f, r.top + cap, intArrayOf(Neon.BRASS, Neon.BRASS_DIM, 0xFF2A1F08.toInt()), null, Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = LinearGradient(0f, r.top, 0f, r.top + cap, intArrayOf(Neon.BRASS, Neon.BRASS_DIM, 0xFF2A1F08.toInt()), null, Shader.TileMode.CLAMP)
         c.drawRect(r.left - 5f * u, r.top, r.right + 5f * u, r.top + cap, p); p.shader = null
         p.color = 0xFF1B1E1C.toInt(); c.drawRect(r.left - 3f * u, r.top - 12f * u, r.right + 3f * u, r.top, p)
         // iron straps with rivets
@@ -687,7 +692,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             x += pw
         }
         // inner shadow toward the crypt
-        p.shader = LinearGradient(if (left) x0 + w else x0, 0f, if (left) x0 + w + 40f * u else x0 - 40f * u, 0f, 0xAA000000.toInt(), 0x00000000, Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = LinearGradient(if (left) x0 + w else x0, 0f, if (left) x0 + w + 40f * u else x0 - 40f * u, 0f, 0xAA000000.toInt(), 0x00000000, Shader.TileMode.CLAMP)
         c.drawRect(if (left) x0 + w else x0 - 40f * u, 0f, if (left) x0 + w + 40f * u else x0, vh, p); p.shader = null
         // strap hinges
         val reach = (if (portrait) 70f else 120f) * u
@@ -700,7 +705,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             if (left) { path.moveTo(sx0, y - 11f * u); path.lineTo(sx1 - 16f * u, y - 7f * u); path.lineTo(tipX + 6f * u, y); path.lineTo(sx1 - 16f * u, y + 7f * u); path.lineTo(sx0, y + 11f * u) }
             else { path.moveTo(sx1, y - 11f * u); path.lineTo(sx0 + 16f * u, y - 7f * u); path.lineTo(tipX - 6f * u, y); path.lineTo(sx0 + 16f * u, y + 7f * u); path.lineTo(sx1, y + 11f * u) }
             path.close()
-            p.shader = LinearGradient(0f, y - 11f * u, 0f, y + 11f * u, intArrayOf(0xFF3A3E46.toInt(), 0xFF111318.toInt(), 0xFF07080A.toInt()), null, Shader.TileMode.CLAMP)
+            p.alpha = 255; p.shader = LinearGradient(0f, y - 11f * u, 0f, y + 11f * u, intArrayOf(0xFF3A3E46.toInt(), 0xFF111318.toInt(), 0xFF07080A.toInt()), null, Shader.TileMode.CLAMP)
             c.drawPath(path, p); p.shader = null
             p.color = 0xFF8A8E96.toInt()
             for (k in 0 until 4) { val rxp = if (left) sx0 + (12f + k * 24f) * u else sx1 - (12f + k * 24f) * u; c.drawCircle(rxp, y, 2.4f * u, p) }
@@ -718,10 +723,10 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         path.reset(); path.moveTo(cx - 60f * s, y - 36f * s); path.lineTo(cx + 60f * s, y - 36f * s)
         path.cubicTo(cx + 56f * s, y - 2f * s, cx + 24f * s, y + 12f * s, cx, y + 12f * s)
         path.cubicTo(cx - 24f * s, y + 12f * s, cx - 56f * s, y - 2f * s, cx - 60f * s, y - 36f * s); path.close()
-        p.shader = LinearGradient(cx - 60f * s, 0f, cx + 60f * s, 0f, intArrayOf(0xFF0A0B0E.toInt(), 0xFF4A4E57.toInt(), 0xFF101216.toInt()), null, Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = LinearGradient(cx - 60f * s, 0f, cx + 60f * s, 0f, intArrayOf(0xFF0A0B0E.toInt(), 0xFF4A4E57.toInt(), 0xFF101216.toInt()), null, Shader.TileMode.CLAMP)
         c.drawPath(path, p); p.shader = null
         p.color = 0xFF9A7A34.toInt(); c.drawRoundRect(cx - 64f * s, y - 42f * s, cx + 64f * s, y - 33f * s, 4f * s, 4f * s, p)
-        p.shader = RadialGradient(cx, y - 38f * s, 56f * s, intArrayOf(0xFFFFB050.toInt(), 0xFFC0381A.toInt(), 0xFF3A0A06.toInt()), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = RadialGradient(cx, y - 38f * s, 56f * s, intArrayOf(0xFFFFB050.toInt(), 0xFFC0381A.toInt(), 0xFF3A0A06.toInt()), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
         c.drawOval(cx - 52f * s, y - 46f * s, cx + 52f * s, y - 30f * s, p); p.shader = null
     }
 
@@ -757,9 +762,9 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             p.color = 0xAA000000.toInt(); p.maskFilter = BlurMaskFilter(14f * u, BlurMaskFilter.Blur.NORMAL)
             c.save(); c.translate(0f, 10f * u); c.drawPath(body, p); c.restore(); p.maskFilter = null
             // stone body
-            p.shader = LinearGradient(0f, 0f, 0f, h, intArrayOf(0xFF454B45.toInt(), 0xFF2B302C.toInt(), 0xFF181B19.toInt()), floatArrayOf(0f, 0.35f, 1f), Shader.TileMode.CLAMP)
+            p.alpha = 255; p.shader = LinearGradient(0f, 0f, 0f, h, intArrayOf(0xFF454B45.toInt(), 0xFF2B302C.toInt(), 0xFF181B19.toInt()), floatArrayOf(0f, 0.35f, 1f), Shader.TileMode.CLAMP)
             c.drawPath(body, p)
-            p.shader = BitmapShader(noise, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT); p.alpha = 150; c.drawPath(body, p); p.shader = null; p.alpha = 255
+            p.alpha = 255; p.shader = BitmapShader(noise, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT); p.alpha = 150; c.drawPath(body, p); p.shader = null; p.alpha = 255
             // bevel
             p.style = Paint.Style.STROKE; p.strokeJoin = Paint.Join.MITER
             p.strokeWidth = 3f * u; p.color = 0x55FFFFF0; c.save(); c.translate(1.5f * u, 1.5f * u); c.clipPath(body); c.drawPath(body, p); c.restore()
@@ -770,18 +775,20 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             p.strokeWidth = 1.2f * u; p.color = 0x30FFFFF0; tmp.offset(0f, 1.6f * u); c.drawRoundRect(tmp, 5f * u, 5f * u, p)
             p.style = Paint.Style.FILL
             // title band: engraved lettering between skull glyphs
-            val bandY = 20f * u
-            engrave(c, "THE SOUL VAULT", w / 2f, bandY + 8.5f * u, 20f * u, Neon.BRASS, serif, 0.32f)
-            val tw = 20f * u * 4.6f
-            skullGlyph(c, w / 2f - tw - 22f * u, bandY + 1f * u, 26f * u, 0xFF0A0B0A.toInt(), 0x66D9D2BE, 0x00000000)
-            skullGlyph(c, w / 2f + tw + 22f * u, bandY + 1f * u, 26f * u, 0xFF0A0B0A.toInt(), 0x66D9D2BE, 0x00000000)
+            val bandY = (gridRect.top - a.top - 8f * u) * 0.5f
+            val gTop = gridRect.top - a.top - 8f * u
+            engrave(c, "THE SOUL VAULT", w / 2f, gTop * 0.5f + 6.5f * u, 17f * u, 0xFFD2B060.toInt(), serif, 0.34f)
+            val mp = Paint(Paint.ANTI_ALIAS_FLAG); mp.typeface = serif; mp.textSize = 17f * u; mp.letterSpacing = 0.34f
+            val tw = mp.measureText("THE SOUL VAULT") / 2f
+            skullGlyph(c, w / 2f - tw - 24f * u, bandY + 1f * u, 24f * u, 0xFF0A0B0A.toInt(), 0x66D9D2BE, 0x00000000)
+            skullGlyph(c, w / 2f + tw + 24f * u, bandY + 1f * u, 24f * u, 0xFF0A0B0A.toInt(), 0x66D9D2BE, 0x00000000)
             p.color = Neon.BRASS_DIM
-            c.drawRect(24f * u, bandY - 1f * u, w / 2f - tw - 44f * u, bandY + 1f * u, p); c.drawRect(w / 2f + tw + 44f * u, bandY - 1f * u, w - 24f * u, bandY + 1f * u, p)
+            c.drawRect(24f * u, bandY - 1f * u, w / 2f - tw - 46f * u, bandY + 1f * u, p); c.drawRect(w / 2f + tw + 46f * u, bandY - 1f * u, w - 24f * u, bandY + 1f * u, p)
             // recessed iron panel behind the niches
             val gx = gridRect.left - a.left; val gy = gridRect.top - a.top
             tmp.set(gx - 8f * u, gy - 8f * u, gx + gridRect.width() + 8f * u, gy + gridRect.height() + 8f * u)
             p.color = 0xFF020303.toInt(); c.drawRoundRect(tmp, 6f * u, 6f * u, p)
-            p.style = Paint.Style.STROKE; p.strokeWidth = 2.6f * u; p.shader = LinearGradient(tmp.left, tmp.top, tmp.right, tmp.bottom, intArrayOf(0xFFD2B060.toInt(), Neon.BRASS, Neon.BRASS_DIM, 0xFF2E230C.toInt()), floatArrayOf(0f, 0.3f, 0.7f, 1f), Shader.TileMode.CLAMP)
+            p.style = Paint.Style.STROKE; p.strokeWidth = 2.6f * u; p.alpha = 255; p.shader = LinearGradient(tmp.left, tmp.top, tmp.right, tmp.bottom, intArrayOf(0xFFD2B060.toInt(), Neon.BRASS, Neon.BRASS_DIM, 0xFF2E230C.toInt()), floatArrayOf(0f, 0.3f, 0.7f, 1f), Shader.TileMode.CLAMP)
             c.drawRoundRect(tmp, 6f * u, 6f * u, p); p.shader = null; p.style = Paint.Style.FILL
             // niches
             val nr = Path()
@@ -790,9 +797,9 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
                 val l = cx0 + 4f * u; val t = cy0 + 4f * u; val r = cx0 + cellW - 4f * u; val b = cy0 + cellH - 4f * u
                 val arch = (r - l) * 0.30f
                 nr.reset(); nr.addRoundRect(RectF(l, t, r, b), floatArrayOf(arch, arch, arch, arch, 4f * u, 4f * u, 4f * u, 4f * u), Path.Direction.CW)
-                p.shader = RadialGradient((l + r) / 2f, (t + b) / 2f + (b - t) * 0.1f, (r - l) * 0.85f, intArrayOf(0xFF18271E.toInt(), 0xFF080D0A.toInt(), 0xFF020303.toInt()), floatArrayOf(0f, 0.6f, 1f), Shader.TileMode.CLAMP)
+                p.alpha = 255; p.shader = RadialGradient((l + r) / 2f, (t + b) / 2f + (b - t) * 0.1f, (r - l) * 0.85f, intArrayOf(0xFF18271E.toInt(), 0xFF080D0A.toInt(), 0xFF020303.toInt()), floatArrayOf(0f, 0.6f, 1f), Shader.TileMode.CLAMP)
                 c.drawPath(nr, p)
-                p.shader = LinearGradient(0f, t, 0f, t + (b - t) * 0.45f, 0xCC000000.toInt(), 0x00000000, Shader.TileMode.CLAMP)
+                p.alpha = 255; p.shader = LinearGradient(0f, t, 0f, t + (b - t) * 0.45f, 0xCC000000.toInt(), 0x00000000, Shader.TileMode.CLAMP)
                 c.save(); c.clipPath(nr); c.drawRect(l, t, r, t + (b - t) * 0.45f, p); c.restore(); p.shader = null
                 // chiselled rim: dark outside edge, light lip along the sill
                 p.style = Paint.Style.STROKE; p.strokeWidth = 2.4f * u; p.color = 0xFF000000.toInt(); c.drawPath(nr, p)
@@ -808,7 +815,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
                 path.reset()
                 path.moveTo(cxp + sx * 2f * u, cyp + sy * 2f * u); path.lineTo(cxp + sx * 46f * u, cyp + sy * 2f * u); path.lineTo(cxp + sx * 40f * u, cyp + sy * 11f * u)
                 path.lineTo(cxp + sx * 11f * u, cyp + sy * 11f * u); path.lineTo(cxp + sx * 11f * u, cyp + sy * 40f * u); path.lineTo(cxp + sx * 2f * u, cyp + sy * 46f * u); path.close()
-                p.shader = LinearGradient(cxp, cyp, cxp + sx * 46f * u, cyp + sy * 46f * u, intArrayOf(0xFFD7B866.toInt(), Neon.BRASS, Neon.BRASS_DIM), null, Shader.TileMode.CLAMP)
+                p.alpha = 255; p.shader = LinearGradient(cxp, cyp, cxp + sx * 46f * u, cyp + sy * 46f * u, intArrayOf(0xFFD7B866.toInt(), Neon.BRASS, Neon.BRASS_DIM), null, Shader.TileMode.CLAMP)
                 c.drawPath(path, p); p.shader = null
                 p.style = Paint.Style.STROKE; p.strokeWidth = 1.2f * u; p.color = 0xCC000000.toInt(); c.drawPath(path, p); p.style = Paint.Style.FILL
                 rivet(c, cxp + sx * 26f * u, cyp + sy * 6.6f * u, 2.3f * u); rivet(c, cxp + sx * 6.6f * u, cyp + sy * 26f * u, 2.3f * u)
@@ -824,7 +831,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             for (f in floatArrayOf(0.30f, 0.70f)) {
                 val x = cx0 + cellW * f - bw / 2
                 val t = cy0 + 5f * u; val b = cy0 + cellH - 5f * u
-                p.shader = LinearGradient(x, 0f, x + bw, 0f, intArrayOf(0xFF07080A.toInt(), 0xFF6A6F79.toInt(), 0xFF111318.toInt()), floatArrayOf(0f, 0.35f, 1f), Shader.TileMode.CLAMP)
+                p.alpha = 255; p.shader = LinearGradient(x, 0f, x + bw, 0f, intArrayOf(0xFF07080A.toInt(), 0xFF6A6F79.toInt(), 0xFF111318.toInt()), floatArrayOf(0f, 0.35f, 1f), Shader.TileMode.CLAMP)
                 p.alpha = 190
                 c.drawRect(x, t, x + bw, b, p)
                 p.shader = null; p.alpha = 255
@@ -837,7 +844,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
     private fun rivet(c: Canvas, x: Float, y: Float, r: Float) {
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
         p.color = 0xCC000000.toInt(); c.drawCircle(x + r * 0.2f, y + r * 0.3f, r * 1.1f, p)
-        p.shader = RadialGradient(x - r * 0.35f, y - r * 0.4f, r * 1.4f, intArrayOf(0xFFFFE9A8.toInt(), Neon.BRASS, Neon.BRASS_DIM), floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = RadialGradient(x - r * 0.35f, y - r * 0.4f, r * 1.4f, intArrayOf(0xFFFFE9A8.toInt(), Neon.BRASS, Neon.BRASS_DIM), floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP)
         c.drawCircle(x, y, r, p)
     }
 
@@ -865,7 +872,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         path.reset(); path.moveTo(cx, cy + s * 0.04f); path.lineTo(cx - s * 0.045f, cy + s * 0.15f); path.lineTo(cx + s * 0.045f, cy + s * 0.15f); path.close(); c.drawPath(path, p)
         if (Color.alpha(eye) > 0) {
             for (sx in floatArrayOf(-1f, 1f)) {
-                p.shader = RadialGradient(cx + sx * s * 0.15f, cy - s * 0.03f, s * 0.09f, intArrayOf(eye, withA(eye, 0)), null, Shader.TileMode.CLAMP)
+                p.alpha = 255; p.shader = RadialGradient(cx + sx * s * 0.15f, cy - s * 0.03f, s * 0.09f, intArrayOf(eye, withA(eye, 0)), null, Shader.TileMode.CLAMP)
                 c.drawCircle(cx + sx * s * 0.15f, cy - s * 0.03f, s * 0.09f, p); p.shader = null
             }
         }
@@ -877,18 +884,47 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
 
     private fun flameFrame(i: Int): Bitmap = mk(48, 96) { c ->
         val w = 48f; val h = 96f
-        val lean = sin(i * 1.9f) * 5f
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
-        val outer = Path()
-        outer.moveTo(w / 2f, h * 0.98f)
-        outer.cubicTo(w * 0.02f, h * 0.80f, w * 0.10f + lean * 0.3f, h * 0.42f, w / 2f + lean, h * 0.03f)
-        outer.cubicTo(w * 0.90f + lean * 0.3f, h * 0.42f, w * 0.98f, h * 0.80f, w / 2f, h * 0.98f); outer.close()
-        p.maskFilter = BlurMaskFilter(2.5f, BlurMaskFilter.Blur.NORMAL)
-        p.shader = LinearGradient(0f, h, 0f, 0f, intArrayOf(0xFFFFE08A.toInt(), 0xFFFF7A1A.toInt(), 0x00B01408), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
-        c.drawPath(outer, p); p.maskFilter = null
-        c.save(); c.scale(0.58f, 0.7f, w / 2f, h * 0.98f)
-        p.shader = LinearGradient(0f, h, 0f, 0f, intArrayOf(0xFFFFFFF0.toInt(), 0xFFFFD27A.toInt(), 0x00FF9A3C), floatArrayOf(0f, 0.6f, 1f), Shader.TileMode.CLAMP)
-        c.drawPath(outer, p); c.restore()
+        fun tongue(x: Float, wid: Float, ht: Float, lean: Float, shader: Shader) {
+            val t = Path()
+            t.moveTo(x, h * 0.98f)
+            t.cubicTo(x - wid, h * 0.80f, x - wid * 0.55f + lean * 0.3f, h * (0.98f - ht) + ht * h * 0.42f, x + lean, h * (0.98f - ht))
+            t.cubicTo(x + wid * 0.55f + lean * 0.3f, h * (0.98f - ht) + ht * h * 0.42f, x + wid, h * 0.80f, x, h * 0.98f); t.close()
+            p.alpha = 255; p.shader = shader; c.drawPath(t, p)
+        }
+        val ph = i * 1.9f
+        val outer = LinearGradient(0f, h, 0f, 0f, intArrayOf(0xFFFFB347.toInt(), 0xFFFF5A12.toInt(), 0x00A01005), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
+        p.maskFilter = BlurMaskFilter(2.2f, BlurMaskFilter.Blur.NORMAL)
+        tongue(w * 0.30f, w * 0.22f, 0.55f + 0.08f * sin(ph + 1f), sin(ph + 2f) * 4f, outer)
+        tongue(w * 0.70f, w * 0.22f, 0.5f + 0.08f * sin(ph + 3f), sin(ph + 4f) * 4f, outer)
+        tongue(w * 0.50f, w * 0.30f, 0.94f, sin(ph) * 5f, outer)
+        p.maskFilter = null
+        val core = LinearGradient(0f, h, 0f, h * 0.3f, intArrayOf(0xFFFFF0B0.toInt(), 0xFFFFC060.toInt(), 0x00FF9A3C), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
+        tongue(w * 0.50f + sin(ph) * 1.5f, w * 0.15f, 0.6f, sin(ph) * 2f, core)
+    }
+
+    /** A wide, turbulent sheet of flame (many tongues, overlapped with ADD) for burning lettering and tablets. */
+    private fun fireSheet(i: Int): Bitmap = mk(176, 128) { c ->
+        val w = 176f; val h = 128f
+        val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        val r = Random(100L + i * 7)
+        fun tongue(x: Float, wid: Float, ht: Float, lean: Float, shader: Shader) {
+            val t = Path()
+            t.moveTo(x - wid * 0.95f, h * 0.99f)
+            t.cubicTo(x - wid * 1.05f, h * (0.99f - ht * 0.45f), x - wid * 0.4f + lean * 0.3f, h * (0.99f - ht * 0.8f), x + lean, h * (0.99f - ht))
+            t.cubicTo(x + wid * 0.4f + lean * 0.3f, h * (0.99f - ht * 0.8f), x + wid * 1.05f, h * (0.99f - ht * 0.45f), x + wid * 0.95f, h * 0.99f); t.close()
+            p.alpha = 255; p.shader = shader; c.drawPath(t, p)
+        }
+        val outer = LinearGradient(0f, h, 0f, 0f, intArrayOf(0xFFFFB347.toInt(), 0xFFFF5A12.toInt(), 0x00A01005), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
+        p.maskFilter = BlurMaskFilter(3f, BlurMaskFilter.Blur.NORMAL)
+        for (k in 0 until 6) tongue(w * (0.14f + 0.72f * k / 5f), w * (0.10f + 0.07f * r.nextFloat()), 0.40f + 0.58f * r.nextFloat(), (r.nextFloat() - 0.5f) * 22f, outer)
+        p.maskFilter = null
+        val core = LinearGradient(0f, h, 0f, h * 0.35f, intArrayOf(0xFFFFF4C0.toInt(), 0xFFFFC060.toInt(), 0x00FF9A3C), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
+        for (k in 0 until 4) tongue(w * (0.18f + 0.64f * k / 3f), w * 0.06f, 0.25f + 0.3f * r.nextFloat(), (r.nextFloat() - 0.5f) * 10f, core)
+        p.alpha = 255; p.shader = LinearGradient(0f, h, 0f, h * 0.6f, 0x00FFFFFF, 0xFFFFFFFF.toInt(), Shader.TileMode.CLAMP)
+        p.xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
+        c.drawRect(0f, 0f, w, h, p)
+        p.xfermode = null; p.shader = null
     }
 
     private fun chainSprite(w: Int, len: Int): Bitmap = mk(w, len) { c ->
@@ -896,7 +932,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         val lw = w.toFloat(); val ll = lw * 1.9f
         var y = 0f; var k = 0
         while (y < len) {
-            p.shader = LinearGradient(0f, y, lw, y, intArrayOf(0xFF1A1C21.toInt(), 0xFF7A7F88.toInt(), 0xFF14161A.toInt()), null, Shader.TileMode.CLAMP)
+            p.alpha = 255; p.shader = LinearGradient(0f, y, lw, y, intArrayOf(0xFF1A1C21.toInt(), 0xFF7A7F88.toInt(), 0xFF14161A.toInt()), null, Shader.TileMode.CLAMP)
             p.strokeWidth = lw * 0.17f
             if (k % 2 == 0) c.drawRoundRect(lw * 0.18f, y + lw * 0.1f, lw * 0.82f, y + ll, lw * 0.3f, lw * 0.3f, p)
             else { p.strokeWidth = lw * 0.22f; c.drawLine(lw * 0.5f, y + lw * 0.2f, lw * 0.5f, y + ll * 0.95f, p) }
@@ -911,18 +947,18 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         val deep = when (tier) { 0 -> 0xFF1F3A12.toInt(); 1 -> SOUL_DEEP; else -> 0xFF1C5A0A.toInt() }
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
         // aura
-        p.shader = RadialGradient(cx, cy, r * 2.1f, intArrayOf(withA(tint, 120), withA(tint, 40), 0x00000000), floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = RadialGradient(cx, cy, r * 2.1f, intArrayOf(withA(tint, 120), withA(tint, 40), 0x00000000), floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP)
         c.drawCircle(cx, cy, r * 2.1f, p); p.shader = null
         // wisp tail
         val tail = Path()
         tail.moveTo(cx - r * 0.62f, cy - r * 0.45f)
         tail.cubicTo(cx - r * 0.55f, cy - r * 1.05f, cx + r * 0.05f, cy - r * 1.05f, cx + r * 0.30f, cy - r * 1.78f)
         tail.cubicTo(cx + r * 0.55f, cy - r * 1.05f, cx + r * 0.72f, cy - r * 0.8f, cx + r * 0.62f, cy - r * 0.45f); tail.close()
-        p.shader = LinearGradient(0f, cy - r * 0.4f, 0f, cy - r * 1.8f, intArrayOf(withA(tint, 230), withA(tint, 100), withA(tint, 0)), floatArrayOf(0f, 0.6f, 1f), Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = LinearGradient(0f, cy - r * 0.4f, 0f, cy - r * 1.8f, intArrayOf(withA(tint, 230), withA(tint, 100), withA(tint, 0)), floatArrayOf(0f, 0.6f, 1f), Shader.TileMode.CLAMP)
         p.maskFilter = BlurMaskFilter(r * 0.06f, BlurMaskFilter.Blur.NORMAL)
         c.drawPath(tail, p); p.maskFilter = null; p.shader = null
         // body
-        p.shader = RadialGradient(cx - r * 0.32f, cy - r * 0.36f, r * 1.35f, intArrayOf(SOUL_HOT, tint, deep), floatArrayOf(0f, 0.42f, 1f), Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = RadialGradient(cx - r * 0.32f, cy - r * 0.36f, r * 1.35f, intArrayOf(SOUL_HOT, tint, deep), floatArrayOf(0f, 0.42f, 1f), Shader.TileMode.CLAMP)
         c.drawCircle(cx, cy, r, p); p.shader = null
         p.style = Paint.Style.STROKE; p.strokeWidth = r * 0.07f; p.color = withA(deep, 200); c.drawCircle(cx, cy, r * 0.97f, p)
         if (tier == 2) { p.strokeWidth = r * 0.09f; p.color = withA(GOLD, 230); c.drawCircle(cx, cy, r * 1.02f, p) }
@@ -931,7 +967,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         p.strokeWidth = r * 0.05f; p.color = 0x66FFFFFF
         for (k in 0..2) c.drawArc(cx - r * 0.7f, cy - r * 0.7f, cx + r * 0.7f, cy + r * 0.7f, 20f + k * 120f, 62f, false, p)
         p.style = Paint.Style.FILL
-        p.shader = RadialGradient(cx - r * 0.36f, cy - r * 0.46f, r * 0.42f, intArrayOf(0xB0FFFFFF.toInt(), 0x00FFFFFF), null, Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = RadialGradient(cx - r * 0.36f, cy - r * 0.46f, r * 0.42f, intArrayOf(0xB0FFFFFF.toInt(), 0x00FFFFFF), null, Shader.TileMode.CLAMP)
         c.drawOval(cx - r * 0.7f, cy - r * 0.84f, cx + r * 0.0f, cy - r * 0.16f, p); p.shader = null
     }
 
@@ -949,7 +985,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
                 p.color = if (k % 2 == 0) GOLD else 0xFFB8862A.toInt(); c.drawPath(path, p)
             }
         }
-        p.shader = SweepGradient(cx, cy, intArrayOf(metalL, metalD, metalL, metalD, metalL), floatArrayOf(0f, 0.25f, 0.5f, 0.75f, 1f))
+        p.alpha = 255; p.shader = SweepGradient(cx, cy, intArrayOf(metalL, metalD, metalL, metalD, metalL), floatArrayOf(0f, 0.25f, 0.5f, 0.75f, 1f))
         c.drawCircle(cx, cy, R, p); p.shader = null
         p.style = Paint.Style.STROKE; p.strokeWidth = s * 0.018f; p.color = 0xDD000000.toInt(); c.drawCircle(cx, cy, R * 0.86f, p); c.drawCircle(cx, cy, R, p)
         p.style = Paint.Style.FILL
@@ -960,7 +996,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             p.color = metalL; c.drawCircle(sx, sy, s * 0.014f, p)
         }
         val gr = R * 0.78f
-        p.shader = RadialGradient(cx - gr * 0.3f, cy - gr * 0.38f, gr * 1.6f, intArrayOf(hot, gem, deep), floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = RadialGradient(cx - gr * 0.3f, cy - gr * 0.38f, gr * 1.6f, intArrayOf(hot, gem, deep), floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP)
         c.drawCircle(cx, cy, gr, p); p.shader = null
         c.save()
         val clip = Path(); clip.addCircle(cx, cy, gr, Path.Direction.CW); c.clipPath(clip)
@@ -974,16 +1010,16 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         p.style = Paint.Style.FILL
         c.restore()
         skullGlyph(c, cx, cy + gr * 0.02f, gr * 1.28f, withA(shade(deep, 0.45f), 235), withA(hot, 150), withA(hot, 255))
-        p.shader = RadialGradient(cx - gr * 0.38f, cy - gr * 0.5f, gr * 0.55f, intArrayOf(0x77FFFFFF, 0x00FFFFFF), null, Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = RadialGradient(cx - gr * 0.38f, cy - gr * 0.5f, gr * 0.55f, intArrayOf(0x77FFFFFF, 0x00FFFFFF), null, Shader.TileMode.CLAMP)
         c.drawOval(cx - gr * 0.8f, cy - gr * 0.95f, cx + gr * 0.1f, cy - gr * 0.1f, p); p.shader = null
     }
 
     private fun reaperOrbSprite(S: Int): Bitmap = mk(S, S) { c ->
         val s = S.toFloat(); val cx = s / 2f; val cy = s / 2f; val r = s * 0.40f
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
-        p.shader = RadialGradient(cx, cy, r * 1.7f, intArrayOf(0xAAE0182F.toInt(), 0x33E0182F, 0x00000000), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = RadialGradient(cx, cy, r * 1.7f, intArrayOf(0xAAE0182F.toInt(), 0x33E0182F, 0x00000000), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
         c.drawCircle(cx, cy, r * 1.7f, p)
-        p.shader = RadialGradient(cx, cy - r * 0.2f, r * 1.2f, intArrayOf(0xFF2A0A12.toInt(), 0xFF0A0306.toInt(), 0xFF000000.toInt()), floatArrayOf(0f, 0.6f, 1f), Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = RadialGradient(cx, cy - r * 0.2f, r * 1.2f, intArrayOf(0xFF2A0A12.toInt(), 0xFF0A0306.toInt(), 0xFF000000.toInt()), floatArrayOf(0f, 0.6f, 1f), Shader.TileMode.CLAMP)
         c.drawCircle(cx, cy, r, p); p.shader = null
         p.style = Paint.Style.STROKE; p.strokeWidth = r * 0.07f; p.color = Neon.RED; c.drawCircle(cx, cy, r, p)
         p.strokeWidth = r * 0.03f; p.color = withA(BLOOD_HOT, 160); c.drawCircle(cx, cy, r * 0.9f, p)
@@ -1005,36 +1041,11 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         c.restore()
     }
 
-    private fun handSprite(): Bitmap = mk((170f * u).toInt(), (90f * u).toInt()) { c ->
-        val p = Paint(Paint.ANTI_ALIAS_FLAG)
-        val w = 170f * u
-        c.translate(0f, 40f * u)
-        // four bony fingers curling over the rim (drawn from the knuckles down)
-        for (f in 0 until 4) {
-            val x = w * (0.18f + f * 0.2f)
-            val len = 50f * u * (1f + (if (f == 1 || f == 2) 0.14f else 0f))
-            var y = 0f
-            var wid = 15f * u
-            for (seg in 0 until 3) {
-                val sl = len / 3f
-                p.shader = LinearGradient(x - wid / 2, 0f, x + wid / 2, 0f, intArrayOf(0xFF7A7464.toInt(), 0xFFD9D2BE.toInt(), 0xFF5B5547.toInt()), null, Shader.TileMode.CLAMP)
-                c.drawRoundRect(x - wid / 2, y, x + wid / 2, y + sl * 1.08f, wid * 0.45f, wid * 0.45f, p); p.shader = null
-                p.color = 0xFF1A1812.toInt(); c.drawCircle(x, y + sl * 1.04f, wid * 0.16f, p)
-                y += sl; wid *= 0.86f
-            }
-        }
-        // metacarpals (back of the hand) fade into the dark
-        p.shader = LinearGradient(0f, 0f, 0f, -40f * u, intArrayOf(0xFF6A6452.toInt(), 0x00000000), null, Shader.TileMode.CLAMP)
-        c.drawRect(w * 0.05f, -40f * u, w * 0.95f, 0f, p); p.shader = null
-    }
-
-    private fun bakeHand(): Bitmap = handSprite()
-
     private fun skullPip(S: Int, lit: Boolean): Bitmap = mk(S, S) { c ->
         val s = S.toFloat()
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
         if (lit) {
-            p.shader = RadialGradient(s / 2, s / 2, s * 0.5f, intArrayOf(0x66E0182F, 0x00000000), null, Shader.TileMode.CLAMP)
+            p.alpha = 255; p.shader = RadialGradient(s / 2, s / 2, s * 0.5f, intArrayOf(0x66E0182F, 0x00000000), null, Shader.TileMode.CLAMP)
             c.drawCircle(s / 2, s / 2, s * 0.5f, p); p.shader = null
         }
         skullGlyph(c, s / 2f, s * 0.52f, s * 0.82f, if (lit) 0xFFD9D2BE.toInt() else 0xFF2B2B2E.toInt(), if (lit) 0x88FFFFF0.toInt() else 0x22FFFFFF, if (lit) Neon.RED else 0x00000000)
@@ -1044,7 +1055,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         val s = D.toFloat(); val cx = s / 2; val cy = s / 2; val R = s * 0.44f
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
         p.color = 0xCC000000.toInt(); p.maskFilter = BlurMaskFilter(s * 0.03f, BlurMaskFilter.Blur.NORMAL); c.drawCircle(cx, cy + s * 0.025f, R, p); p.maskFilter = null
-        p.shader = SweepGradient(cx, cy, intArrayOf(0xFF9A9FA8.toInt(), 0xFF1C1F25.toInt(), 0xFF7A7F88.toInt(), 0xFF14161B.toInt(), 0xFF9A9FA8.toInt()), floatArrayOf(0f, 0.28f, 0.5f, 0.78f, 1f))
+        p.alpha = 255; p.shader = SweepGradient(cx, cy, intArrayOf(0xFF9A9FA8.toInt(), 0xFF1C1F25.toInt(), 0xFF7A7F88.toInt(), 0xFF14161B.toInt(), 0xFF9A9FA8.toInt()), floatArrayOf(0f, 0.28f, 0.5f, 0.78f, 1f))
         c.drawCircle(cx, cy, R, p); p.shader = null
         p.style = Paint.Style.STROKE; p.strokeWidth = R * 0.04f; p.color = 0xEE000000.toInt(); c.drawCircle(cx, cy, R, p); c.drawCircle(cx, cy, R * 0.86f, p)
         p.style = Paint.Style.FILL
@@ -1055,25 +1066,26 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         }
         val dr = R * 0.78f
         val dome = if (ready) intArrayOf(0xFFFF8F73.toInt(), Neon.RED, 0xFF5A0A14.toInt(), 0xFF22040A.toInt()) else intArrayOf(0xFF565A63.toInt(), 0xFF2A2D34.toInt(), 0xFF15171C.toInt(), 0xFF0A0B0D.toInt())
-        p.shader = RadialGradient(cx - dr * 0.3f, cy - dr * 0.4f, dr * 1.55f, dome, floatArrayOf(0f, 0.38f, 0.75f, 1f), Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = RadialGradient(cx - dr * 0.3f, cy - dr * 0.4f, dr * 1.55f, dome, floatArrayOf(0f, 0.38f, 0.75f, 1f), Shader.TileMode.CLAMP)
         c.drawCircle(cx, cy, dr, p); p.shader = null
         p.style = Paint.Style.STROKE; p.strokeWidth = dr * 0.05f; p.color = 0xAA000000.toInt(); c.drawCircle(cx, cy, dr, p); p.style = Paint.Style.FILL
         skullGlyph(c, cx, cy - dr * 0.18f, dr * 0.9f, if (ready) 0x30000000 else 0x20000000, 0x00000000, 0x00000000)
         engrave(c, "SPIN", cx, cy + dr * 0.30f, dr * 0.52f, if (ready) 0xFFF8EDD4.toInt() else 0xFF6E727A.toInt(), serif, 0.12f)
-        p.shader = RadialGradient(cx - dr * 0.36f, cy - dr * 0.52f, dr * 0.5f, intArrayOf(if (ready) 0x66FFFFFF else 0x33FFFFFF, 0x00FFFFFF), null, Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = RadialGradient(cx - dr * 0.36f, cy - dr * 0.52f, dr * 0.5f, intArrayOf(if (ready) 0x66FFFFFF else 0x33FFFFFF, 0x00FFFFFF), null, Shader.TileMode.CLAMP)
         c.drawOval(cx - dr * 0.8f, cy - dr * 0.95f, cx + dr * 0.1f, cy - dr * 0.05f, p); p.shader = null
     }
 
     private fun raysSprite(S: Int): Bitmap = mk(S, S) { c ->
         val s = S.toFloat(); val cx = s / 2; val cy = s / 2
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
-        val n = 14
+        p.maskFilter = BlurMaskFilter(s * 0.012f, BlurMaskFilter.Blur.NORMAL)
+        val n = 26
         for (k in 0 until n) {
             val a = k * (2 * PI / n).toFloat()
-            val w = (PI / n).toFloat() * 0.55f
+            val w = (PI / n).toFloat() * (if (k % 2 == 0) 0.34f else 0.16f)
             path.reset(); path.moveTo(cx, cy)
             path.lineTo(cx + cos(a - w) * s * 0.5f, cy + sin(a - w) * s * 0.5f); path.lineTo(cx + cos(a + w) * s * 0.5f, cy + sin(a + w) * s * 0.5f); path.close()
-            p.shader = RadialGradient(cx, cy, s * 0.5f, intArrayOf(0xCCFFFFFF.toInt(), 0x55FFFFFF, 0x00FFFFFF), floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP)
+            p.alpha = 255; p.shader = RadialGradient(cx, cy, s * 0.5f, intArrayOf(0x99FFFFFF.toInt(), 0x44FFFFFF, 0x00FFFFFF), floatArrayOf(0.05f, 0.5f, 1f), Shader.TileMode.CLAMP)
             c.drawPath(path, p)
         }
     }
@@ -1085,7 +1097,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         cr.cubicTo(s * 0.30f, s * 0.04f, s * 0.78f, s * 0.04f, s * 0.97f, s * 0.5f)
         cr.cubicTo(s * 0.70f, s * 0.26f, s * 0.32f, s * 0.30f, s * 0.08f, s * 0.5f); cr.close()
         p.maskFilter = BlurMaskFilter(s * 0.05f, BlurMaskFilter.Blur.NORMAL); p.color = withA(Neon.RED, 200); c.drawPath(cr, p); p.maskFilter = null
-        p.shader = LinearGradient(s * 0.08f, 0f, s * 0.97f, 0f, intArrayOf(withA(BLOOD_HOT, 120), 0xFFFFF4E0.toInt(), 0xFFFFFFFF.toInt()), null, Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = LinearGradient(s * 0.08f, 0f, s * 0.97f, 0f, intArrayOf(withA(BLOOD_HOT, 120), 0xFFFFF4E0.toInt(), 0xFFFFFFFF.toInt()), null, Shader.TileMode.CLAMP)
         c.drawPath(cr, p)
     }
 
@@ -1105,7 +1117,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             cloak.cubicTo(-2.55f * k, 0.95f * k, -1.80f * k, 0.55f * k, -1.34f * k, 0.30f * k)
             cloak.cubicTo(-1.20f * k, -0.10f * k, -1.22f * k, -0.55f * k, -1.12f * k, -1.10f * k)
             cloak.cubicTo(-1.00f * k, -1.80f * k, -0.55f * k, -2.28f * k, 0f, -2.3f * k); cloak.close()
-            p.shader = LinearGradient(0f, -2.3f * k, 0f, 3.0f * k, intArrayOf(0xFF101216.toInt(), 0xFF08090B.toInt(), 0xFF040405.toInt()), null, Shader.TileMode.CLAMP)
+            p.alpha = 255; p.shader = LinearGradient(0f, -2.3f * k, 0f, 3.0f * k, intArrayOf(0xFF101216.toInt(), 0xFF08090B.toInt(), 0xFF040405.toInt()), null, Shader.TileMode.CLAMP)
             c.drawPath(cloak, p); p.shader = null
             // folds
             p.style = Paint.Style.STROKE; p.strokeCap = Paint.Cap.ROUND
@@ -1119,7 +1131,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             }
             // rim light: sickly teal on the left, violet on the right
             p.strokeWidth = 2.6f * u
-            p.shader = LinearGradient(-1.4f * k, 0f, 1.4f * k, 0f, intArrayOf(0x8890D8B8.toInt(), 0x2290D8B8, 0x00000000, 0x558A6AC8), floatArrayOf(0f, 0.3f, 0.6f, 1f), Shader.TileMode.CLAMP)
+            p.alpha = 255; p.shader = LinearGradient(-1.4f * k, 0f, 1.4f * k, 0f, intArrayOf(0x8890D8B8.toInt(), 0x2290D8B8, 0x00000000, 0x558A6AC8), floatArrayOf(0f, 0.3f, 0.6f, 1f), Shader.TileMode.CLAMP)
             c.drawPath(cloak, p); p.shader = null
             p.style = Paint.Style.FILL
             // hood lining + face void
@@ -1131,7 +1143,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             face.cubicTo(0.66f * k, 0.15f * k, 0.42f * k, 0.62f * k, 0f, 0.82f * k)
             face.cubicTo(-0.42f * k, 0.62f * k, -0.66f * k, 0.15f * k, -0.66f * k, -0.40f * k)
             face.cubicTo(-0.66f * k, -0.95f * k, -0.42f * k, -1.45f * k, 0f, -1.50f * k); face.close()
-            p.shader = RadialGradient(0f, -0.2f * k, 1.0f * k, intArrayOf(0xFF0B0F10.toInt(), 0xFF020303.toInt(), 0xFF000000.toInt()), floatArrayOf(0f, 0.6f, 1f), Shader.TileMode.CLAMP)
+            p.alpha = 255; p.shader = RadialGradient(0f, -0.2f * k, 1.0f * k, intArrayOf(0xFF0B0F10.toInt(), 0xFF020303.toInt(), 0xFF000000.toInt()), floatArrayOf(0f, 0.6f, 1f), Shader.TileMode.CLAMP)
             c.drawPath(face, p); p.shader = null
             // the skull inside the dark: cheekbones, nasal cavity, teeth (dim bone, so the eyes do the work)
             p.color = 0x14D9D2BE; c.drawOval(-0.46f * k, -1.05f * k, 0.46f * k, 0.42f * k, p)
@@ -1164,18 +1176,18 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             val body = Path(); octagon(body, w, h, min(w, h) * 0.12f)
             p.color = 0xB0000000.toInt(); p.maskFilter = BlurMaskFilter(8f * u, BlurMaskFilter.Blur.NORMAL)
             c.save(); c.translate(0f, 5f * u); c.drawPath(body, p); c.restore(); p.maskFilter = null
-            p.shader = LinearGradient(0f, 0f, 0f, h, intArrayOf(0xFF323640.toInt(), 0xFF1A1C22.toInt(), 0xFF0F1115.toInt()), floatArrayOf(0f, 0.4f, 1f), Shader.TileMode.CLAMP)
+            p.alpha = 255; p.shader = LinearGradient(0f, 0f, 0f, h, intArrayOf(0xFF323640.toInt(), 0xFF1A1C22.toInt(), 0xFF0F1115.toInt()), floatArrayOf(0f, 0.4f, 1f), Shader.TileMode.CLAMP)
             c.drawPath(body, p)
-            p.shader = BitmapShader(noise, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT); p.alpha = 120; c.drawPath(body, p); p.shader = null; p.alpha = 255
+            p.alpha = 255; p.shader = BitmapShader(noise, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT); p.alpha = 120; c.drawPath(body, p); p.shader = null; p.alpha = 255
             // inner dark field
             val ins = 6f * u
             val inner = Path(); octagon(inner, w - 2 * ins, h - 2 * ins, min(w, h) * 0.10f); inner.offset(ins, ins)
-            p.shader = LinearGradient(0f, ins, 0f, h - ins, intArrayOf(0xFF07080A.toInt(), 0xFF101216.toInt()), null, Shader.TileMode.CLAMP)
+            p.alpha = 255; p.shader = LinearGradient(0f, ins, 0f, h - ins, intArrayOf(0xFF07080A.toInt(), 0xFF101216.toInt()), null, Shader.TileMode.CLAMP)
             c.drawPath(inner, p); p.shader = null
             p.style = Paint.Style.STROKE; p.strokeWidth = 1.2f * u; p.color = withA(accent, 150); c.drawPath(inner, p)
             // brass border
             p.strokeWidth = 2.8f * u; p.strokeJoin = Paint.Join.MITER
-            p.shader = LinearGradient(0f, 0f, w, h, intArrayOf(0xFFD7B866.toInt(), Neon.BRASS, Neon.BRASS_DIM, 0xFF2E230C.toInt()), floatArrayOf(0f, 0.3f, 0.7f, 1f), Shader.TileMode.CLAMP)
+            p.alpha = 255; p.shader = LinearGradient(0f, 0f, w, h, intArrayOf(0xFFD7B866.toInt(), Neon.BRASS, Neon.BRASS_DIM, 0xFF2E230C.toInt()), floatArrayOf(0f, 0.3f, 0.7f, 1f), Shader.TileMode.CLAMP)
             c.drawPath(body, p); p.shader = null
             p.strokeWidth = 1.2f * u; p.color = 0xDD000000.toInt(); c.save(); c.scale((w - 6f * u) / w, (h - 6f * u) / h, w / 2, h / 2); c.drawPath(body, p); c.restore()
             p.style = Paint.Style.FILL
@@ -1194,16 +1206,16 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             val accent = jpColor[i]
             plates[i] = plateBitmap(r, accent) { c, w, h ->
                 val big = i == 3
-                val vertical = portrait
-                val sealS = if (vertical) h * 0.62f else h * (if (big) 0.92f else 0.84f)
+                val vertical = portrait || big
+                val sealS = if (vertical) h * (if (portrait) 0.62f else 0.58f) else h * 0.84f
                 val sx = if (vertical) w / 2f else h * 0.56f
                 val sy = if (vertical) h * 0.34f else h / 2f
                 dst.set(sx - sealS / 2, sy - sealS / 2, sx + sealS / 2, sy + sealS / 2)
                 c.drawBitmap(sealBmp[i], null, dst, pBmp)
                 val tx = if (vertical) w / 2f else (h * 1.08f + w - 8f * u) / 2f
                 val maxW = if (vertical) w - 14f * u else w - h * 1.08f - 14f * u
-                val nameSize = if (vertical) h * 0.15f else h * (if (big) 0.19f else 0.22f)
-                val valSize = if (vertical) h * 0.19f else h * (if (big) 0.25f else 0.28f)
+                val nameSize = if (vertical) h * 0.15f else h * 0.22f
+                val valSize = if (vertical) h * 0.19f else h * 0.28f
                 val tp = Paint(Paint.ANTI_ALIAS_FLAG); tp.textAlign = Paint.Align.CENTER; tp.typeface = serif; tp.letterSpacing = 0.16f
                 tp.textSize = nameSize
                 val ny = if (vertical) h * 0.70f else h * 0.40f
@@ -1230,7 +1242,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             val p = Paint(Paint.ANTI_ALIAS_FLAG)
             p.color = 0xFF020203.toInt(); c.drawCircle(nx, ny, nr, p)
             p.style = Paint.Style.STROKE; p.strokeWidth = nr * 0.12f
-            p.shader = LinearGradient(nx - nr, ny - nr, nx + nr, ny + nr, intArrayOf(0xFFD7B866.toInt(), Neon.BRASS, Neon.BRASS_DIM), null, Shader.TileMode.CLAMP)
+            p.alpha = 255; p.shader = LinearGradient(nx - nr, ny - nr, nx + nr, ny + nr, intArrayOf(0xFFD7B866.toInt(), Neon.BRASS, Neon.BRASS_DIM), null, Shader.TileMode.CLAMP)
             c.drawCircle(nx, ny, nr, p); p.shader = null
         }
         // total
@@ -1282,8 +1294,10 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         c.drawText(nb, nbStart, n, x, y, pText)
     }
 
-    private fun label(c: Canvas, s: String, x: Float, y: Float, size: Float, fill: Int, tf: Typeface = serif, spacing: Float = 0.12f, outline: Boolean = true) {
-        pText.typeface = tf; pText.letterSpacing = spacing; pText.textSize = size
+    private fun label(c: Canvas, s: String, x: Float, y: Float, size0: Float, fill: Int, tf: Typeface = serif, spacing: Float = 0.12f, outline: Boolean = true, maxW: Float = 0f) {
+        pText.typeface = tf; pText.letterSpacing = spacing; pText.textSize = size0
+        if (maxW > 0f) { val w = pText.measureText(s); if (w > maxW) pText.textSize = size0 * maxW / w }
+        val size = pText.textSize
         if (outline) { pText.style = Paint.Style.STROKE; pText.strokeWidth = size * 0.16f; pText.color = 0xE6000000.toInt(); c.drawText(s, x, y, pText) }
         pText.style = Paint.Style.FILL; pText.color = fill
         c.drawText(s, x, y, pText)
@@ -1306,7 +1320,6 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         drawFog(c, t, false)
         drawReaper(c, t)
         c.drawBitmap(altarBmp, altarX, altarY, null)
-        drawHands(c)
         drawCollectDim(c)
         drawGrid(c, t)
         c.drawBitmap(barsBmp, gridRect.left, gridRect.top, null)
@@ -1326,7 +1339,9 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         if (fin < 0.8f) { pFill.color = Color.argb(((1f - fin / 0.8f) * (if (calm) 120 else 235)).toInt(), 236, 230, 214); c.drawRect(0f, 0f, width.toFloat(), height.toFloat(), pFill) }
         if (outroAt > 0) {
             val q = ((real - outroAt) / 0.9).coerceIn(0.0, 1.0).toFloat()
-            pFill.color = Color.argb((q * 255).toInt(), 0, 0, 0); c.drawRect(0f, 0f, width.toFloat(), height.toFloat(), pFill)
+            drawDoors(c, q)
+            if (q >= 0.8f && !doorSlammed) { doorSlammed = true; audio.play(Sfx.DOOR_SLAM, 0.9f) }
+            pFill.color = Color.argb((smooth((q - 0.72f) / 0.28f) * 255).toInt(), 0, 0, 0); c.drawRect(0f, 0f, width.toFloat(), height.toFloat(), pFill)
             if (q >= 1f && !finished) { finished = true; post { onFinished(result.payTokens) }; return }
         }
         scheduleNext(real)
@@ -1338,6 +1353,65 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             (grandAt >= 0 && vt - grandAt < 3.2) || collectTo >= 0 || vt - resetFlash < 1.0 || (summaryAt >= 0 && (vt - summaryAt < 2.2 || rainLevel > 0.05f)) ||
             outroAt > 0 || real - spinPressedAt < 0.3 || sparksLive()
         if (busy) postInvalidateOnAnimation() else postInvalidateDelayed(if (calm) 250L else 90L)
+    }
+
+    /** One heavy iron-bound door leaf (hinged on the outside edge), baked on first use; mirrored for the other side. */
+    private fun ensureDoor() {
+        if (doorBmp != null) return
+        val w = (vw / 2f).toInt() + 3; val h = vh.toInt()
+        doorBmp = mk(w, h) { c ->
+            val p = Paint(Paint.ANTI_ALIAS_FLAG)
+            val rnd = Random(31)
+            val pw = 52f * u
+            var x = 0f
+            while (x < w) {
+                val sh = 24 + rnd.nextInt(12)
+                p.alpha = 255; p.shader = LinearGradient(x, 0f, x + pw, 0f, Color.rgb(sh + 10, sh + 2, sh - 4), Color.rgb(sh - 6, sh - 12, sh - 16), Shader.TileMode.CLAMP)
+                c.drawRect(x, 0f, x + pw, h.toFloat(), p); p.shader = null
+                p.color = 0x26000000
+                for (k in 0 until 7) { val gx = x + rnd.nextFloat() * pw; c.drawLine(gx, 0f, gx + (rnd.nextFloat() - 0.5f) * 8f * u, h.toFloat(), p) }
+                p.color = 0xDD000000.toInt(); c.drawRect(x + pw - 2.4f * u, 0f, x + pw, h.toFloat(), p)
+                x += pw
+            }
+            p.alpha = 255; p.shader = BitmapShader(noise, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT); p.alpha = 120; c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), p); p.shader = null; p.alpha = 255
+            // horizontal iron straps with rivets and a pointed tip toward the seam
+            for (yy in floatArrayOf(0.07f, 0.29f, 0.50f, 0.71f, 0.93f)) {
+                val y = h * yy; val th = 30f * u
+                path.reset(); path.moveTo(0f, y - th / 2); path.lineTo(w - 34f * u, y - th / 2); path.lineTo(w - 6f * u, y); path.lineTo(w - 34f * u, y + th / 2); path.lineTo(0f, y + th / 2); path.close()
+                p.alpha = 255; p.shader = LinearGradient(0f, y - th / 2, 0f, y + th / 2, intArrayOf(0xFF3E424B.toInt(), 0xFF14161B.toInt(), 0xFF08090B.toInt()), null, Shader.TileMode.CLAMP)
+                c.drawPath(path, p); p.shader = null
+                p.style = Paint.Style.STROKE; p.strokeWidth = 1.6f * u; p.color = 0xCC000000.toInt(); c.drawPath(path, p); p.style = Paint.Style.FILL
+                var rxp = 26f * u
+                while (rxp < w - 50f * u) { rivet(c, rxp, y, 3.2f * u); rxp += 52f * u }
+            }
+            // the seam: a vertical iron band with a heavy brass ring and a skull boss
+            val sx = w - 30f * u
+            p.alpha = 255; p.shader = LinearGradient(sx, 0f, sx + 30f * u, 0f, intArrayOf(0xFF2E3138.toInt(), 0xFF0E1014.toInt(), 0xFF050608.toInt()), null, Shader.TileMode.CLAMP)
+            c.drawRect(sx, 0f, w.toFloat(), h.toFloat(), p); p.shader = null
+            p.color = 0x33FFFFFF; c.drawRect(sx, 0f, sx + 1.6f * u, h.toFloat(), p)
+            skullGlyph(c, w - 40f * u, h * 0.5f - 66f * u, 52f * u, 0xFF0A0B0D.toInt(), 0x88D9D2BE.toInt(), withA(Neon.RED, 255))
+            p.style = Paint.Style.STROKE; p.strokeWidth = 9f * u
+            p.alpha = 255; p.shader = SweepGradient(w - 40f * u, h * 0.5f + 20f * u, intArrayOf(0xFFE3C676.toInt(), Neon.BRASS_DIM, 0xFFC8A24C.toInt(), 0xFF2E230C.toInt(), 0xFFE3C676.toInt()), null)
+            c.drawCircle(w - 40f * u, h * 0.5f + 20f * u, 34f * u, p); p.shader = null; p.style = Paint.Style.FILL
+            // darkness gathers toward the hinges
+            p.alpha = 255; p.shader = LinearGradient(0f, 0f, w * 0.5f, 0f, 0x99000000.toInt(), 0x00000000, Shader.TileMode.CLAMP)
+            c.drawRect(0f, 0f, w * 0.5f, h.toFloat(), p); p.shader = null
+        }
+    }
+
+    private fun drawDoors(c: Canvas, q: Float) {
+        ensureDoor()
+        val d = doorBmp ?: return
+        val e = (q / 0.8f).coerceIn(0f, 1f)
+        val slide = e * e * (3f - 2f * e) * (1f - 0.04f * (1f - e))      // eased, finishing with a little weight
+        val w = d.width.toFloat()
+        val lx = -w + slide * (vw / 2f + 1f)
+        c.drawBitmap(d, lx, 0f, pBmp)
+        c.save(); c.scale(-1f, 1f, vw / 2f, 0f)
+        c.drawBitmap(d, lx, 0f, pBmp)
+        c.restore()
+        // the closing gap glows ember-red and a shadow falls across the room
+        if (e < 1f) { val gap = (1f - slide) * vw * 0.5f; glow(c, vw / 2f, vh * 0.5f, gap * 0.8f + 30f * u, tintRed, 0.5f * (1f - e)) }
     }
 
     private fun sparksLive(): Boolean { for (i in 0 until spN) if (spT[i] >= 0) return true; return false }
@@ -1372,9 +1446,9 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         }
         for (i in 0 until rainN) {
             if (!rnOn[i]) {
-                if (rainLevel > 0f && fx.nextFloat() < rainLevel * 0.12f) {
+                if (rainLevel > 0f && fx.nextFloat() < rainLevel * 0.10f) {
                     rnOn[i] = true; rnX[i] = fx.nextFloat() * W; rnY[i] = -10f * u; rnVy[i] = (70f + fx.nextFloat() * 130f) * u
-                    rnSz[i] = (2.5f + fx.nextFloat() * 5f) * u; rnPh[i] = fx.nextFloat() * 6.28f
+                    rnSz[i] = (3f + fx.nextFloat() * 6f) * u; rnPh[i] = fx.nextFloat() * 6.28f
                 }
             } else {
                 rnY[i] += rnVy[i] * dt; rnX[i] += sin(t * 1.7f + rnPh[i]) * 14f * u * dt
@@ -1402,15 +1476,15 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             glow(c, fireX[i], fireY[i] - 40f * s, 170f * s, tintWarm, 0.20f * f)
             glow(c, fireX[i], fireY[i] - 40f * s, 70f * s, tintWarm, 0.34f * f)
             val big = s > 0.9f * u
-            val fh = (if (big) 96f else 46f) * s
-            val n = if (big) 3 else 1
+            val fh = (if (big) 78f else 46f) * s
+            val n = if (big) 4 else 1
             for (k in 0 until n) {
                 val frame = ((t * 11f + i * 2 + k * 3).toInt() and 0x7FFFFFFF) % 6
-                val dx = if (n == 1) 0f else (k - 1) * 22f * s
-                val hh = fh * (if (k == 1) 1f else 0.72f) * (0.92f + 0.12f * flick(t, k + i * 3f))
+                val dx = if (n == 1) 0f else (k - 1.5f) * 26f * s
+                val hh = fh * (if (k == 1 || k == 2) 1f else 0.7f) * (0.92f + 0.12f * flick(t, k + i * 3f))
                 val bx = fireX[i] + dx; val by = fireY[i] - 38f * s
                 dst.set(bx - hh * 0.3f, by - hh, bx + hh * 0.3f, by)
-                pBmp.alpha = 235; c.drawBitmap(flameBmp[frame], null, dst, pBmp); pBmp.alpha = 255
+                pBmp.alpha = 215; c.drawBitmap(flameBmp[frame], null, dst, pBmp); pBmp.alpha = 255
             }
         }
         // chains swaying from the ceiling beside the hood
@@ -1448,8 +1522,10 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         }
         for (i in 0 until rainN) {
             if (!rnOn[i]) continue
-            glow(c, rnX[i], rnY[i], rnSz[i] * 2.6f, tintWarm, 0.85f)
-            glow(c, rnX[i], rnY[i] - rnSz[i] * 2f, rnSz[i] * 1.3f, tintWarm, 0.5f)
+            pAdd.colorFilter = tintWarm; pAdd.alpha = 220
+            dst.set(rnX[i] - rnSz[i] * 1.7f, rnY[i] - rnSz[i] * 7f, rnX[i] + rnSz[i] * 1.7f, rnY[i] + rnSz[i] * 1.4f); c.drawBitmap(glowBmp, null, dst, pAdd)
+            pAdd.alpha = 255; pAdd.colorFilter = null
+            glow(c, rnX[i], rnY[i], rnSz[i] * 1.6f, tintBone, 0.7f)
         }
     }
 
@@ -1481,18 +1557,6 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             pFill.color = 0xFFFFF4EC.toInt(); pFill.alpha = (255 * lvl).toInt()
             dst.set(ex - 0.05f * k, ey - 0.016f * k, ex + 0.05f * k, ey + 0.016f * k); c.drawOval(dst, pFill); pFill.alpha = 255
         }
-    }
-
-    private fun drawHands(c: Canvas) {
-        val a = altarRect
-        val hw = handBmp.width.toFloat()
-        // knuckles rest on the rim, fingers hooked over the front edge
-        val hy = a.top - 40f * u
-        c.drawBitmap(handBmp, a.left + 70f * u, hy, pBmp)
-        val rcx = a.right - 70f * u - hw / 2f
-        c.save(); c.scale(-1f, 1f, rcx, 0f)
-        c.drawBitmap(handBmp, rcx - hw / 2f, hy, pBmp)
-        c.restore()
     }
 
     private fun drawCollectDim(c: Canvas) {
@@ -1539,9 +1603,9 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
                 }
                 else -> {
                     val idx = o.kind - 1
-                    val sz = cm * 1.0f * pop * done
-                    glow(c, cx, cy, cm * 1.05f * pop, jpTint[idx], 0.38f + 0.1f * sin(t * 2.2f + i))
-                    sprite(c, sealBmp[idx], cx, cy, sz, sz)
+                    val sz = cm * 0.84f * pop * done
+                    glow(c, cx, cy - cm * 0.06f, cm * 1.05f * pop, jpTint[idx], 0.38f + 0.1f * sin(t * 2.2f + i))
+                    sprite(c, sealBmp[idx], cx, cy - cm * 0.06f, sz, sz)
                 }
             }
             if (age < 0.5f) {
@@ -1555,6 +1619,29 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
                 c.drawCircle(cx, cy, cm * 0.44f, pStroke); pStroke.alpha = 255
             }
         }
+    }
+
+    /** Burning edge: [n] overlapped fire sheets along y = [base], from x0 to x1, [hgt] tall, animated by [t]. */
+    private fun fireLine(c: Canvas, x0: Float, x1: Float, base: Float, hgt: Float, n: Int, t: Float, strength: Float) {
+        val gapX = (x1 - x0) / max(1, n - 1)
+        pAdd.alpha = (200 * strength).toInt().coerceIn(0, 255)
+        for (k in 0 until n) {
+            val frame = ((t * 8f + hash(k) * 6f).toInt() and 0x7FFFFFFF) % 6
+            val fxp = x0 + gapX * k + (hash(k + 5) - 0.5f) * gapX * 0.7f
+            val sw = gapX * (1.9f + 0.7f * hash(k + 17))
+            val hh = hgt * (0.55f + 0.7f * hash(k + 33)) * (0.75f + 0.25f * flick(t, k * 1.9f)) * (if (k == 0 || k == n - 1) 0.7f else 1f)
+            dst.set(fxp - sw / 2f, base - hh * 0.9f, fxp + sw / 2f, base + hh * 0.1f)
+            c.drawBitmap(fireBmp[frame], null, dst, pAdd)
+        }
+        pAdd.alpha = 255
+    }
+
+    /** Cheap deterministic hash to 0..1 (stable per index, no allocation). */
+    private fun hash(i: Int): Float {
+        var x = i * 374761393 + 668265263
+        x = (x xor (x ushr 13)) * 1274126177
+        x = x xor (x ushr 16)
+        return (x and 0xFFFF) / 65535f
     }
 
     private fun sprite(c: Canvas, b: Bitmap, cx: Float, cy: Float, w: Float, h: Float) {
@@ -1589,14 +1676,36 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
                     val big = o.value >= 15
                     num(c, tokens(cellValue[i]), cx, cy + cm * 0.10f, cm * (if (big) 0.30f else 0.26f) * pop, if (big) GOLD_HOT else 0xFFF6F0DC.toInt(), maxW * 0.9f)
                 }
-                Orb.REAPER -> if (cellValue[i] > 0) num(c, tokens(cellValue[i]), cx, cy + cm * 0.37f, cm * 0.25f * pop, 0xFFFFD6D2.toInt(), maxW, 0xFF3A0508.toInt())
-                else -> {
+                Orb.REAPER -> if (cellValue[i] > 0) ribbon(c, cx, tmp.bottom - cm * 0.06f, cellW * 0.86f, cm * 0.21f, Neon.RED, null, tokens(cellValue[i]), 0xFFFFD6D2.toInt())
+                else -> if (age > 0.12f) {
                     val idx = o.kind - 1
-                    label(c, jpNames[idx], cx, cy - cm * 0.30f, cm * 0.16f, jpHot[idx], serif, 0.1f)
-                    num(c, tokens(cellValue[i]), cx, cy + cm * 0.44f, cm * 0.24f * pop, 0xFFF6F0DC.toInt(), maxW, 0xFF000000.toInt())
+                    ribbon(c, cx, tmp.bottom - cm * 0.06f, cellW * 0.92f, cm * 0.21f, jpColor[idx], jpNames[idx], tokens(cellValue[i]), 0xFFF6F0DC.toInt())
                 }
             }
         }
+    }
+
+    /** Dark engraved ribbon across the foot of a niche: optional tier name on the left, token value on the right. */
+    private fun ribbon(c: Canvas, cx: Float, bottom: Float, rw: Float, rh: Float, accent: Int, name: String?, value: Long, valueCol: Int) {
+        dst.set(cx - rw / 2, bottom - rh, cx + rw / 2, bottom)
+        pFill.color = 0xEB040406.toInt(); c.drawRoundRect(dst, rh * 0.32f, rh * 0.32f, pFill)
+        pStroke.color = accent; pStroke.alpha = 215; pStroke.strokeWidth = 1.5f * u; c.drawRoundRect(dst, rh * 0.32f, rh * 0.32f, pStroke); pStroke.alpha = 255
+        val pad = rh * 0.34f
+        var avail = rw - pad * 2
+        if (name != null) {
+            pText.typeface = serif; pText.letterSpacing = 0.06f; pText.textSize = rh * 0.54f; pText.textAlign = Paint.Align.LEFT
+            pText.style = Paint.Style.FILL; pText.color = accent
+            c.drawText(name, dst.left + pad, dst.centerY() + rh * 0.20f, pText)
+            avail -= pText.measureText(name) + pad * 0.6f
+            pText.textAlign = Paint.Align.CENTER; pText.letterSpacing = 0f
+        }
+        val n = fmt(value)
+        pText.typeface = serif; pText.textSize = rh * 0.72f
+        val wd = pText.measureText(nb, nbStart, n)
+        val sz = if (wd > avail && wd > 0f) rh * 0.72f * avail / wd else rh * 0.72f
+        pText.textSize = sz; pText.style = Paint.Style.FILL; pText.color = valueCol
+        if (name != null) { pText.textAlign = Paint.Align.RIGHT; c.drawText(nb, nbStart, n, dst.right - pad, dst.centerY() + sz * 0.34f, pText); pText.textAlign = Paint.Align.CENTER }
+        else c.drawText(nb, nbStart, n, cx, dst.centerY() + sz * 0.34f, pText)
     }
 
     // ------------------------------------------------------------------ collector beams: scythe slashes into the Reaper
@@ -1620,15 +1729,15 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             val h = smooth((q * 1.35f - idx * 0.012f).coerceIn(0f, 1f))
             val h0 = max(0f, h - 0.42f)
             // the source flares as the blade leaves it
-            glow(c, sx, sy, cellW * 0.7f, tintRed, 0.5f * (1f - h) * fade)
+            glow(c, sx, sy, cellW * 0.65f, tintBone, 0.38f * (1f - h) * fade)
             var px = bez(sx, cx, tx, h0); var py = bez(sy, cy, ty, h0)
             for (k in 1..6) {
                 val hh = h0 + (h - h0) * k / 6f
                 val x = bez(sx, cx, tx, hh); val y = bez(sy, cy, ty, hh)
                 val wgt = k / 6f
-                pStroke.color = Neon.RED; pStroke.alpha = (150 * wgt * fade).toInt(); pStroke.strokeWidth = (3f + 11f * wgt) * u
+                pStroke.color = Neon.RED; pStroke.alpha = (165 * wgt * fade).toInt(); pStroke.strokeWidth = (3f + 14f * wgt) * u
                 c.drawLine(px, py, x, y, pStroke)
-                pStroke.color = 0xFFFFF0DC.toInt(); pStroke.alpha = (235 * wgt * fade).toInt(); pStroke.strokeWidth = (1.2f + 3.2f * wgt) * u
+                pStroke.color = 0xFFFFF0DC.toInt(); pStroke.alpha = (235 * wgt * fade).toInt(); pStroke.strokeWidth = (1.4f + 4.0f * wgt) * u
                 c.drawLine(px, py, x, y, pStroke)
                 px = x; py = y
             }
@@ -1637,7 +1746,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             val hx = bez(sx, cx, tx, h); val hy = bez(sy, cy, ty, h)
             val tdx = 2f * (1f - h) * (cx - sx) + 2f * h * (tx - cx); val tdy = 2f * (1f - h) * (cy - sy) + 2f * h * (ty - cy)
             c.save(); c.translate(hx, hy); c.rotate(Math.toDegrees(atan2(tdy, tdx).toDouble()).toFloat())
-            pBmp.alpha = (255 * fade).toInt(); val cs = 58f * u
+            pBmp.alpha = (255 * fade).toInt(); val cs = 70f * u
             dst.set(-cs * 0.55f, -cs * 0.5f, cs * 0.55f, cs * 0.5f); c.drawBitmap(crescent, null, dst, pBmp); pBmp.alpha = 255
             c.restore()
             glow(c, hx, hy, 22f * u, tintGreen, 0.8f * fade)
@@ -1661,7 +1770,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         for (i in 0 until spN) {
             if (spT[i] < 0) continue
             val q = ((vt - spT[i]) / 0.5).toFloat()
-            if (q >= 1f) { spT[i] = -1.0; continue }
+            if (q >= 1f) { spT[i] = -1.0; bumpAt = vt; continue }
             val e = smooth(q)
             val mx = (spX[i] + tx) / 2f + (ty - spY[i]) * 0.18f; val my = (spY[i] + ty) / 2f - (tx - spX[i]) * 0.18f
             val x = bez(spX[i], mx, tx, e); val y = bez(spY[i], my, ty, e)
@@ -1696,8 +1805,11 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         val v = tokens(shownMult.toInt().coerceAtLeast(0))
         val nh = r.height() * 0.52f
         val big = abs(tgt - shownMult) > 0.5f
-        glow(c, r.centerX(), r.top + r.height() * 0.62f, r.width() * 0.35f, tintGreen, if (big) 0.30f else 0.12f)
+        val bump = (1f - ((vt - bumpAt) / 0.3).toFloat()).coerceIn(0f, 1f)
+        glow(c, r.centerX(), r.top + r.height() * 0.62f, r.width() * 0.35f, tintGreen, (if (big) 0.30f else 0.12f) + 0.35f * bump)
+        c.save(); c.scale(1f + 0.05f * bump, 1f + 0.05f * bump, r.centerX(), r.top + r.height() * 0.64f)
         num(c, v, r.centerX() - r.width() * 0.07f, r.top + r.height() * 0.80f, nh, 0xFFF4EDD6.toInt(), r.width() * 0.56f)
+        c.restore()
         label(c, "TOKENS", r.right - r.width() * 0.17f, r.top + r.height() * 0.80f, r.height() * 0.17f, 0xFFB8AF94.toInt(), serif, 0.18f)
         // bet
         c.drawBitmap(plates[6]!!, betRect.left - plateM, betRect.top - plateM, null)
@@ -1705,14 +1817,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
 
     private fun drawGrandFlames(c: Canvas, r: RectF, t: Float) {
         val active = grandAt >= 0
-        val n = if (portrait) 4 else 6
-        for (k in 0 until n) {
-            val fx0 = r.left + r.width() * (0.12f + 0.76f * k / (n - 1))
-            val frame = ((t * 10f + k * 2).toInt() and 0x7FFFFFFF) % 6
-            val hh = (if (active) 70f else 34f) * u * (0.85f + 0.2f * flick(t, k * 2f))
-            dst.set(fx0 - hh * 0.3f, r.top - hh * 0.55f, fx0 + hh * 0.3f, r.top + hh * 0.45f)
-            pBmp.alpha = if (active) 255 else 170; c.drawBitmap(flameBmp[frame], null, dst, pBmp); pBmp.alpha = 255
-        }
+        fireLine(c, r.left + r.width() * 0.10f, r.right - r.width() * 0.10f, r.top + 8f * u, (if (active) 64f else 38f) * u, if (portrait) 4 else 6, t, if (active) 1f else 0.75f)
         glow(c, r.centerX(), r.top + r.height() * 0.2f, r.width() * 0.6f, tintGold, (if (active) 0.40f else 0.14f) * flick(t, 9f))
     }
 
@@ -1764,7 +1869,113 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         sprite(c, d, cx, cy, spinBtn.width() * 1.25f * s, spinBtn.width() * 1.25f * s)
         if (ready) {
             val a = 0.65f + 0.35f * sin(t * 3.2f)
-            label(c, "TAP TO RESPIN", cx, spinBtn.bottom + 34f * u, 21f * u, mix(0xFF9A8E78.toInt(), 0xFFF2EBD8.toInt(), a), serif, 0.14f)
+            label(c, "TAP TO RESPIN", cx, spinBtn.bottom + (if (portrait) 24f else 34f) * u, (if (portrait) 17f else 21f) * u, mix(0xFF9A8E78.toInt(), 0xFFF2EBD8.toInt(), a), serif, 0.14f)
+        }
+    }
+
+    // ------------------------------------------------------------------ gothic typography (baked)
+    /** Title lettering baked to a bitmap: coloured glow, black outline, vertical metal gradient, bevel highlight. */
+    private fun titleBitmap(text: String, size0: Float, maxW: Float, top: Int, mid: Int, bot: Int, glowCol: Int, tracking: Float = 0.1f): Bitmap {
+        val p = Paint(Paint.ANTI_ALIAS_FLAG); p.typeface = serif; p.letterSpacing = tracking; p.textSize = size0
+        var size = size0
+        val w0 = p.measureText(text)
+        if (w0 > maxW) { size = size0 * maxW / w0; p.textSize = size }
+        val tw = p.measureText(text)
+        val m = size * 0.5f
+        val bw = (tw + 2 * m).toInt(); val bh = (size * 1.3f + 2 * m).toInt()
+        val base = m + size * 0.98f
+        return mk(bw, bh) { c ->
+            p.textAlign = Paint.Align.CENTER
+            val cx = bw / 2f
+            p.style = Paint.Style.FILL_AND_STROKE; p.strokeWidth = size * 0.10f; p.color = withA(glowCol, 210); p.maskFilter = BlurMaskFilter(size * 0.2f, BlurMaskFilter.Blur.NORMAL)
+            c.drawText(text, cx, base, p); p.maskFilter = null
+            p.style = Paint.Style.STROKE; p.strokeWidth = size * 0.095f; p.strokeJoin = Paint.Join.ROUND; p.color = 0xFF0A0604.toInt()
+            c.drawText(text, cx, base, p)
+            p.style = Paint.Style.FILL; p.strokeWidth = 0f
+            p.alpha = 255; p.shader = LinearGradient(0f, base - size * 0.74f, 0f, base + size * 0.08f, intArrayOf(top, mid, bot), floatArrayOf(0f, 0.48f, 1f), Shader.TileMode.CLAMP)
+            c.drawText(text, cx, base, p)
+            p.alpha = 255; p.shader = LinearGradient(0f, base - size * 0.74f, 0f, base - size * 0.40f, 0x77FFFFFF, 0x00FFFFFF, Shader.TileMode.CLAMP)
+            c.drawText(text, cx, base, p); p.shader = null
+        }
+    }
+
+    /** Thorned divider: a blade of brass to each side of a red-eyed skull. */
+    private fun ornament(c: Canvas, cx: Float, y: Float, half: Float, alpha: Float) {
+        val gap = 30f * u; val th = 3.2f * u
+        pFill.color = Color.argb((255 * alpha).toInt(), 168, 135, 58)
+        for (side in 0..1) {
+            val sg = if (side == 0) -1f else 1f
+            path.reset(); path.moveTo(cx + sg * gap, y - th); path.lineTo(cx + sg * half, y); path.lineTo(cx + sg * gap, y + th); path.close()
+            c.drawPath(path, pFill)
+            path.reset(); path.moveTo(cx + sg * (gap + 6f * u), y); path.lineTo(cx + sg * (gap + 16f * u), y - 9f * u); path.lineTo(cx + sg * (gap + 22f * u), y); path.lineTo(cx + sg * (gap + 16f * u), y + 9f * u); path.close()
+            c.drawPath(path, pFill)
+        }
+        pBmp.alpha = (255 * alpha).toInt(); sprite(c, pipOn, cx, y, 40f * u, 40f * u); pBmp.alpha = 255
+    }
+
+    private val introRect = RectF()
+    private var introTitleY = 0f
+    private var introOrnY = 0f
+    private var introPromptY = 0f
+    private val sumRect = RectF()
+    private val jpTitle = arrayOfNulls<Bitmap>(3)
+    private val boneShader = LinearGradient(0f, -0.78f, 0f, 0.02f, intArrayOf(0xFFFFFAEA.toInt(), 0xFFE9E1CB.toInt(), 0xFFA39B84.toInt()), floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP)
+    private val goldShader = LinearGradient(0f, -0.78f, 0f, 0.02f, intArrayOf(0xFFFFF6C8.toInt(), GOLD, 0xFFB5541A.toInt()), floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP)
+    private val ashShader = LinearGradient(0f, -0.78f, 0f, 0.02f, intArrayOf(0xFFC9C5B6.toInt(), 0xFF8E8A7C.toInt(), 0xFF5A5850.toInt()), floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP)
+
+    private fun layoutOverlays() {
+        val W = vw; val H = vh
+        val tw = if (portrait) W * 0.92f else min(W * 0.80f, 940f * u)
+        val rowH = (if (portrait) 84f else 64f) * u
+        val th = rowH * 4 + (if (portrait) 78f else 60f) * u
+        val top = H * (if (portrait) 0.37f else 0.40f)
+        introRect.set((W - tw) / 2, top, (W + tw) / 2, top + th)
+        introTitleY = H * (if (portrait) 0.18f else 0.17f)
+        introOrnY = introTitleY + H * (if (portrait) 0.07f else 0.095f)
+        introPromptY = min(H - 30f * u, introRect.bottom + 56f * u)
+        val sw = if (portrait) W * 0.92f else min(W * 0.76f, 900f * u)
+        val sh = if (portrait) H * 0.52f else min(H * 0.68f, 500f * u)
+        val cy = H * 0.49f
+        sumRect.set((W - sw) / 2, cy - sh / 2, (W + sw) / 2, cy + sh / 2)
+    }
+
+    private fun bakeIntro() {
+        layoutOverlays()
+        val H = vh; val W = vw
+        introTitle = titleBitmap("THE SOUL VAULT", H * (if (portrait) 0.066f else 0.098f), W * 0.9f, BONE_HOT, 0xFFD9D2BE.toInt(), 0xFFC02A3E.toInt(), Neon.RED)
+        val rowH = (if (portrait) 84f else 64f) * u
+        introPlate = plateBitmap(introRect, Neon.RED) { c, w, h ->
+            val tp = Paint(Paint.ANTI_ALIAS_FLAG); tp.textAlign = Paint.Align.LEFT
+            val iconW = (if (portrait) 96f else 112f) * u
+            val tx = iconW + 24f * u
+            val maxT = w - tx - 22f * u
+            val rows = arrayOf(
+                "RESPIN" to "Souls stay bound. Every new orb resets your respins to ${ReaperConfig.VAULT_RESPINS}.",
+                "JACKPOT ORBS" to "MINI ${ReaperConfig.MINI}×     MINOR ${ReaperConfig.MINOR}×     MAJOR ${ReaperConfig.MAJOR}×",
+                "THE REAPER ORB" to "Harvests every soul on the board.",
+                "FILL ALL ${SoulVault.CELLS}" to "Claim the GRAND  —  ${ReaperConfig.GRAND}× your bonus bet.")
+            for (i in rows.indices) {
+                val y0 = 14f * u + i * rowH; val cy = y0 + rowH / 2f
+                if (i > 0) { tp.color = 0x33D2B060; c.drawRect(26f * u, y0 - 0.6f * u, w - 26f * u, y0 + 0.6f * u, tp) }
+                val ix = iconW / 2f + (if (portrait) 24f else 12f) * u
+                when (i) {
+                    0 -> for (k in 0..2) { dst.set(ix + (k - 1) * 31f * u - 15f * u, cy - 15f * u, ix + (k - 1) * 31f * u + 15f * u, cy + 15f * u); c.drawBitmap(pipOn, null, dst, pBmp) }
+                    1 -> for (k in 0..2) { val xx = ix + (k - 1) * 33f * u; dst.set(xx - 19f * u, cy - 19f * u, xx + 19f * u, cy + 19f * u); c.drawBitmap(sealBmp[k], null, dst, pBmp) }
+                    2 -> { dst.set(ix - 33f * u, cy - 33f * u, ix + 33f * u, cy + 33f * u); c.drawBitmap(reaperOrb, null, dst, pBmp) }
+                    else -> { dst.set(ix - 36f * u, cy - 36f * u, ix + 36f * u, cy + 36f * u); c.drawBitmap(sealBmp[3], null, dst, pBmp) }
+                }
+                tp.typeface = serif; tp.letterSpacing = 0.14f
+                val ts = fit(tp, rows[i].first, maxT, rowH * 0.30f)
+                tp.textSize = ts; tp.color = 0xCC000000.toInt(); c.drawText(rows[i].first, tx, cy - rowH * 0.06f + 1.5f * u, tp)
+                tp.color = 0xFFD2B060.toInt(); c.drawText(rows[i].first, tx, cy - rowH * 0.06f, tp)
+                tp.typeface = cond; tp.letterSpacing = 0f
+                tp.textSize = fit(tp, rows[i].second, maxT, rowH * 0.27f)
+                tp.color = 0xFFD9D2BE.toInt(); c.drawText(rows[i].second, tx, cy + rowH * 0.27f, tp)
+            }
+            tp.textAlign = Paint.Align.CENTER; tp.typeface = serifIt; tp.letterSpacing = 0f
+            val foot = "Bonus bet: ${result.bet} tokens, your average stake while collecting relics"
+            tp.textSize = fit(tp, foot, w - 40f * u, rowH * 0.25f); tp.color = 0xFF9A9486.toInt()
+            c.drawText(foot, w / 2f, h - 20f * u, tp)
         }
     }
 
@@ -1774,47 +1985,68 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         val a = (1f - e / 1.4f).coerceIn(0f, 1f)
         val idx = jackpotKind.coerceIn(0, 2)
         val cx = gridRect.centerX(); val cy = gridRect.centerY()
-        c.save(); c.rotate(e * (if (calm) 6f else 14f), cx, cy)
-        pAdd.colorFilter = jpTint[idx]; pAdd.alpha = (150 * a * min(1f, e * 6f)).toInt()
-        val rs = gridRect.height() * 1.7f; dst.set(cx - rs, cy - rs, cx + rs, cy + rs); c.drawBitmap(raysBmp, null, dst, pAdd)
+        c.save(); c.rotate(e * (if (calm) 5f else 11f), cx, cy)
+        pAdd.colorFilter = jpTint[idx]; pAdd.alpha = ((if (calm) 70 else 120) * a * min(1f, e * 6f)).toInt()
+        val rs = gridRect.height() * 1.25f; dst.set(cx - rs, cy - rs, cx + rs, cy + rs); c.drawBitmap(raysBmp, null, dst, pAdd)
         pAdd.colorFilter = null; pAdd.alpha = 255
         c.restore()
-        val s = 1f + 0.18f * (1f - a)
-        label(c, jpBang[idx], cx, cy + gridRect.height() * 0.05f, gridRect.height() * 0.19f * s, withA(jpHot[idx], (255 * min(1f, a * 2.2f)).toInt()), serif, 0.1f)
+        glow(c, cx, cy, gridRect.height() * 0.8f, jpTint[idx], 0.32f * a)
+        var tb = jpTitle[idx]
+        if (tb == null) {
+            tb = titleBitmap(jpBang[idx], gridRect.height() * 0.2f, gridRect.width() * 0.8f, jpHot[idx], jpColor[idx], shade(jpColor[idx], 0.45f), jpColor[idx])
+            jpTitle[idx] = tb
+        }
+        val s = 1f + 0.16f * (1f - a)
+        pBmp.alpha = (255 * min(1f, a * 2.4f)).toInt()
+        sprite(c, tb, cx, cy + gridRect.height() * 0.02f, tb.width * s, tb.height * s); pBmp.alpha = 255
     }
 
     private fun drawGrand(c: Canvas, t: Float) {
         val e = (vt - grandAt).toFloat()
-        pFill.color = Color.argb((190 * smooth(e * 2.5f)).toInt(), 6, 3, 2); c.drawRect(0f, 0f, width.toFloat(), height.toFloat(), pFill)
-        val cx = width / 2f; val cy = height * 0.46f
-        c.save(); c.rotate(e * (if (calm) 4f else 9f), cx, cy)
-        pAdd.colorFilter = tintGold; pAdd.alpha = (140 * smooth(e * 2f)).toInt()
-        val rs = max(width, height) * 0.75f; dst.set(cx - rs, cy - rs, cx + rs, cy + rs); c.drawBitmap(raysBmp, null, dst, pAdd)
+        val W = width.toFloat(); val H = height.toFloat()
+        pFill.color = Color.argb((200 * smooth(e * 2.5f)).toInt(), 6, 3, 2); c.drawRect(0f, 0f, W, H, pFill)
+        val cx = W / 2f; val cy = H * 0.46f
+        c.save(); c.rotate(e * (if (calm) 3f else 7f), cx, cy)
+        pAdd.colorFilter = tintGold; pAdd.alpha = ((if (calm) 70 else 130) * smooth(e * 2f)).toInt()
+        val rs = max(W, H) * 0.78f; dst.set(cx - rs, cy - rs, cx + rs, cy + rs); c.drawBitmap(raysBmp, null, dst, pAdd)
         pAdd.colorFilter = null; pAdd.alpha = 255
         c.restore()
-        glow(c, cx, cy, height * 0.5f, tintGold, 0.35f * smooth(e * 2f))
-        val s = (1f + 0.04f * sin(e * 4.5f)) * min(1f, 0.6f + e * 1.5f)
-        c.save(); c.scale(s, s, cx, cy)
-        val ts = height * 0.21f
-        label(c, "GRAND", cx, cy + ts * 0.34f, ts, GOLD_HOT, serif, 0.08f)
-        c.restore()
+        glow(c, cx, cy, H * 0.55f, tintGold, 0.32f * smooth(e * 2f))
+        var gt = grandTitle
+        if (gt == null) { gt = titleBitmap("GRAND", H * 0.24f, W * 0.8f, 0xFFFFFFFF.toInt(), GOLD, 0xFFB5541A.toInt(), EMBER, 0.12f); grandTitle = gt }
+        val s = (1f + 0.035f * sin(e * 4.2f)) * (0.7f + 0.3f * smooth(e * 2.2f))
+        pBmp.alpha = (255 * smooth(e * 3f)).toInt()
+        sprite(c, gt, cx, cy, gt.width * s, gt.height * s); pBmp.alpha = 255
         // fire along the lettering
-        for (k in 0 until 9) {
-            val frame = ((t * 10f + k * 2).toInt() and 0x7FFFFFFF) % 6
-            val fxp = cx + (k - 4) * ts * 0.34f
-            val hh = ts * (0.75f + 0.25f * flick(t, k * 1.3f)) * min(1f, e * 2f)
-            dst.set(fxp - hh * 0.28f, cy - ts * 0.30f - hh * 0.8f, fxp + hh * 0.28f, cy - ts * 0.30f + hh * 0.2f)
-            pBmp.alpha = 235; c.drawBitmap(flameBmp[frame], null, dst, pBmp); pBmp.alpha = 255
-        }
-        label(c, "THE VAULT IS FULL", cx, height * 0.67f, height * 0.05f, 0xFFF2EBD8.toInt(), serif, 0.24f)
+        val capTop = cy - gt.height * s * 0.17f
+        val fl = gt.width * s * 0.70f
+        fireLine(c, cx - fl / 2f, cx + fl / 2f, capTop + H * 0.02f, H * 0.2f * min(1f, e * 2f), 9, t, 1f)
+        label(c, "THE VAULT IS FULL", cx, H * 0.69f, H * (if (portrait) 0.034f else 0.05f), 0xFFF2EBD8.toInt(), serif, 0.24f, true, W * 0.9f)
     }
 
     // ------------------------------------------------------------------ intro and summary
-    private val introLines = arrayOf(
-        "Press SPIN to respin. Souls stay bound; every new orb resets your respins to 3.",
-        "Jackpot orbs: MINI ${ReaperConfig.MINI}×  •  MINOR ${ReaperConfig.MINOR}×  •  MAJOR ${ReaperConfig.MAJOR}×  •  fill all 20 for the GRAND (${ReaperConfig.GRAND}×)",
-        "The Reaper orb harvests every soul on the board.",
-        "Bonus bet: ${result.bet} tokens (your average stake while collecting relics)")
+    private fun drawIntro(c: Canvas, t: Float) {
+        val W = width.toFloat(); val H = height.toFloat()
+        pFill.color = Color.argb(236, 2, 3, 4); c.drawRect(0f, 0f, W, H, pFill)
+        val e = t
+        val a = smooth(e * 2.2f)
+        val tb = introTitle ?: return
+        val s = 0.94f + 0.06f * smooth(e * 1.6f)
+        glow(c, W / 2f, introTitleY, W * 0.42f, tintRed, 0.16f * a)
+        pBmp.alpha = (255 * a).toInt(); sprite(c, tb, W / 2f, introTitleY, tb.width * s, tb.height * s); pBmp.alpha = 255
+        ornament(c, W / 2f, introOrnY, min(W * 0.30f, 330f * u), a)
+        pBmp.alpha = (255 * smooth((e - 0.25f) * 2f)).toInt()
+        c.drawBitmap(introPlate!!, introRect.left - plateM, introRect.top - plateM, pBmp); pBmp.alpha = 255
+        val pa = 0.55f + 0.45f * sin(t * 2.6f)
+        label(c, "TAP TO BEGIN", W / 2f, introPromptY, H * (if (portrait) 0.034f else 0.045f), mix(0xFF7A0F18.toInt(), 0xFFFF3B4E.toInt(), pa), serif, 0.22f, true, W * 0.9f)
+    }
+
+    private fun summaryTierOf(): Int {
+        if (result.grand) return 4
+        val x = result.payTokens.toDouble() / result.bet
+        return if (x >= 100) 3 else if (x >= 40) 2 else if (x >= 18) 1 else 0
+    }
+
     private val wonLine by lazy { "TOKENS WON  •  ${Money.describe(result.payTokens)}" }
     private val noteLine by lazy {
         when {
@@ -1824,41 +2056,83 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         }
     }
 
-    private fun drawIntro(c: Canvas, t: Float) {
-        pFill.color = Color.argb(205, 2, 3, 4); c.drawRect(0f, 0f, width.toFloat(), height.toFloat(), pFill)
-        val e = t
-        val s = min(1f, 0.92f + e * 0.3f)
-        c.save(); c.scale(s, s, width / 2f, height * 0.36f)
-        label(c, "THE SOUL VAULT", width / 2f, height * 0.36f, height * (if (portrait) 0.065f else 0.11f), BONE_HOT, serif, 0.1f)
-        c.restore()
-        for (i in introLines.indices) label(c, introLines[i], width / 2f, height * (0.5f + i * 0.065f), height * 0.032f, 0xFFD9D2BE.toInt(), cond, 0f)
-        val a = 0.6f + 0.4f * sin(t * 3f)
-        label(c, "TAP TO BEGIN", width / 2f, height * 0.82f, height * 0.045f, mix(0xFF7A0F18.toInt(), Neon.RED, a), serif, 0.2f)
+    private fun web(c: Canvas, x0: Float, y0: Float, sx: Float, sy: Float, r: Float) {
+        val p = Paint(Paint.ANTI_ALIAS_FLAG); p.style = Paint.Style.STROKE; p.strokeWidth = 1.1f * u; p.color = 0x55D9D2BE
+        val n = 6
+        for (k in 0..n) { val a = (PI / 2 * k / n).toFloat(); c.drawLine(x0, y0, x0 + sx * r * cos(a), y0 + sy * r * sin(a), p) }
+        for (ring in 1..5) {
+            val rr = r * ring / 5f
+            for (k in 0 until n) {
+                val a0 = (PI / 2 * k / n).toFloat(); val a1 = (PI / 2 * (k + 1) / n).toFloat(); val am = (a0 + a1) / 2f
+                path.reset(); path.moveTo(x0 + sx * rr * cos(a0), y0 + sy * rr * sin(a0))
+                path.quadTo(x0 + sx * rr * 0.86f * cos(am), y0 + sy * rr * 0.86f * sin(am), x0 + sx * rr * cos(a1), y0 + sy * rr * sin(a1))
+                c.drawPath(path, p)
+            }
+        }
     }
 
-    private fun summaryTierOf(): Int {
-        if (result.grand) return 4
-        val x = result.payTokens.toDouble() / result.bet
-        return if (x >= 100) 3 else if (x >= 40) 2 else if (x >= 18) 1 else 0
+    private fun ensureSummary(tier: Int) {
+        if (summaryTier == tier && summaryPlate != null) return
+        summaryTier = tier
+        val accent = when (tier) { 0 -> 0xFF566450.toInt(); 1 -> Neon.GREEN; 2 -> Neon.RED; else -> GOLD }
+        summaryPlate = plateBitmap(sumRect, accent) { c, w, h ->
+            val p = Paint(Paint.ANTI_ALIAS_FLAG)
+            if (tier == 0) { web(c, 6f * u, 6f * u, 1f, 1f, h * 0.30f); web(c, w - 6f * u, h - 6f * u, -1f, -1f, h * 0.22f) }
+            p.style = Paint.Style.STROKE; p.strokeWidth = 1.4f * u; p.color = withA(accent, if (tier == 0) 70 else 150)
+            tmp.set(20f * u, 20f * u, w - 20f * u, h - 20f * u); c.drawRoundRect(tmp, 8f * u, 8f * u, p)
+            if (tier >= 3) { p.strokeWidth = 2.4f * u; p.color = withA(GOLD, 120); tmp.inset(7f * u, 7f * u); c.drawRoundRect(tmp, 6f * u, 6f * u, p) }
+        }
+        val title = when (tier) { 0 -> "THE VAULT IS EMPTY"; 1 -> "SOULS HARVESTED"; 2 -> "THE VAULT YIELDS"; 3 -> "THE VAULT RUNS RED"; else -> "THE GRAND VAULT FALLS" }
+        val sz = sumRect.height() * (if (portrait) 0.105f else 0.125f)
+        val mw = sumRect.width() * 0.9f
+        summaryTitle = when (tier) {
+            0 -> titleBitmap(title, sz, mw, 0xFFB5B1A2.toInt(), 0xFF8E8A7C.toInt(), 0xFF4A4A44.toInt(), 0xFF1E2A1E.toInt())
+            1 -> titleBitmap(title, sz, mw, BONE_HOT, 0xFFD9D2BE.toInt(), 0xFF8A8472.toInt(), 0xFF3F8F1A.toInt())
+            2 -> titleBitmap(title, sz, mw, BLOOD_HOT, Neon.RED, BLOOD_DEEP, Neon.RED)
+            3 -> titleBitmap(title, sz, mw, GOLD_HOT, GOLD, 0xFFB23A12.toInt(), EMBER)
+            else -> titleBitmap(title, sz, mw, 0xFFFFFFFF.toInt(), GOLD, 0xFFB5541A.toInt(), EMBER)
+        }
     }
 
     private fun drawSummary(c: Canvas, t: Float) {
         val e = (vt - summaryAt).toFloat()
         val tier = summaryTierOf()
-        pFill.color = Color.argb((if (tier == 0) 225 else 205).let { (it * min(1f, e * 2f)).toInt() }, 0, 0, 0)
-        c.drawRect(0f, 0f, width.toFloat(), height.toFloat(), pFill)
-        val s = min(1f, e * 2f)
-        c.save(); c.scale(s, s, width / 2f, height / 2f)
-        val titleCol = when (tier) { 0 -> 0xFF8E8A7C.toInt(); 1 -> BONE_HOT; 2 -> BLOOD_HOT; else -> GOLD_HOT }
-        val title = when (tier) { 0 -> "THE VAULT IS EMPTY"; 1 -> "SOULS HARVESTED"; 2 -> "THE VAULT YIELDS"; 3 -> "THE VAULT RUNS RED"; else -> "THE GRAND VAULT FALLS" }
-        label(c, title, width / 2f, height * 0.30f, height * (if (portrait) 0.04f else 0.075f), titleCol, serif, 0.08f)
+        ensureSummary(tier)
+        val W = width.toFloat(); val H = height.toFloat()
+        val sa = smooth(e * 2.2f)
+        pFill.color = Color.argb(((if (tier == 0) 232 else 206) * sa).toInt(), 0, 0, 0); c.drawRect(0f, 0f, W, H, pFill)
+        val r = sumRect
+        if (tier >= 2) glow(c, r.centerX(), r.centerY(), max(r.width(), r.height()) * 0.8f, if (tier >= 3) tintGold else tintRed, 0.22f * sa)
+        // the tablet drops in with weight: heavy fall, one small rebound
+        val fall = (e / 0.42f).coerceIn(0f, 1f)
+        val y = -(1f - fall * fall) * H * 0.55f + (if (e > 0.42f) -abs(sin((e - 0.42f) * 13f)) * 9f * u * kotlin.math.exp(-(e - 0.42f) * 7f) else 0f)
+        c.save(); c.translate(0f, y)
+        pBmp.alpha = (255 * min(1f, e * 5f)).toInt()
+        c.drawBitmap(summaryPlate!!, r.left - plateM, r.top - plateM, pBmp); pBmp.alpha = 255
+        val tb = summaryTitle!!
+        sprite(c, tb, r.centerX(), r.top + r.height() * 0.17f, tb.width.toFloat(), tb.height.toFloat())
+        if (tier >= 3) fireLine(c, r.left + r.width() * 0.06f, r.right - r.width() * 0.06f, r.top + 6f * u, r.height() * 0.2f, 8, t, 1f)
+        // amount (counts up while the stone settles)
         val shown = result.payTokens * smooth(e / 0.8f)
-        num(c, shown.toLong(), width / 2f, height * 0.50f, height * 0.15f, if (tier == 0) 0xFFB9B3A3.toInt() else if (tier >= 3) GOLD_HOT else 0xFFF4EDD6.toInt(), width * 0.8f)
-        label(c, wonLine, width / 2f, height * 0.58f, height * 0.04f, 0xFFE9E1CB.toInt(), cond, 0f)
-        label(c, noteLine, width / 2f, height * 0.65f, height * 0.03f, 0xFFB0B0B0.toInt(), cond, 0f)
-        label(c, "Added to your credit", width / 2f, height * 0.70f, height * 0.03f, 0xFFB0B0B0.toInt(), cond, 0f)
-        if (e > 0.8f) label(c, "TAP TO RETURN TO THE GRAVEYARD", width / 2f, height * 0.82f, height * 0.04f, mix(0xFF7A6A44.toInt(), GOLD_HOT, 0.6f + 0.4f * sin(t * 3f)), serif, 0.14f)
+        val sh = when (tier) { 0 -> ashShader; 4, 3 -> goldShader; else -> boneShader }
+        val ay = r.top + r.height() * 0.545f
+        val asz = r.height() * 0.24f
+        if (tier >= 1) glow(c, r.centerX(), ay - asz * 0.3f, r.width() * 0.34f, if (tier >= 3) tintGold else if (tier == 2) tintRed else tintGreen, if (tier >= 3) 0.42f else 0.22f)
+        mtx.setScale(1f, asz); mtx.postTranslate(0f, ay); sh.setLocalMatrix(mtx)
+        val n = fmt(shown.toLong())
+        pText.typeface = serif; pText.letterSpacing = 0f; pText.textSize = asz
+        val wd = pText.measureText(nb, nbStart, n)
+        if (wd > r.width() * 0.86f) pText.textSize = asz * r.width() * 0.86f / wd
+        pText.style = Paint.Style.STROKE; pText.strokeWidth = pText.textSize * 0.13f; pText.color = 0xFF000000.toInt(); c.drawText(nb, nbStart, n, r.centerX(), ay, pText)
+        pText.style = Paint.Style.FILL; pText.shader = sh; c.drawText(nb, nbStart, n, r.centerX(), ay, pText); pText.shader = null
+        label(c, wonLine, r.centerX(), r.top + r.height() * 0.675f, r.height() * (if (portrait) 0.052f else 0.062f), 0xFFE9E1CB.toInt(), cond, 0f, true, r.width() * 0.9f)
+        label(c, noteLine, r.centerX(), r.top + r.height() * 0.765f, r.height() * (if (portrait) 0.036f else 0.044f), 0xFFA9A596.toInt(), cond, 0f, true, r.width() * 0.9f)
+        label(c, "Added to your credit", r.centerX(), r.top + r.height() * 0.83f, r.height() * (if (portrait) 0.036f else 0.044f), 0xFFA9A596.toInt(), cond, 0f)
         c.restore()
+        if (e > 0.8f) {
+            val pa = 0.55f + 0.45f * sin(t * 2.6f)
+            label(c, "TAP TO RETURN TO THE GRAVEYARD", r.centerX(), r.bottom + H * 0.075f, H * (if (portrait) 0.030f else 0.04f), mix(0xFF7A6A44.toInt(), GOLD_HOT, pa), serif, 0.14f, true, W * 0.94f)
+        }
     }
 
     fun release() { recycleAll() }

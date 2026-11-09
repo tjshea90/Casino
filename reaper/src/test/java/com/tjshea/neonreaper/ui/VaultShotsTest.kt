@@ -164,7 +164,7 @@ class VaultShotsTest {
         val v = begin(tag, w, h, natural(30..70))
         tap(v)
         var guard = 0
-        while (guard++ < 40 && !(v.summaryAge >= 0)) { step(v, 0.5); if (v.awaitingSpin) press(v) }
+        while (guard++ < 240 && !(v.summaryAge >= 0)) { step(v, 0.5, 100); if (v.awaitingSpin) press(v) }
         assertTrue(until(30.0, v) { v.summaryAge in 1.3..1.5 }); shot(v, "vs_${tag}_16_summary_natural")
     }
 
@@ -184,13 +184,50 @@ class VaultShotsTest {
         val v = VaultView(ctx, audio, res) {}
         size(v, 1280, 800); step(v, 1.0); tap(v)
         var guard = 0
-        while (guard++ < 80 && v.summaryAge < 0) { step(v, 0.5, 100); if (v.awaitingSpin) press(v) }
+        while (guard++ < 600 && v.summaryAge < 0) { step(v, 0.5, 100); if (v.awaitingSpin) press(v) }
         assertTrue(v.summaryAge >= 0)
         assertEquals(res.totalMult, v.tallyMult)
         for (i in 0 until SoulVault.CELLS) {
             assertEquals("cell $i kind", res.cells[i]?.kind, v.liveCells[i]?.kind)
             assertEquals("cell $i value", res.cells[i]?.value ?: 0, v.liveValue(i))
         }
+    }
+
+    /**
+     * Performance guard: while the vault just waits for SPIN (candles flickering, fog drifting, embers rising) a frame
+     * must not allocate on the JVM heap beyond the framework's own bookkeeping.
+     */
+    @Test fun steadyStateAllocatesLittle() {
+        val v = begin("alloc", 1280, 800, showcase()); tap(v)
+        assertTrue(until(12.0, v) { v.awaitingSpin }); step(v, 1.0)
+        // java.lang.management is not on the android.jar compile classpath, but it is there on the JVM that runs the test
+        val mxBean = Class.forName("java.lang.management.ManagementFactory").getMethod("getThreadMXBean").invoke(null)
+        val allocated = Class.forName("com.sun.management.ThreadMXBean").getMethod("getThreadAllocatedBytes", Long::class.javaPrimitiveType)
+        val id = Thread.currentThread().id
+        fun heap(): Long = allocated.invoke(mxBean, id) as Long
+        val b = Bitmap.createBitmap(1280, 800, Bitmap.Config.ARGB_8888); val cv = Canvas(b)
+        repeat(30) { ShadowSystemClock.advanceBy(Duration.ofMillis(40)); v.draw(cv) }
+        val b0 = heap()
+        val n = 120
+        repeat(n) { ShadowSystemClock.advanceBy(Duration.ofMillis(40)); v.draw(cv) }
+        val per = (heap() - b0) / n
+        println("VaultView steady-state heap allocation: $per bytes/frame")
+        assertTrue("per-frame allocation $per bytes", per < 16 * 1024)
+    }
+
+    /** The crypt is baked once in onSizeChanged on the UI thread: report how long that takes (JIT-warm and cold). */
+    @Test fun bakeIsQuick() {
+        SystemClock.setCurrentTimeMillis(1_000_000)
+        val ms = ArrayList<Long>()
+        for ((w, h) in listOf(1280 to 800, 800 to 1280, 1280 to 800)) {
+            val v = VaultView(ctx, audio, showcase()) {}
+            val t0 = System.nanoTime(); size(v, w, h); val t1 = System.nanoTime()
+            frame(v); val t2 = System.nanoTime()
+            ms += (t1 - t0) / 1_000_000
+            println("VaultView bake ${w}x$h: ${(t1 - t0) / 1_000_000} ms, first frame ${(t2 - t1) / 1_000_000} ms")
+            v.release()
+        }
+        assertTrue("warm bake took ${ms.last()} ms", ms.last() < 2500)
     }
 
     private companion object { const val VAULT_COLS = ReaperConfig.VAULT_COLS }
