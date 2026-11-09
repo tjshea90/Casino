@@ -24,15 +24,69 @@ import kotlin.math.tanh
  * ghost choir and taiko drums, all through a Freeverb-style reverb.
  */
 class Audio(context: Context) {
+    /**
+     * AUDIO CONTRACT v3 ("DREAD"). The UI calls these names; the sound designer owns what they sound like.
+     * Direction: dark, adult horror-cinematic, premium-slot punch (sub thump + body + high sparkle), tonal centre D minor.
+     * NO music-box, giggles, cartoon boings or cute chimes. `rate` (0.5..2) is used by the UI to pitch a sound up a scale step
+     * (ticks, scatter landings, multiplier ups, orbs), so those sounds must stay musical when pitched.
+     */
     enum class Sfx {
+        // ---- legacy names (still called; re-voice them darker) ----
         CLICK, SPIN, STOP, WIN, WIN_MED, BIG_WIN, THUNDER, RELIC, VAULT, ORB, HEARTBEAT, JACKPOT, GROWL, SLASH, TICK,
-        ERROR, BELL, LAUGH, CACKLE, GIGGLE, CAW, CHATTER, WHOOSH, COINS, FANFARE, COUNT_END, PRESS
+        ERROR, BELL, LAUGH /* deep reaper laugh */, CACKLE /* low demonic chuckle */, GIGGLE /* faint ghostly whisper-laugh */,
+        CAW, CHATTER, WHOOSH, COINS, FANFARE, COUNT_END, PRESS,
+        // ---- v3: UI / reels ----
+        UI_OPEN, UI_CLOSE,            // dialog open / close (stone + soft whoosh)
+        STAKE_CHANGE,                 // stake button: short mechanical tick (rate = stake step)
+        REEL_THUD,                    // heavy reel stop used for wild / scatter / big symbols
+        SPIN_START,                   // lever + chain + reels spinning up (~0.5 s)
+        // ---- v3: wins (escalating). WIN_SMALL < WIN_BIG (SOUL REAPED 10x) < WIN_MEGA (DEATH'S TOLL 25x) < WIN_EPIC (HELLFIRE 50x) < WIN_APOCALYPSE (100x)
+        WIN_SMALL, WIN_TICK /* count-up tick, pitched by rate */, WIN_BIG, WIN_MEGA, WIN_EPIC, WIN_APOCALYPSE,
+        COIN_SHOWER,                  // ~3 s shower of soul-coins, loop-free
+        // ---- v3: coffin scatter + THE SÉANCE free spins ----
+        SCATTER_LAND,                 // a coffin lands on a reel (rate rises 1st/2nd/3rd...)
+        COFFIN_OPEN,                  // lid creaks open + choir hit + whoosh of souls
+        SEANCE_START,                 // big ritual stinger (~4 s) when free spins begin
+        SEANCE_MULT_UP,               // multiplier step (rate rises with the multiplier)
+        SEANCE_RETRIGGER,             // extra spins awarded
+        SEANCE_END,                   // free spins finished stinger
+        // ---- v3: tension ----
+        ANTICIPATE,                   // ~2.5 s rising dread riser while the last reels still spin with 2 scatters/relics showing
+        ANTICIPATE_HIT,               // the tension pays off (boom + choir)
+        ANTICIPATE_MISS,              // the tension dies (deflating sub drop, short)
+        // ---- v3: characters & atmosphere ----
+        REAPER_WHISPER, REAPER_LAUGH, DOCTOR_RASP /* plague doctor breath */, DEMON_ROAR, SKULL_RATTLE, RAVEN_FLOCK /* several caws + wings */,
+        WRAITH_WAIL, BONE_CRACK, CHAIN_RATTLE, LIGHTNING_CRACK, DOOR_SLAM, WIND_GUST, CANDLE_WHOOSH,
+        // ---- v3: features ----
+        WILD_LAND,                    // wild symbol lands (blade slash + impact)
+        MINI_INTRO,                   // mini-feature character appears
+        ORB_LAND,                     // soul vault orb lands (rate = pitch step)
+        VAULT_DOOR,                   // vault opening: stone grind + chains + deep boom
+        JACKPOT_MINI, JACKPOT_MINOR, JACKPOT_MAJOR, JACKPOT_GRAND,
+        RELIC_FLY,                    // relic streaks to the meter
+        BUY_CONFIRM,                  // feature bought: heavy coin drop + ritual hit
+        // ---- v3: meta ----
+        RANK_UP, ACHIEVEMENT, REALITY_CHECK /* gentle low bell */
     }
-    enum class Track { BASE, VAULT }
+    /** BASE = idle/spinning dread; SEANCE = free-spin ritual; VAULT = hold&spin. BASE and SEANCE react to [setIntensity]. */
+    enum class Track { BASE, VAULT, SEANCE }
 
     var sfxOn = true
     var musicOn = true
         set(v) { field = v; if (v) resumeMusic() else pauseMusic() }
+    /** 0..1 master levels for the settings dialog. */
+    var sfxVolume = 1f
+    var musicVolume = 1f
+    private var intensity = 0f
+
+    /**
+     * Adaptive music intensity, 0..1 (the engine smooths it; >= 1 s cross-fades): 0 calm idle, ~0.35 reels spinning,
+     * ~0.7 feature / anticipation, 1.0 big win. Only BASE and SEANCE react.
+     */
+    fun setIntensity(level: Float) { intensity = level.coerceIn(0f, 1f) }
+
+    /** Temporarily lowers the music to [to] (fraction of normal) for [seconds] (win stingers, voices). */
+    fun duck(seconds: Float, to: Float = 0.35f) { /* sound designer implements */ }
 
     private val pool = SoundPool.Builder().setMaxStreams(12).setAudioAttributes(
         AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_GAME)
@@ -283,6 +337,8 @@ class Audio(context: Context) {
             FloatArray(n(0.12)), voice(0.32, 500.0, 400.0, doubleArrayOf(820.0, 1450.0, 2700.0), 0.45, 0.35, 0.0, 0.4, 5)), 0.3f, tail = 0.8)
         // bony teeth chatter (skull)
         Sfx.CHATTER -> reverb(concat(*Array(9) { k -> concat(mix(noise(0.012, 0.6, 120.0, 0.9, 40L + k), tone(0.03, 1700.0 + (k % 3) * 120, 90.0, 0.3)), FloatArray(n(0.035))) }), 0.25f, tail = 0.4)
+        // v3 contract entries: placeholder until the sound designer replaces them
+        else -> mix(tone(0.18, 140.0 + 20.0 * (s.ordinal % 7), 9.0, 0.45), noise(0.06, 0.2, 30.0, 0.3, 100L + s.ordinal))
     }
 
     /** Brass-like note: detuned saws with a fast swell and a low-pass that opens with the attack. */
