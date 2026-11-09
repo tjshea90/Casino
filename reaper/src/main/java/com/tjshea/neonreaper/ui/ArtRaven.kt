@@ -14,14 +14,18 @@ import android.graphics.Shader
 internal object Raven {
     private val RED = Portraits.RED
     private val MOON = 0xFFE02A20.toInt()
-    /** Eye (unit) and beak pivot for the live parts. */
-    val EYE = floatArrayOf(0.628f, 0.292f, 0.0125f)
-    val BEAK_PIVOT = floatArrayOf(0.705f, 0.372f)
+    // The whole bird is painted at 0.9 scale about (0.56, 0.5) to stay inside the cell: EYE0 is in painted space, EYE / BEAK_PIVOT
+    // (what Characters uses for the live parts) are the same points after that transform.
+    private const val K = 0.9f
+    private val EYE0 = floatArrayOf(0.628f, 0.292f, 0.0125f)
+    /** Eye (unit square: x, y, radius) and beak pivot (x, y) for the live parts. */
+    val EYE = floatArrayOf(0.56f + K * (0.628f - 0.56f), 0.5f + K * (0.292f - 0.5f), 0.0125f * K)
+    val BEAK_PIVOT = floatArrayOf(0.56f + K * (0.705f - 0.56f), 0.5f + K * (0.372f - 0.5f))
 
     fun paint(c: Canvas, s: Float, live: Boolean) {
         // blood moon
-        val mx = s * 0.66f; val my = s * 0.32f; val mr = s * 0.27f
-        Kit.aura(c, mx, my, s * 0.55f, MOON, 0.42f)
+        val mx = s * 0.63f; val my = s * 0.30f; val mr = s * 0.215f
+        Kit.aura(c, mx, my, s * 0.30f, MOON, 0.50f)
         val mp = Kit.fill(); mp.shader = RadialGradient(mx - mr * 0.3f, my - mr * 0.3f, mr * 1.5f, intArrayOf(0xFFFF8068.toInt(), 0xFFD02820.toInt(), 0xFF780C0E.toInt(), 0xFF3A0406.toInt()), floatArrayOf(0f, 0.4f, 0.8f, 1f), Shader.TileMode.CLAMP)
         c.drawCircle(mx, my, mr, mp)
         c.save(); c.clipPath(Path().apply { addCircle(mx, my, mr, Path.Direction.CW) })
@@ -32,6 +36,7 @@ internal object Raven {
         c.drawOval(mx - mr * 1.2f, my + mr * 0.12f, mx + mr * 0.7f, my + mr * 0.30f, cl); c.drawOval(mx - mr * 0.3f, my - mr * 0.35f, mx + mr * 1.2f, my - mr * 0.2f, cl)
         c.restore()
         c.drawCircle(mx, my, mr, Kit.stroke(0x55FF9A80, s * 0.006f))
+        c.save(); c.scale(K, K, s * 0.56f, s * 0.5f)      // keep wing, tail and beak well inside the cell
         Kit.groundShadow(c, s * 0.5f, s * 0.93f, s * 0.36f, s * 0.025f, 0.5f)
         branch(c, s)
         fallingFeathers(c, s)
@@ -53,12 +58,18 @@ internal object Raven {
         for (i in 0 until 9) { val t = i / 8f; q.reset(); q.moveTo(s * (0.66f - 0.02f * t), s * (0.30f + 0.38f * t)); q.quadTo(s * (0.58f - 0.03f * t), s * (0.34f + 0.38f * t), s * (0.51f - 0.04f * t), s * (0.40f + 0.38f * t)); c.drawPath(q, fs) }
         c.restore()
         Kit.edgeLight(c, body, -s * 0.007f, -s * 0.007f, Kit.fill(0x7799A4E8.toInt()))
-        Kit.edgeLight(c, body, s * 0.011f, s * 0.011f, Kit.fill(Kit.al(MOON, 0.8f)))
+        c.save(); c.clipRect(s * 0.5f, s * 0.12f, s, s * 0.62f)      // blood-red moonlight only where the moon is behind the bird
+        Kit.edgeLight(c, body, s * 0.011f, s * 0.011f, Kit.fill(Kit.al(MOON, 0.55f)))
+        c.restore()
         wing(c, s)
         feet(c, s)
         beak(c, s, live)
-        if (!live) Kit.eye(c, s * EYE[0], s * EYE[1], s * EYE[2], RED, 0xFFFFE0D0.toInt(), 1f, 0.8f)
+        if (!live) Kit.eye(c, s * EYE0[0], s * EYE0[1], s * EYE0[2], RED, 0xFFFFE0D0.toInt(), 1f, 0.8f)
+        c.restore()
     }
+
+    /** The lower mandible as a sprite on an empty square, in the same transformed space as the finished painting. */
+    fun jawSprite(c: Canvas, s: Float) { c.save(); c.scale(K, K, s * 0.56f, s * 0.5f); beakLow(c, s); c.restore() }
 
     private fun branch(c: Canvas, s: Float) {
         val br = Path(); br.moveTo(s * 0.0f, s * 0.835f); br.cubicTo(s * 0.3f, s * 0.80f, s * 0.6f, s * 0.80f, s * 1.0f, s * 0.735f)
@@ -80,7 +91,7 @@ internal object Raven {
     private fun wing(c: Canvas, s: Float) {
         val px = s * 0.47f; val py = s * 0.42f
         // primaries, ragged, fanning back and down
-        for (i in 0..6) feather(c, px, py, s * (0.50f - kotlin.math.abs(i - 3) * 0.012f), s * 0.085f, 132f + i * 7.5f, 0xFF0B0911.toInt(), 0xFF4A4A86.toInt(), true)
+        for (i in 0..6) feather(c, px, py, s * (0.44f - kotlin.math.abs(i - 3) * 0.01f), s * 0.085f, 125f + i * 5.8f, 0xFF0B0911.toInt(), 0xFF4A4A86.toInt(), true)
         // secondaries and coverts
         for (i in 0..5) feather(c, px + s * 0.01f, py - s * 0.015f, s * (0.30f - i * 0.008f), s * 0.07f, 108f + i * 9f, 0xFF100E18.toInt(), 0xFF5A5AA8.toInt(), false)
         for (i in 0..4) feather(c, px + s * 0.04f, py - s * 0.03f, s * 0.17f, s * 0.055f, 98f + i * 10f, 0xFF15121F.toInt(), 0xFF6A6AB8.toInt(), false)

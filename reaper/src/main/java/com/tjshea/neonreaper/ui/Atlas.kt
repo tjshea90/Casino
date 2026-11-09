@@ -33,6 +33,23 @@ object Atlas {
         (bb.get(0).toInt() and 255) == 0x11
     }
 
+    /**
+     * Paints the twelve bodies on up to three worker threads (each symbol writes only its own slot; the painting toolkit keeps no
+     * shared mutable state). Anything that fails here is simply built lazily, as before, by the caller's thread.
+     */
+    private fun prebuild(ch: Characters) {
+        val workers = minOf(3, Runtime.getRuntime().availableProcessors())
+        if (workers < 2) return
+        val pool = java.util.concurrent.Executors.newFixedThreadPool(workers)
+        try {
+            // heavy portraits first so the workers finish together
+            val order = intArrayOf(ReaperConfig.WILD, ReaperConfig.SKULL, ReaperConfig.DOCTOR, ReaperConfig.WRAITH, ReaperConfig.RAVEN, ReaperConfig.DEMON,
+                ReaperConfig.SCATTER, ReaperConfig.ACE, ReaperConfig.KING, ReaperConfig.QUEEN, ReaperConfig.JACK, ReaperConfig.TEN)
+            val jobs = order.map { s -> pool.submit { ch.body(s) } }
+            for (j in jobs) try { j.get() } catch (e: Exception) { /* built lazily below */ }
+        } finally { pool.shutdown() }
+    }
+
     fun build(cell: Int = 256): Data {
         val bmp = Bitmap.createBitmap(cell * COLS, cell * ROWS, Bitmap.Config.ARGB_8888)
         val c = Canvas(bmp)
@@ -43,6 +60,7 @@ object Atlas {
         val tap = Paint(Paint.FILTER_BITMAP_FLAG).apply { xfermode = Kit.ADD; alpha = 85 }   // 3 x 85/255 = 1
         val gain = Paint(Paint.FILTER_BITMAP_FLAG).apply { xfermode = Kit.ADD; alpha = 46 }
         val d = cell * SPACING
+        prebuild(ch)
         for (s in 0 until ReaperConfig.SYMBOL_COUNT) {
             val body = ch.body(s)
             c.drawBitmap(body, ((s % COLS) * cell).toFloat(), ((s / COLS) * cell).toFloat(), p)
