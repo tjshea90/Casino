@@ -92,6 +92,12 @@ class Mesh(private val data: MeshData) {
     private var ibo = 0
     val indexCount = data.inN
 
+    companion object {
+        /** Per-frame statistics for budget tests (reset by the caller). */
+        @JvmField var drawCalls = 0
+        @JvmField var triangles = 0L
+    }
+
     fun upload(gl: Gl) {
         if (vbo != 0) return
         val fb: FloatBuffer = ByteBuffer.allocateDirect(data.vn * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
@@ -104,6 +110,7 @@ class Mesh(private val data: MeshData) {
 
     fun draw(gl: Gl) {
         upload(gl)
+        drawCalls++; triangles += indexCount / 3
         gl.bindBuffer(Gl.ARRAY_BUFFER, vbo)
         gl.bindBuffer(Gl.ELEMENT_ARRAY_BUFFER, ibo)
         gl.vertexAttribPointer(0, 3, MeshData.BYTES, 0); gl.enableVertexAttribArray(0)
