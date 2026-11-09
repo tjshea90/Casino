@@ -265,6 +265,9 @@ class CoffinModel : CharacterModel {
         val open = max(0f, ex * (7f + 11f * creak * creak) + ex * 1.8f * sin(t * 26f) + 0.35f * (0.5f + 0.5f * sin(t * 0.8f)))
         val lidM = root.copyOf()
         Mat4.translate(lidM, HX, 0f, HZ); Mat4.rotate(lidM, -open, 0f, 1f, 0f); Mat4.translate(lidM, -HX, 0f, -HZ)
+        // ---- green light spilling over the lid (only when it opens: idle stays dark and wicked); must precede the first drawV
+        sc.beginLocalLights()
+        sc.pointLightAt(root, 0f, 0.62f, 0.60f, 1.9f, 0x3CFF6A, (0.07f + 0.05f * pulse + 0.9f * ex) * dim)
         val glowK = (0.75f + 0.45f * pulse + 0.95f * ex)
         sc.drawV(box, root, emis = glowK, dim = dim, rim = rim, spec = 0.35f)
         sc.drawV(lid, lidM, emis = glowK, dim = dim, rim = rim, spec = 0.35f)
@@ -278,9 +281,6 @@ class CoffinModel : CharacterModel {
             Mat4.rotate(tm, 3f * sin(t * 1.1f + ph) + ex * 9f * sin(t * 21f + ph * 2f), 1f, 0f, 0f)
             sc.drawV(tail, tm, dim = dim, rim = rim, spec = 0.35f)
         }
-
-        // ---- green light spilling over the lid (only when it opens: idle stays dark and wicked)
-        sc.pointLightAt(root, 0f, 0.62f, 0.60f, 1.9f, 0x3CFF6A, (0.07f + 0.05f * pulse + 0.9f * ex) * dim)
 
         // ---- glow sprites: halo behind, mist at the foot, the eyes / lock / medallion, the leak around the lid
         sc.glowAt(root, 0f, 0.58f, -0.40f, 1.8f + 0.5f * ex, 0x2FFF6A, (0.15f + 0.07f * pulse + 0.22f * ex) * dim, 0f)
