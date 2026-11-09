@@ -34,6 +34,26 @@ internal object AudioRender {
         return out
     }
 
+    /**
+     * Heap the synthesiser needs while it renders an asset, per output frame: measured on the 64 s BASE layers, which need ~45 MB of
+     * live heap in total (dry bus + two reverb sends + the master copy + the PCM + its WAV image) = ~32 bytes per frame; 36 leaves ~10 %.
+     * (On a device whose app heap is 96 MB, a first-launch render running next to the game could otherwise push ANY thread into an
+     * OutOfMemoryError, not only the render thread that catches it.)
+     */
+    private const val RENDER_BYTES_PER_FRAME = 36L
+
+    /** Heap in bytes [job] needs while it renders. */
+    fun heapNeed(job: Job): Long {
+        val frames = when (job) {
+            is Job.Layer -> Scores.tracks[job.track]?.loopFrames ?: 0
+            is Job.OneShot -> frames(SfxBank.spec(job.sfx)?.sec ?: 0.0)
+        }
+        return frames.toLong() * RENDER_BYTES_PER_FRAME
+    }
+
+    /** True when [freeHeap] bytes are enough to render [job] without endangering the other threads of the app. */
+    fun fits(job: Job, freeHeap: Long): Boolean = freeHeap >= heapNeed(job)
+
     fun render(job: Job): Pcm = when (job) {
         is Job.OneShot -> SfxBank.render(job.sfx)
         is Job.Layer -> Scores.renderLayer(job.track, job.index)

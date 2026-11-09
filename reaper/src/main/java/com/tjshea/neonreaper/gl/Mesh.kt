@@ -92,10 +92,17 @@ class Mesh(private val data: MeshData) {
     private var ibo = 0
     val indexCount = data.inN
 
+    init { if (data.vertexCount > maxVertices) maxVertices = data.vertexCount }
+
     companion object {
         /** Per-frame statistics for budget tests (reset by the caller). */
         @JvmField var drawCalls = 0
         @JvmField var triangles = 0L
+        /**
+         * Largest vertex count of any mesh built so far. Indices are 16-bit ([MeshData.tri] silently wraps larger ones), so a mesh with
+         * more than 65536 vertices would draw garbage; ReviewGlTest asserts this stays in range for every model and world piece.
+         */
+        @JvmField var maxVertices = 0
     }
 
     fun upload(gl: Gl) {

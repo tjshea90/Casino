@@ -303,6 +303,17 @@ class Audio internal constructor(context: Context, autoRender: Boolean) {
         }
     }
 
+    /**
+     * Whether the app heap has room for synthesising [job] right now (see [AudioRender.heapNeed]). On a small heap the asset is skipped
+     * (the game stays silent for it, and it is tried again on the next launch) instead of risking an OutOfMemoryError in the UI thread.
+     */
+    private fun roomFor(job: Job): Boolean {
+        fun free(): Long { val rt = Runtime.getRuntime(); return rt.maxMemory() - (rt.totalMemory() - rt.freeMemory()) }
+        if (AudioRender.fits(job, free())) return true
+        Runtime.getRuntime().gc()                       // the figure counts garbage that has not been collected yet
+        return AudioRender.fits(job, free())
+    }
+
     private fun renderLoop() {
         try {
             val root = cacheRoot ?: return
@@ -315,7 +326,7 @@ class Audio internal constructor(context: Context, autoRender: Boolean) {
                     val f = File(dir, job.file)
                     when (job) {
                         is Job.OneShot -> {
-                            if (!Wav.valid(f)) { val pcm = AudioRender.render(job); Wav.write(f, pcm) }
+                            if (!Wav.valid(f)) { if (!roomFor(job)) continue; val pcm = AudioRender.render(job); Wav.write(f, pcm) }
                             if (!released) {
                                 val id = pool?.load(f.path, 1) ?: 0
                                 if (id != 0) { ids[job.sfx.ordinal] = id; idToOrdinal[id] = job.sfx.ordinal }
@@ -323,7 +334,7 @@ class Audio internal constructor(context: Context, autoRender: Boolean) {
                         }
                         is Job.Layer -> {
                             var pcm = Wav.read(f)
-                            if (pcm == null) { pcm = AudioRender.render(job); Wav.write(f, pcm) }
+                            if (pcm == null) { if (!roomFor(job)) continue; pcm = AudioRender.render(job); Wav.write(f, pcm) }
                             val keep = job.track == Track.BASE || job.track == wantTrack
                             if (keep) {
                                 val spec = Scores.tracks[job.track]!!
