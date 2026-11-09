@@ -27,11 +27,11 @@ import kotlin.math.sin
  * jaw, scythe arm (sleeve + hand + staff + blade) and the free arm.
  */
 class ReaperModel : CharacterModel {
-    private val neck = floatArrayOf(0f, 0.80f, 0.04f)
-    private val head0 = floatArrayOf(0f, 0.905f, 0.0f)       // skull centre
-    private val headScale = 0.138f
-    private val shoulderR = floatArrayOf(0.24f, 0.72f, 0.0f)
-    private val shoulderL = floatArrayOf(-0.24f, 0.72f, 0.0f)
+    private val neck = floatArrayOf(0f, 0.88f, 0.04f)
+    private val head0 = floatArrayOf(0f, 0.985f, 0.0f)       // skull centre
+    private val headScale = 0.118f
+    private val shoulderR = floatArrayOf(0.255f, 0.80f, 0.0f)
+    private val shoulderL = floatArrayOf(-0.255f, 0.80f, 0.0f)
 
     private val body: Mesh
     private val hood: Mesh
@@ -56,8 +56,8 @@ class ReaperModel : CharacterModel {
         val pb = PartBuilder()
         val rnd = Random(7)
         // robe: shoulders -> ragged hem, with folds, a hunched back and an uneven tattered edge
-        val profile = listOf(0.0f to 0.80f, 0.12f to 0.79f, 0.22f to 0.755f, 0.29f to 0.69f, 0.30f to 0.59f, 0.285f to 0.47f,
-            0.29f to 0.34f, 0.32f to 0.21f, 0.36f to 0.10f, 0.385f to 0.01f)
+        val profile = listOf(0.0f to 0.88f, 0.12f to 0.87f, 0.225f to 0.835f, 0.285f to 0.775f, 0.275f to 0.68f, 0.25f to 0.56f,
+            0.245f to 0.42f, 0.27f to 0.28f, 0.31f to 0.14f, 0.345f to 0.01f)
         val rows = profile.size
         val robe = Sculpt.shell(profile, 56,
             radial = { ang, _, t ->
@@ -70,7 +70,7 @@ class ReaperModel : CharacterModel {
             })
         pb.add(robe, 0x17171F, Mat.CLOTH, ao = 0.95f)
         // back cape: a longer, wider drape hanging from the shoulders
-        val capeProfile = listOf(0.14f to 0.80f, 0.26f to 0.77f, 0.33f to 0.70f, 0.35f to 0.55f, 0.37f to 0.38f, 0.41f to 0.20f, 0.46f to 0.06f, 0.50f to -0.04f)
+        val capeProfile = listOf(0.14f to 0.88f, 0.25f to 0.855f, 0.31f to 0.79f, 0.31f to 0.65f, 0.32f to 0.48f, 0.35f to 0.30f, 0.40f to 0.12f, 0.44f to -0.03f)
         val cape = Sculpt.shell(capeProfile, 40, a0 = (PI * 0.82).toFloat(), a1 = (PI * 2.18).toFloat(),
             radial = { ang, _, t -> 1f + (0.05f + 0.11f * t) * sin(6f * ang + 2f * t) },
             dy = { ang, k, _ -> if (k >= capeProfile.size - 2) -((if (k == capeProfile.size - 1) 1f else 0.3f) * (0.05f + 0.16f * abs(sin(8f * ang + 1.1f)).pow(1.5f))) else 0f })
@@ -78,29 +78,29 @@ class ReaperModel : CharacterModel {
         // hanging rags around the hem
         for (i in 0 until 16) {
             val a = (PI * 2 * i / 16 + rnd.nextFloat() * 0.3).toFloat()
-            val r = 0.33f + rnd.nextFloat() * 0.05f
+            val r = 0.30f + rnd.nextFloat() * 0.05f
             val len = 0.13f + rnd.nextFloat() * 0.16f
             pb.add(Sculpt.rag(0.06f + rnd.nextFloat() * 0.03f, len, 0.12f), 0x0E0E14, Mat.CLOTH,
                 x = r * cos(a), y = 0.09f + rnd.nextFloat() * 0.03f, z = r * sin(a), ry = 90f - Math.toDegrees(a.toDouble()).toFloat(), ao = 0.8f)
         }
         // rope belt, a small skull charm and a hanging chain
-        pb.add(Sculpt.tube(40, 5, { t -> floatArrayOf(0.288f * cos((2 * PI * t).toFloat()), 0.455f, 0.288f * sin((2 * PI * t).toFloat())) }, { 0.015f }), 0x2B1E16, Mat.LEATHER, ao = 0.9f)
-        pb.add(Bones.skull(14, 20), 0xBDB39C, Mat.BONE, x = 0f, y = 0.44f, z = 0.305f, sx = 0.034f, ao = 0.9f)
+        pb.add(Sculpt.tube(40, 5, { t -> floatArrayOf(0.262f * cos((2 * PI * t).toFloat()), 0.50f, 0.262f * sin((2 * PI * t).toFloat())) }, { 0.015f }), 0x2B1E16, Mat.LEATHER, ao = 0.9f)
+        pb.add(Bones.skull(14, 20), 0xBDB39C, Mat.BONE, x = 0f, y = 0.49f, z = 0.28f, sx = 0.034f, ao = 0.9f)
         for (i in 0 until 7) {
-            pb.add(Sculpt.link(0.05f, 0.03f, 0.0065f), 0x5A5A66, Mat.METAL, x = 0.20f, y = 0.43f - i * 0.040f, z = 0.215f + 0.004f * i, ry = if (i % 2 == 0) 0f else 90f, ao = 1f)
+            pb.add(Sculpt.link(0.05f, 0.03f, 0.0065f), 0x5A5A66, Mat.METAL, x = 0.18f, y = 0.48f - i * 0.040f, z = 0.20f + 0.004f * i, ry = if (i % 2 == 0) 0f else 90f, ao = 1f)
         }
         // a shoulder pauldron of bone spikes on each side (menace)
         for (sx in floatArrayOf(-1f, 1f)) for (k in 0 until 3) {
-            pb.add(Sculpt.spike(0.018f, 0.085f - k * 0.015f), 0xB8AE96, Mat.BONE, x = sx * (0.205f + k * 0.012f), y = 0.775f - k * 0.02f, z = -0.005f + k * 0.03f, rz = -sx * (55f + k * 12f), ao = 0.9f)
+            pb.add(Sculpt.spike(0.018f, 0.085f - k * 0.015f), 0xB8AE96, Mat.BONE, x = sx * (0.215f + k * 0.012f), y = 0.855f - k * 0.02f, z = -0.005f + k * 0.03f, rz = -sx * (55f + k * 12f), ao = 0.9f)
         }
         return pb.build()
     }
 
     private fun buildHood(): Mesh {
         val pb = PartBuilder()
-        val profile = listOf(0.01f to 1.21f, 0.08f to 1.195f, 0.15f to 1.145f, 0.205f to 1.07f, 0.235f to 0.98f, 0.245f to 0.90f,
-            0.25f to 0.83f, 0.27f to 0.77f, 0.30f to 0.72f)
-        val open = 0.64f
+        val profile = listOf(0.01f to 1.30f, 0.075f to 1.285f, 0.14f to 1.235f, 0.19f to 1.16f, 0.215f to 1.07f, 0.225f to 0.99f,
+            0.23f to 0.92f, 0.25f to 0.86f, 0.28f to 0.80f)
+        val open = 0.66f
         val hoodMesh = Sculpt.shell(profile, 40, a0 = (PI / 2 + open).toFloat(), a1 = (PI / 2 - open + 2 * PI).toFloat(),
             radial = { ang, _, t -> 1f + 0.05f * sin(5f * ang + 2f * t) + 0.08f * max(0f, -sin(ang)) * sstep(0.6f, 0.1f, t) },
             dy = { ang, _, t ->
@@ -113,8 +113,8 @@ class ReaperModel : CharacterModel {
 
     private fun buildSkull(): Pair<Mesh, Mesh> {
         val pb = PartBuilder()
-        pb.add(Bones.skull(), 0xCFC5AB, Mat.BONE, x = head0[0], y = head0[1], z = head0[2], sx = headScale, ao = 1f)
-        pb.add(Bones.upperTeeth(), 0xE6DCC4, Mat.BONE, x = head0[0], y = head0[1], z = head0[2], sx = headScale, ao = 1f)
+        pb.add(Bones.skull(), 0xB9AE95, Mat.BONE, x = head0[0], y = head0[1], z = head0[2], sx = headScale, ao = 1f)
+        pb.add(Bones.upperTeeth(), 0xCFC5AA, Mat.BONE, x = head0[0], y = head0[1], z = head0[2], sx = headScale, ao = 1f)
         val eb = PartBuilder()
         for (sx in floatArrayOf(-1f, 1f)) {
             eb.add(Sculpt.ellipsoid(0.085f, 0.085f, 0.085f, 8, 10), 0xFF2A3A, Mat.EMISSIVE,
@@ -125,7 +125,7 @@ class ReaperModel : CharacterModel {
 
     private fun buildJaw(): Mesh {
         val pb = PartBuilder()
-        pb.add(Bones.jaw(), 0xC7BDA3, Mat.BONE, sx = headScale, ao = 0.95f)
+        pb.add(Bones.jaw(), 0xB3A88F, Mat.BONE, sx = headScale, ao = 0.95f)
         return pb.build()
     }
 
@@ -139,19 +139,19 @@ class ReaperModel : CharacterModel {
 
     private fun buildArmScythe(): Pair<Mesh, Mesh> {
         val pb = PartBuilder()
-        val sh = shoulderR; val el = floatArrayOf(0.35f, 0.58f, 0.09f); val wr = floatArrayOf(0.335f, 0.505f, 0.245f)
+        val sh = shoulderR; val el = floatArrayOf(0.34f, 0.62f, 0.09f); val wr = floatArrayOf(0.335f, 0.50f, 0.245f)
         pb.add(sleeve(sh, el, wr, 0.08f, 0.066f, 0.098f), 0x14141B, Mat.CLOTH, ao = 0.9f)
         for (i in 0 until 4) pb.add(Sculpt.rag(0.045f, 0.10f + 0.02f * i, 0.1f), 0x0E0E14, Mat.CLOTH, x = 0.335f + (i - 1.5f) * 0.03f, y = 0.50f, z = 0.255f, ry = (i - 1.5f) * 20f, ao = 0.8f)
         // bony forearm and the gripping hand
         pb.add(Sculpt.limb(floatArrayOf(0.335f, 0.50f, 0.245f), floatArrayOf(0.335f, 0.465f, 0.262f), 0.017f, 0.014f, 0.1f, 6), 0xCFC5AB, Mat.BONE, ao = 0.9f)
         pb.add(Bones.hand(1f), 0xD5CBB3, Mat.BONE, x = 0.335f, y = 0.47f, z = 0.265f, rx = 0f, ry = 90f, rz = 0f, sx = 1.5f, ao = 0.9f)
         // staff, bindings, bottom spike, blade socket
-        val staff = Sculpt.tube(24, 8, { t -> floatArrayOf(0.335f + 0.012f * t, -0.07f + 1.50f * t, 0.265f - 0.02f * t * t) }, { t -> 0.0165f - 0.002f * t }, cap = true)
+        val staff = Sculpt.tube(24, 8, { t -> floatArrayOf(0.335f + 0.012f * t, -0.07f + 1.58f * t, 0.265f - 0.02f * t * t) }, { t -> 0.0165f - 0.002f * t }, cap = true)
         pb.add(staff, 0x4A3320, Mat.WOOD, ao = 0.95f)
-        for (y in floatArrayOf(0.40f, 0.43f, 0.58f, 0.61f, 1.30f, 1.33f)) pb.add(Sculpt.tube(12, 6, { t -> floatArrayOf(0.337f + 0.0166f * cos((2 * PI * t).toFloat()), y, 0.265f + 0.0166f * sin((2 * PI * t).toFloat())) }, { 0.0045f }), 0x2A1A14, Mat.LEATHER, ao = 0.9f)
+        for (y in floatArrayOf(0.40f, 0.43f, 0.60f, 0.63f, 1.38f, 1.41f)) pb.add(Sculpt.tube(12, 6, { t -> floatArrayOf(0.337f + 0.0166f * cos((2 * PI * t).toFloat()), y, 0.265f + 0.0166f * sin((2 * PI * t).toFloat())) }, { 0.0045f }), 0x2A1A14, Mat.LEATHER, ao = 0.9f)
         pb.add(Sculpt.spike(0.02f, 0.09f), 0x6A6A74, Mat.METAL, x = 0.335f, y = -0.04f, z = 0.265f, rx = 180f, ao = 1f)
-        pb.add(Sculpt.tube(10, 8, { t -> floatArrayOf(0.349f, 1.395f + 0.06f * t, 0.245f) }, { 0.028f }, cap = true), 0x55555F, Mat.METAL, ao = 1f)
-        pb.add(Bones.skull(14, 20), 0xBDB39C, Mat.BONE, x = 0.349f, y = 1.345f, z = 0.285f, sx = 0.036f, ao = 0.95f)
+        pb.add(Sculpt.tube(10, 8, { t -> floatArrayOf(0.349f, 1.475f + 0.06f * t, 0.245f) }, { 0.028f }, cap = true), 0x55555F, Mat.METAL, ao = 1f)
+        pb.add(Bones.skull(14, 20), 0xBDB39C, Mat.BONE, x = 0.349f, y = 1.425f, z = 0.285f, sx = 0.036f, ao = 0.95f)
 
         // blade: a curved crescent with a diamond cross-section; the cutting edge (inner curve) glows
         val bp = PartBuilder()
@@ -166,7 +166,7 @@ class ReaperModel : CharacterModel {
 
     /** Centre line of the blade (x0,y0 = the staff top), `side` > 0 = back edge, < 0 = cutting edge, z fixed. */
     private fun bladePoint(t: Float, side: Float): FloatArray {
-        val x0 = 0.349f; val y0 = 1.43f
+        val x0 = 0.349f; val y0 = 1.51f
         val cx = x0 - 0.80f * t + 0.05f * sin(PI.toFloat() * t)
         val cy = y0 + 0.17f * sin(PI.toFloat() * t * 0.92f) - 0.13f * t * t * t
         // normal of the centre line (2D), used to offset the edges
@@ -212,7 +212,7 @@ class ReaperModel : CharacterModel {
 
     private fun buildArmFree(): Mesh {
         val pb = PartBuilder()
-        val sh = shoulderL; val el = floatArrayOf(-0.31f, 0.57f, 0.10f); val wr = floatArrayOf(-0.22f, 0.50f, 0.27f)
+        val sh = shoulderL; val el = floatArrayOf(-0.31f, 0.60f, 0.12f); val wr = floatArrayOf(-0.22f, 0.50f, 0.30f)
         pb.add(sleeve(sh, el, wr, 0.08f, 0.066f, 0.098f), 0x14141B, Mat.CLOTH, ao = 0.9f)
         for (i in 0 until 4) pb.add(Sculpt.rag(0.045f, 0.10f + 0.02f * i, 0.1f), 0x0E0E14, Mat.CLOTH, x = -0.22f + (i - 1.5f) * 0.03f, y = 0.50f, z = 0.28f, ry = (i - 1.5f) * 20f, ao = 0.8f)
         pb.add(Sculpt.limb(floatArrayOf(-0.22f, 0.50f, 0.27f), floatArrayOf(-0.20f, 0.47f, 0.31f), 0.017f, 0.014f, 0.1f, 6), 0xCFC5AB, Mat.BONE, ao = 0.9f)
@@ -243,7 +243,7 @@ class ReaperModel : CharacterModel {
         val eyeK = (1.0f + 0.15f * sin(t * 2.3f) + ex * 1.6f + 0.3f * ex * sin(t * 19f)) * blink
         sc.drawV(eyes, head, emis = eyeK * 1.4f, dim = dim)
         // the burning eyes light the bone around them (an ember glow that makes the face readable inside the dark hood)
-        sc.pointLightAt(head, head0[0], head0[1] + 0.02f, head0[2] + 0.30f, 0.95f, 0xFF4A38, (0.55f + 0.9f * ex) * dim)
+        sc.pointLightAt(head, head0[0], head0[1] + 0.02f, head0[2] + 0.30f, 0.80f, 0xFF4A38, (0.22f + 0.7f * ex) * dim)
         // jaw hangs open when excited
         val open = ex * (14f + 22f * abs(sin(t * 13f))) + 1.5f
         val jawM = copy(head)

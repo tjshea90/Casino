@@ -16,75 +16,77 @@ object Bones {
     /** Hinge of the jaw in head units (the jaw mesh is built around this point). */
     val JAW_HINGE = floatArrayOf(0f, -0.30f, 0.02f)
 
+    /** One eye socket: two overlapping dents (an outer-upper and an inner-lower one) give a slanted, angry orbit. */
     private fun orbit(dx: Float, dy: Float, dz: Float, sx: Float): Float {
-        // elliptical gaussian around the socket centre direction
-        val cx = 0.40f * sx; val cy = 0.12f; val cz = 0.90f
-        val d2 = 0.55f * (dx - cx) * (dx - cx) + 1.1f * (dy - cy) * (dy - cy) + 0.35f * (dz - cz) * (dz - cz)
-        return gauss(d2, 0.17f)
+        fun g(cx: Float, cy: Float, cz: Float): Float {
+            val d2 = 0.50f * (dx - cx * sx) * (dx - cx * sx) + 1.15f * (dy - cy) * (dy - cy) + 0.32f * (dz - cz) * (dz - cz)
+            return gauss(d2, 0.15f)
+        }
+        return g(0.50f, 0.17f, 0.84f) + g(0.31f, 0.06f, 0.92f) * 0.9f
     }
 
     /** Radial profile of the cranium + upper face (maxilla): sockets, nose, brow, cheekbones, temples. */
     fun skullShape(dx: Float, dy: Float, dz: Float): Float {
         var r = 1f
         val front = sstep(-0.1f, 0.55f, dz)
-        // the face narrows towards the mouth: a muzzle below the cheekbones
+        // the face narrows hard towards the mouth: a muzzle below the cheekbones
         val low = sstep(-0.05f, -0.85f, dy)
-        r *= 1f - 0.20f * low * front
-        r *= 1f - 0.08f * sstep(-0.2f, -1f, dy)                    // flatter underside
-        // eye orbits (deep), nasal aperture, brow ridge, cheekbones, temple hollows
-        r -= 0.40f * (orbit(dx, dy, dz, -1f) + orbit(dx, dy, dz, 1f))
-        val nasal = gauss(2.4f * dx * dx + 0.55f * (dy + 0.30f) * (dy + 0.30f) + 0.35f * (dz - 0.93f) * (dz - 0.93f), 0.14f)
-        r -= 0.30f * nasal
-        r += 0.065f * gauss((dy - 0.36f) * (dy - 0.36f), 0.11f) * sstep(0.15f, 0.8f, dz) * sstep(0.98f, 0.35f, abs(dx))
+        r *= 1f - 0.30f * low * front
+        r *= 1f - 0.10f * sstep(-0.2f, -1f, dy)                    // flatter underside
+        // eye orbits (deep), nasal aperture, heavy brow, high cheekbones, temple hollows
+        r -= 0.50f * (orbit(dx, dy, dz, -1f) + orbit(dx, dy, dz, 1f))
+        val nasal = gauss(2.8f * dx * dx + 0.45f * (dy + 0.30f) * (dy + 0.30f) + 0.35f * (dz - 0.93f) * (dz - 0.93f), 0.15f)
+        r -= 0.36f * nasal
+        r += 0.085f * gauss((dy - 0.40f) * (dy - 0.40f), 0.10f) * sstep(0.15f, 0.8f, dz) * sstep(0.98f, 0.35f, abs(dx))
         for (sx in floatArrayOf(-1f, 1f)) {
-            val c = gauss((dx - 0.62f * sx) * (dx - 0.62f * sx) + (dy + 0.20f) * (dy + 0.20f) + 0.4f * (dz - 0.70f) * (dz - 0.70f), 0.2f)
-            r += 0.10f * c
-            r -= 0.06f * gauss((dx - 0.97f * sx) * (dx - 0.97f * sx) + (dy - 0.10f) * (dy - 0.10f) + (dz - 0.18f) * (dz - 0.18f), 0.22f)
+            val c = gauss((dx - 0.66f * sx) * (dx - 0.66f * sx) + (dy + 0.22f) * (dy + 0.22f) + 0.4f * (dz - 0.64f) * (dz - 0.64f), 0.19f)
+            r += 0.15f * c
+            r -= 0.07f * gauss((dx - 0.97f * sx) * (dx - 0.97f * sx) + (dy - 0.10f) * (dy - 0.10f) + (dz - 0.18f) * (dz - 0.18f), 0.22f)
         }
-        // sagittal crest and a slight forehead bulge
-        r += 0.03f * gauss(dx * dx, 0.12f) * sstep(0.1f, 0.8f, dy)
+        // sagittal crest, brow to forehead slope
+        r += 0.035f * gauss(dx * dx, 0.12f) * sstep(0.1f, 0.8f, dy)
         return r
     }
 
     /** Cranium + upper face. Roughly 0.95 wide, 1.0 tall, 1.08 deep. */
     fun skull(lat: Int = 34, lon: Int = 52): MeshData =
-        Sculpt.blob(lat, lon, 0.95f, 1.0f, 1.08f, ao = { r, dy -> (sstep(0.52f, 0.97f, r) * (0.72f + 0.28f * sstep(-1f, 0.3f, dy))).coerceIn(0.04f, 1f) }, shape = ::skullShape)
+        Sculpt.blob(lat, lon, 0.86f, 1.08f, 1.06f, ao = { r, dy -> (sstep(0.52f, 0.97f, r) * (0.72f + 0.28f * sstep(-1f, 0.3f, dy))).coerceIn(0.04f, 1f) }, shape = ::skullShape)
 
-    /** Lower jaw (mandible): a deep U plate with rising rami, built around [JAW_HINGE]. */
+    /** Lower jaw (mandible): a deep angular U plate with rising rami and fangs, built around [JAW_HINGE]. */
     fun jaw(): MeshData {
         val h = JAW_HINGE
-        // path in head units, then flattened vertically a little so it reads as a plate rather than a wire
         val pts = listOf(
-            floatArrayOf(-0.64f, -0.02f, 0.02f), floatArrayOf(-0.62f, -0.40f, 0.10f), floatArrayOf(-0.50f, -0.62f, 0.42f),
-            floatArrayOf(-0.28f, -0.72f, 0.74f), floatArrayOf(0f, -0.74f, 0.84f),
-            floatArrayOf(0.28f, -0.72f, 0.74f), floatArrayOf(0.50f, -0.62f, 0.42f), floatArrayOf(0.62f, -0.40f, 0.10f), floatArrayOf(0.64f, -0.02f, 0.02f))
+            floatArrayOf(-0.60f, -0.02f, 0.02f), floatArrayOf(-0.58f, -0.46f, 0.10f), floatArrayOf(-0.46f, -0.80f, 0.42f),
+            floatArrayOf(-0.24f, -0.98f, 0.74f), floatArrayOf(0f, -1.04f, 0.84f),
+            floatArrayOf(0.24f, -0.98f, 0.74f), floatArrayOf(0.46f, -0.80f, 0.42f), floatArrayOf(0.58f, -0.46f, 0.10f), floatArrayOf(0.60f, -0.02f, 0.02f))
         fun at(t: Float): FloatArray {
             val f = t * (pts.size - 1); val i = f.toInt().coerceAtMost(pts.size - 2); val u = f - i
-            // Catmull-Rom-ish smoothing via cosine interpolation
             val s = (1f - cos(u * PI.toFloat())) * 0.5f
             val a = pts[i]; val b = pts[i + 1]
             return floatArrayOf(a[0] + (b[0] - a[0]) * s - h[0], (a[1] + (b[1] - a[1]) * s - h[1]), a[2] + (b[2] - a[2]) * s - h[2])
         }
-        val m = Sculpt.tube(40, 8, ::at, { t -> val c = abs(t - 0.5f) * 2f; 0.085f + 0.035f * (1f - c) * (1f - c) - 0.02f * sstep(0.7f, 1f, c) }, cap = true)
-        // teeth sit on the upper edge of the jaw
+        val m = Sculpt.tube(44, 8, ::at, { t -> val c = abs(t - 0.5f) * 2f; 0.075f + 0.045f * (1f - c) * (1f - c) - 0.02f * sstep(0.7f, 1f, c) }, cap = true)
         val pb = PartBuilder()
         pb.data.append(m, Mat4.identity())
+        // teeth along the upper edge of the jaw, with two long fangs
         for (i in -4..4) {
             val x = i * 0.105f
             val z = 0.80f - 0.30f * (abs(x) / 0.55f) * (abs(x) / 0.55f)
             val xz = if (abs(x) > 0.46f) 0.55f - (abs(x) - 0.46f) * 1.3f else z
-            pb.add(tooth(0.034f, 0.062f, 0.028f), 0xE8DEC4, Mat.BONE, x = x - h[0], y = -0.66f - h[1], z = xz - h[2], rz = i * -1.5f, ao = 0.95f)
+            val fang = if (abs(i) == 3) 1.7f else 1f
+            pb.add(tooth(0.036f, 0.062f * fang, 0.03f), 0xD9CEB2, Mat.BONE, x = x - h[0], y = -0.70f - h[1] + (fang - 1f) * 0.05f, z = xz - h[2], rz = i * -1.5f, ao = 0.9f)
         }
         return pb.data
     }
 
-    /** Upper teeth (attached to the skull mesh's maxilla). */
+    /** Upper teeth (attached to the skull mesh's maxilla); the canines are long fangs. */
     fun upperTeeth(): MeshData {
         val pb = PartBuilder()
         for (i in -4..4) {
             val x = i * 0.1f
-            val z = 0.93f - 0.34f * (abs(x) / 0.5f) * (abs(x) / 0.5f)
-            pb.add(tooth(0.034f, 0.066f, 0.03f), 0xEAE0C8, Mat.BONE, x = x, y = -0.60f, z = z, rz = i * 1.5f, ao = 0.9f)
+            val z = 0.93f - 0.40f * (abs(x) / 0.5f) * (abs(x) / 0.5f)
+            val fang = if (abs(i) == 3) 1.9f else 1f
+            pb.add(tooth(0.036f, 0.066f * fang, 0.03f), 0xDCD2B6, Mat.BONE, x = x, y = -0.64f - (fang - 1f) * 0.06f, z = z - 0.05f, rz = i * 1.5f, ao = 0.85f)
         }
         return pb.data
     }
