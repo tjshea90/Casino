@@ -119,6 +119,10 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
     private var toastTitle = ""; private var toastSub = ""; private var toastAt = -10.0
     private val toastQueue = ArrayDeque<Pair<String, String>>()
     private var lastRankIndex = -1
+    // a BOUGHT round must not be celebrated when it returns less than it cost ("no loss disguised as a win")
+    private var boughtPrice = 0L
+    /** Price of the bought round being shown (0 = a normal round); the Vault screen asks for it once and clears it. */
+    fun takeBoughtPrice(): Long { val p = boughtPrice; if (phase != Phase.SEANCE_TRIGGER && seance == null) boughtPrice = 0L; return p }
     private var tickStep = 0                               // count-up tick pitch step (musical scale)
     private var nextAntPlay = 0.0                          // when the anticipation loop sound is re-triggered
     private var bigHitAt = -1.0                            // when the win stinger "hits": banner slam, shake, flash
@@ -541,6 +545,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         curFree = free
         val o = p.outcome
         o.stops.copyInto(shownStops); shownFs = free != null
+        if (free == null) boughtPrice = 0L
         pendingWin = spinWin(o)
         pendingVault = p.vault?.payTokens ?: 0L
         if (free == null) {
@@ -726,6 +731,8 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
             seanceRevealed += freeWin
             if (f.extraSpins > 0) { seanceBanner = "+${f.extraSpins} SPINS"; seanceBannerAt = t; audio.play(Sfx.SEANCE_RETRIGGER) }
         }
+        // free spins of a bought Séance only celebrate once the running total has paid back the price
+        if (curFree != null && boughtPrice > 0 && seanceRevealed < boughtPrice) tier = 0
         if (o.scatterCount >= 3 && curFree == null) { audio.play(Sfx.COFFIN_OPEN, 0.8f); shakeUntil = t + 0.5 }
         if (win > 0) {
             rollTarget = win; rollStart = t; tickStep = 0
@@ -837,16 +844,17 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         settleRoll(); rollTarget = 0
         pendingSeance = 0; pendingWin = 0; curFree = null; play = null
         wallet.markSeanceSeen()
-        audio.play(Sfx.SEANCE_END)
+        val losing = boughtPrice > 0 && se.payTokens < boughtPrice          // a bought round that paid back less than it cost
+        audio.play(Sfx.SEANCE_END, if (losing) 0.45f else 1f)
         trackSwitchTo = Audio.Track.BASE; trackSwitchAt = now() + 1.2
         // the money was revealed spin by spin: this recap only counts the total up, the credit meter is already right
         seanceEndTotal = se.payTokens; seanceEndAt = now()
-        soulRate = if (se.payTokens > 0) 40f else 0f
+        soulRate = if (se.payTokens > 0 && !losing) 40f else 0f
         enter(Phase.SEANCE_END)
     }
 
     private fun endSeanceFlow() {
-        seance = null; curFree = null; soulRate = 0f; shownFs = false
+        seance = null; curFree = null; soulRate = 0f; shownFs = false; boughtPrice = 0L
         audio.playTrack(Audio.Track.BASE)
         if (vaultToShow == null) vaultToShow = wallet.pendingVault()       // a spin that unlocked both: the Vault comes next
         if (vaultToShow != null) { vaultWinShown = 0; startVaultTrigger(); return }
@@ -863,6 +871,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
     private fun startBuy(f: Feature) {
         val stake = wallet.stake
         val b = wallet.buy(f, stake) ?: run { audio.play(Sfx.ERROR); showMessage("That can't be bought right now"); return }
+        boughtPrice = b.price
         audio.play(Sfx.BUY_CONFIRM)
         performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
         settleRoll(); play = null; curFree = null; pendingWin = 0
@@ -2254,7 +2263,12 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
             val xs = Math.round(se.payTokens.toDouble() / se.bet * 10) / 10.0
             pText.typeface = cond; pText.textSize = h * 0.04f; pText.color = 0xFFCCFF90.toInt()
             c.drawText("TOKENS  •  ${se.totalSpins} FREE SPINS  •  ×$xs YOUR STAKE", w / 2, h * 0.64f, pText)
-            if (se.capped && v >= se.payTokens) { pText.color = Neon.RED; c.drawText("25-BOOK MAXIMUM WIN", w / 2, h * 0.7f, pText) }
+            if (boughtPrice > 0) {
+                val net = se.payTokens - boughtPrice
+                pText.color = if (net >= 0) 0xFFCCFF90.toInt() else 0xFFB8AE92.toInt()
+                c.drawText("BOUGHT FOR ${Money.fmt(boughtPrice)} TOKENS  •  NET ${if (net >= 0) "+" else "−"}${Money.fmt(abs(net))}", w / 2, h * 0.70f, pText)
+            }
+            if (se.capped && v >= se.payTokens) { pText.color = Neon.RED; c.drawText("25-BOOK MAXIMUM WIN", w / 2, h * 0.77f, pText) }
         } else {
             pText.typeface = serif; pText.textSize = h * 0.06f; pText.color = Neon.RED; pText.alpha = 255
             c.drawText("THE SPIRITS WERE SILENT", w / 2, h * 0.52f, pText)
