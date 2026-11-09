@@ -193,5 +193,27 @@ class VaultShotsTest {
         }
     }
 
+    /**
+     * Performance guard: while the vault just waits for SPIN (candles flickering, fog drifting, embers rising) a frame
+     * must not allocate on the JVM heap beyond the framework's own bookkeeping.
+     */
+    @Test fun steadyStateAllocatesLittle() {
+        val v = begin("alloc", 1280, 800, showcase()); tap(v)
+        assertTrue(until(12.0, v) { v.awaitingSpin }); step(v, 1.0)
+        // java.lang.management is not on the android.jar compile classpath, but it is there on the JVM that runs the test
+        val mxBean = Class.forName("java.lang.management.ManagementFactory").getMethod("getThreadMXBean").invoke(null)
+        val allocated = Class.forName("com.sun.management.ThreadMXBean").getMethod("getThreadAllocatedBytes", Long::class.javaPrimitiveType)
+        val id = Thread.currentThread().id
+        fun heap(): Long = allocated.invoke(mxBean, id) as Long
+        val b = Bitmap.createBitmap(1280, 800, Bitmap.Config.ARGB_8888); val cv = Canvas(b)
+        repeat(30) { ShadowSystemClock.advanceBy(Duration.ofMillis(40)); v.draw(cv) }
+        val b0 = heap()
+        val n = 120
+        repeat(n) { ShadowSystemClock.advanceBy(Duration.ofMillis(40)); v.draw(cv) }
+        val per = (heap() - b0) / n
+        println("VaultView steady-state heap allocation: $per bytes/frame")
+        assertTrue("per-frame allocation $per bytes", per < 16 * 1024)
+    }
+
     private companion object { const val VAULT_COLS = ReaperConfig.VAULT_COLS }
 }
