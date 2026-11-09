@@ -49,6 +49,9 @@ class DemonModel : CharacterModel {
     /** design-space head point -> final character space */
     private fun dp(x: Float, y: Float, z: Float) = floatArrayOf(hn[0] + (x - hc[0]) * HS, hn[1] + (y - hc[1]) * HS, hn[2] + (z - hc[2]) * HS)
     private val half = (PI / 2).toFloat()
+    // glow positions (head space), precomputed so the frame loop does not allocate
+    private val eyeGlow = arrayOf(dp(-0.040f, 0.923f, 0.175f), dp(0.040f, 0.923f, 0.175f))
+    private val mouthGlow = dp(0f, 0.832f, 0.15f)
 
     /** Glowing ember crack: a thin emissive tube along [pts]. */
     private fun vein(pb: PartBuilder, pts: List<FloatArray>, r: Float = 0.0042f) {
@@ -60,16 +63,16 @@ class DemonModel : CharacterModel {
     private fun spk(r: Float, len: Float, sides: Int = 4): MeshData = Sculpt.tube(2, sides, { t -> floatArrayOf(0f, len * t, 0f) }, { t -> r * (1f - t) }, cap = true)
 
     // ---------------------------------------------------------------------------------------------- body
-    private val prof = listOf(0.115f to 0.800f, 0.130f to 0.740f, 0.215f to 0.695f, 0.295f to 0.640f, 0.285f to 0.560f, 0.255f to 0.460f,
-        0.215f to 0.360f, 0.195f to 0.220f, 0.200f to 0.080f, 0.0f to 0.0f)
+    private val prof = listOf(0.115f to 0.800f, 0.130f to 0.740f, 0.215f to 0.695f, 0.295f to 0.640f, 0.288f to 0.585f, 0.272f to 0.530f,
+        0.250f to 0.470f, 0.228f to 0.405f, 0.210f to 0.335f, 0.198f to 0.255f, 0.196f to 0.170f, 0.200f to 0.080f, 0.0f to 0.0f)
 
     private fun zr(t: Float) = 0.60f + 0.22f * t
 
     private fun torsoRad(ang: Float, t: Float): Float {
         var f = KitA.ell(ang, zr(t))
-        val chest = gauss(sq(t - 0.47f), 0.14f)
+        val chest = gauss(sq(t - 0.42f), 0.12f)
         f *= 1f + 0.15f * chest * (gauss(sq(ang - (half - 0.58f)), 0.34f) + gauss(sq(ang - (half + 0.58f)), 0.34f))     // pecs
-        f *= 1f + 0.09f * max(0f, -sin(ang)) * gauss(sq(t - 0.28f), 0.12f)                                           // hunched trapezius
+        f *= 1f + 0.09f * max(0f, -sin(ang)) * gauss(sq(t - 0.20f), 0.10f)                                           // hunched trapezius
         return f
     }
 
@@ -93,9 +96,15 @@ class DemonModel : CharacterModel {
             val fade = 0.30f + 0.70f * sstep(0f, 0.42f, y)                                                  // fades into smoke at the base
             val sternum = 1f - 0.32f * gauss(x * x, 0.025f) * sstep(0f, 0.08f, z) * sstep(0.30f, 0.46f, y) * sstep(0.70f, 0.56f, y)
             val underPec = 1f - 0.30f * gauss(sq(y - (0.50f - 0.30f * abs(x))), 0.045f) * sstep(0f, 0.06f, z) * sstep(0.30f, 0.12f, abs(x))
-            fade * sternum * underPec
+            val abs3 = 1f - 0.30f * (gauss(sq(y - 0.405f), 0.022f) + gauss(sq(y - 0.335f), 0.022f) + gauss(sq(y - 0.255f), 0.022f)) * gauss(x * x, 0.14f) * sstep(0f, 0.05f, z)
+            fade * sternum * underPec * abs3
         }
-        pb.add(torso, 0x3C1013, SKIN)
+        pb.add(torso, 0x4A1411, SKIN)
+        // spiked collar around the neck base
+        for (i in 0 until 6) {
+            val a = KitA.TAU * i / 6f + 0.35f
+            pb.add(spk(0.016f, 0.075f), 0x3A332D, Mat.BONE, x = 0.135f * kotlin.math.cos(a), y = 0.765f, z = 0.03f + 0.135f * sin(a), rx = 42f, ry = Math.toDegrees((PI / 2 - a).toDouble()).toFloat())
+        }
         // glowing cracks across the chest and belly
         fun cv(x: Float, y: Float) = floatArrayOf(x, y, torsoZ(x, y) + 0.008f)
         for (v in listOf(
@@ -134,8 +143,8 @@ class DemonModel : CharacterModel {
     private fun buildHead(): Mesh {
         val pb = PartBuilder()
         val skull = Sculpt.blob(16, 22, 0.100f, 0.118f, 0.112f) { dx, dy, dz -> headShape(dx, dy, dz) }
-        KitA.shade(skull) { _, y, z, _, ny, _ -> (0.70f + 0.30f * sstep(-0.12f, 0.06f, z)) * (0.80f + 0.20f * (ny * 0.5f + 0.5f)) * (0.85f + 0.15f * sstep(-0.12f, 0.10f, y)) }
-        pb.add(skull, 0x46130F, SKIN, x = hc[0], y = hc[1], z = hc[2])
+        KitA.shade(skull) { x, y, z, _, ny, _ -> (0.70f + 0.30f * sstep(-0.12f, 0.06f, z)) * (0.80f + 0.20f * (ny * 0.5f + 0.5f)) * (0.85f + 0.15f * sstep(-0.12f, 0.10f, y)) * (1f - 0.60f * gauss(sq(abs(x) - 0.030f) + sq(y) + sq(z - 0.068f), 0.030f)) }
+        pb.add(skull, 0x52150F, SKIN, x = hc[0], y = hc[1], z = hc[2])
         // ringed horns with white-hot tips (the tips glow harder when the demon roars)
         for (sx in SGN) {
             val path = hornPath(sx)
@@ -151,9 +160,12 @@ class DemonModel : CharacterModel {
             pb.add(Sculpt.tube(3, 4, KitA.spline(listOf(h(sx * 0.094f, 0.020f, -0.010f), h(sx * 0.150f, 0.050f, -0.050f), h(sx * 0.205f, 0.110f, -0.085f))),
                 { t -> 0.022f * (1f - t) + 0.001f }, cap = true), 0x3C100E, SKIN)
         }
+        // heavy angry brow ridges over the eyes
+        for (sx in SGN) pb.add(Sculpt.tube(3, 5, KitA.spline(listOf(h(sx * 0.0115f, 0.023f, 0.126f), h(sx * 0.054f, 0.039f, 0.114f), h(sx * 0.088f, 0.049f, 0.057f))), { t -> 0.015f - 0.005f * t }, cap = true), 0x3A100D, SKIN)
         // glowing cracks on the forehead and from the eye sockets
-        vein(pb, listOf(h(0f, 0.080f, 0.108f), h(0.012f, 0.110f, 0.095f), h(-0.010f, 0.140f, 0.075f), h(0.005f, 0.178f, 0.048f)), 0.0034f)
-        for (sx in SGN) vein(pb, listOf(h(sx * 0.070f, 0.010f, 0.094f), h(sx * 0.088f, -0.020f, 0.074f), h(sx * 0.100f, -0.052f, 0.046f), h(sx * 0.104f, -0.082f, 0.020f)), 0.0034f)
+        fun hv(dx: Float, dy: Float, dz: Float): FloatArray { val l = sqrt(dx * dx + dy * dy + dz * dz); val k = 1.05f / l; return h(dx * k * 0.100f, dy * k * 0.118f, dz * k * 0.112f) }
+        vein(pb, listOf(hv(0.03f, 0.60f, 0.80f), hv(-0.05f, 0.78f, 0.62f), hv(0.04f, 0.90f, 0.43f), hv(0f, 0.97f, 0.25f)), 0.0034f)
+        for (sx in SGN) vein(pb, listOf(hv(sx * 0.70f, 0.05f, 0.71f), hv(sx * 0.78f, -0.15f, 0.60f), hv(sx * 0.80f, -0.32f, 0.50f), hv(sx * 0.76f, -0.50f, 0.42f)), 0.0034f)
         // burning eyes (molten yellow), set in the sockets and slanted angrily
         for (sx in SGN) pb.add(Sculpt.ellipsoid(0.026f, 0.0125f, 0.012f, 3, 6), 0xFFD860, Mat.EMISSIVE, x = hc[0] + sx * 0.036f, y = hc[1] + 0.006f, z = hc[2] + 0.078f, rz = sx * 24f)
         // upper fangs and a glowing palate
@@ -191,7 +203,7 @@ class DemonModel : CharacterModel {
     private fun buildArm(sx: Float): Mesh {
         val pb = PartBuilder()
         val s = floatArrayOf(sx * 0.30f, 0.62f, 0f); val e = floatArrayOf(sx * 0.40f, 0.44f, 0.07f); val w = floatArrayOf(sx * 0.36f, 0.29f, 0.22f)
-        val skin = 0x3C1013
+        val skin = 0x45120F
         // spiked pauldron
         pb.add(Sculpt.ellipsoid(0.085f, 0.075f, 0.080f, 3, 8), 0x34100F, SKIN, x = s[0], y = s[1] + 0.012f, z = s[2])
         for (k in 0 until 3) pb.add(spk(0.015f, 0.070f - 0.010f * k), 0x3A332D, Mat.BONE, x = s[0] + sx * (0.030f + 0.012f * k), y = s[1] + 0.045f - 0.020f * k, z = -0.012f + 0.030f * k, rz = -sx * (50f + 14f * k))
@@ -207,10 +219,10 @@ class DemonModel : CharacterModel {
         pb.add(Sculpt.ellipsoid(0.048f, 0.040f, 0.036f, 3, 6), skin, SKIN, x = hx, y = hy, z = hz)
         for (i in 0 until 4) {
             val kx = hx + sx * (-0.030f + 0.020f * i)
-            val k0 = floatArrayOf(kx, hy - 0.010f, hz + 0.025f); val k1 = floatArrayOf(kx + sx * 0.004f * (i - 1.5f), hy - 0.030f, hz + 0.062f); val k2 = floatArrayOf(kx + sx * 0.010f * (i - 1.5f), hy - 0.072f, hz + 0.084f)
-            pb.add(Sculpt.tube(2, 4, KitA.spline(listOf(k0, k1, k2)), { t -> 0.0125f * (1f - t) + 0.0006f }, cap = true), 0x2C2622, Mat.BONE)
+            val k0 = floatArrayOf(kx, hy - 0.010f, hz + 0.025f); val k1 = floatArrayOf(kx + sx * 0.004f * (i - 1.5f), hy - 0.034f, hz + 0.074f); val k2 = floatArrayOf(kx + sx * 0.012f * (i - 1.5f), hy - 0.092f, hz + 0.106f)
+            pb.add(Sculpt.tube(2, 4, KitA.spline(listOf(k0, k1, k2)), { t -> 0.0145f * (1f - t) + 0.0006f }, cap = true), 0x2C2622, Mat.BONE)
         }
-        val t0 = floatArrayOf(hx - sx * 0.040f, hy, hz + 0.005f); val t1 = floatArrayOf(hx - sx * 0.062f, hy - 0.020f, hz + 0.030f); val t2 = floatArrayOf(hx - sx * 0.060f, hy - 0.052f, hz + 0.050f)
+        val t0 = floatArrayOf(hx - sx * 0.040f, hy, hz + 0.005f); val t1 = floatArrayOf(hx - sx * 0.064f, hy - 0.024f, hz + 0.036f); val t2 = floatArrayOf(hx - sx * 0.064f, hy - 0.066f, hz + 0.062f)
         pb.add(Sculpt.tube(2, 4, KitA.spline(listOf(t0, t1, t2)), { t -> 0.012f * (1f - t) + 0.0006f }, cap = true), 0x2C2622, Mat.BONE)
         return pb.build()
     }
@@ -240,7 +252,7 @@ class DemonModel : CharacterModel {
             val mem = MeshData()
             addMembrane(mem, wrist, listOf(tip1, elbow, root, low, tip3, s1, tip2, s2))
             KitA.shade(mem) { x, _, _, _, _, _ -> 0.45f + 0.55f * sstep(0.08f, 0.55f, abs(x)) }
-            pb.add(mem, 0x2E0B0F, SKIN)
+            pb.add(mem, 0x401015, SKIN)
             for (end in listOf(s1, s2, low, tip3)) {
                 val mid = floatArrayOf((wrist[0] + end[0]) / 2f, (wrist[1] + end[1]) / 2f + 0.01f, (wrist[2] + end[2]) / 2f + 0.006f)
                 vein(pb, listOf(floatArrayOf(wrist[0], wrist[1], wrist[2] + 0.006f), mid, floatArrayOf(end[0], end[1], end[2] + 0.006f)), 0.0034f)
@@ -291,16 +303,16 @@ class DemonModel : CharacterModel {
         sc.pointLightAt(root, 0f, 0.10f, 0.40f, 1.3f, 0xFF3A18, (0.45f + 0.25f * fl + 0.40f * ex) * dim)
 
         // ---- draws
-        sc.drawV(wings, wm, emis = 0.8f + 0.4f * fl + 0.6f * ex, dim = dim, rim = 0x500C0C, spec = 0.7f, shine = 26f)
-        sc.drawV(body, root, emis = 0.8f + 0.4f * fl + 0.7f * ex, dim = dim, rim = 0x4A0C0C, spec = 0.9f, shine = 26f)
-        sc.drawV(head, hm, emis = eye, dim = dim, rim = 0x4A0C0C, spec = 0.9f, shine = 26f)
-        sc.drawV(jaw, jm, emis = 0.8f + 0.9f * ex, dim = dim, rim = 0x4A0C0C, spec = 0.9f, shine = 26f)
-        sc.drawV(armR, aR, emis = 0.8f + 0.4f * fl + 0.7f * ex, dim = dim, rim = 0x4A0C0C, spec = 0.9f, shine = 26f)
-        sc.drawV(armL, aL, emis = 0.8f + 0.4f * fl + 0.7f * ex, dim = dim, rim = 0x4A0C0C, spec = 0.9f, shine = 26f)
+        sc.drawV(wings, wm, emis = 0.8f + 0.4f * fl + 0.6f * ex, dim = dim, rim = 0x8A1818, spec = 0.4f, shine = 20f)
+        sc.drawV(body, root, emis = 0.8f + 0.4f * fl + 0.7f * ex, dim = dim, rim = 0x7A1414, spec = 0.5f, shine = 20f)
+        sc.drawV(head, hm, emis = eye, dim = dim, rim = 0x7A1414, spec = 0.5f, shine = 20f)
+        sc.drawV(jaw, jm, emis = 0.8f + 0.9f * ex, dim = dim, rim = 0x7A1414, spec = 0.5f, shine = 20f)
+        sc.drawV(armR, aR, emis = 0.8f + 0.4f * fl + 0.7f * ex, dim = dim, rim = 0x7A1414, spec = 0.5f, shine = 20f)
+        sc.drawV(armL, aL, emis = 0.8f + 0.4f * fl + 0.7f * ex, dim = dim, rim = 0x7A1414, spec = 0.5f, shine = 20f)
         // glow sprites: the eyes (hot core, red halo), the open mouth, the hellfire at the base
-        for (sx in SGN) { val g = dp(sx * 0.040f, hc[1] + 0.008f, hc[2] + 0.115f); sc.glowAt(hm, g[0], g[1], g[2], 0.085f * eye + 0.02f, 0xFF3A1E, 0.8f * dim, 0.8f) }
+        for (g in eyeGlow) sc.glowAt(hm, g[0], g[1], g[2], 0.085f * eye + 0.02f, 0xFF3A1E, 0.8f * dim, 0.8f)
         val mouth = sstep(6f, 24f, open)
-        if (mouth > 0.01f) { val g = dp(0f, 0.832f, 0.15f); sc.glowAt(hm, g[0], g[1], g[2], 0.16f + 0.14f * mouth, 0xFF3010, 0.65f * mouth * dim, 0.3f) }
+        if (mouth > 0.01f) sc.glowAt(hm, mouthGlow[0], mouthGlow[1], mouthGlow[2], 0.16f + 0.14f * mouth, 0xFF3010, 0.65f * mouth * dim, 0.3f)
         sc.glowAt(root, 0f, 0.07f, 0.10f, 0.95f + 0.2f * ex, 0xFF2A10, (0.22f + 0.10f * fl + 0.15f * ex) * dim, 0f)
     }
 

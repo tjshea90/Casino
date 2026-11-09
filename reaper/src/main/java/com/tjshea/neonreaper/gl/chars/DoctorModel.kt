@@ -88,7 +88,7 @@ class DoctorModel : CharacterModel {
         val coat = Sculpt.shell(coatProf, 28, radial = { ang, _, t -> coatRad(ang, t) },
             dy = { ang, k, _ -> if (k >= rows - 2) -((if (k == rows - 1) 1f else 0.3f) * (0.004f + 0.040f * abs(sin(3f * ang + 0.7f)).pow(1.4f) + 0.024f * abs(sin(7f * ang)))) else 0f })
         KitA.shade(coat) { _, y, _, _, ny, _ -> (0.72f + 0.28f * sstep(0.02f, 0.75f, y)) * (0.88f + 0.12f * (ny * 0.5f + 0.5f)) }
-        pb.add(coat, 0x1D1915, Mat.MATTE)
+        pb.add(coat, 0x27221C, Mat.MATTE)
         // front seam + a double row of tarnished buttons
         val pk = ArrayList<FloatArray>()
         for (k in 3 until rows) { val t = k.toFloat() / (rows - 1); pk += floatArrayOf(0f, coatProf[k].second, coatProf[k].first * coatRad(halfPi, t) + 0.0025f) }
@@ -270,6 +270,7 @@ class DoctorModel : CharacterModel {
     }
 
     // ---------------------------------------------------------------------------------------------- animation
+    private val beakTip = beakC(1f)
     private val root = FloatArray(16); private val hm = FloatArray(16); private val jm = FloatArray(16)
     private val aR = FloatArray(16); private val lm = FloatArray(16)
 
@@ -309,15 +310,15 @@ class DoctorModel : CharacterModel {
         sc.pointLightAt(hm, 0f, lensP[1] - 0.03f, 0.24f, 0.55f, 0x35FF3A, (0.16f + 0.10f * ex) * eye * dim)
 
         // ---- draws
-        sc.drawV(body, root, emis = 0.5f, dim = dim, rim = 0x0A1A10, spec = 0.5f, shine = 34f, wave = 1.2f + ex)
-        sc.drawV(head, hm, emis = eye, dim = dim, rim = 0x1B4A24, spec = 0.28f, shine = 18f)
-        sc.drawV(beakLow, jm, emis = 1f + ex * 1.2f, dim = dim, rim = 0x1B4A24, spec = 0.28f, shine = 18f)
+        sc.drawV(body, root, emis = 0.5f * dim, dim = dim, rim = 0x1B5A2C, spec = 0.5f, shine = 34f, wave = 1.2f + ex)
+        sc.drawV(head, hm, emis = eye * dim, dim = dim, rim = 0x2A7A3A, spec = 0.28f, shine = 18f)
+        sc.drawV(beakLow, jm, emis = 1f + ex * 1.2f, dim = dim, rim = 0x2A7A3A, spec = 0.28f, shine = 18f)
         sc.drawV(lantern, lm, emis = 1.2f + 0.7f * fl + 1.0f * ex, dim = dim, rim = 0x2E8A2E, spec = 0.5f, shine = 34f)
-        sc.drawV(armR, aR, dim = dim, rim = 0x0A1A10, spec = 0.5f, shine = 34f)
+        sc.drawV(armR, aR, dim = dim, rim = 0x1B5A2C, spec = 0.5f, shine = 34f)
         // glow sprites: one per lens (halo with a hot core), the flame core and its wide halo
-        for (sx in SGN) sc.glowAt(hm, sx * (lensP[0] + 0.012f), lensP[1], lensP[2] + 0.075f, 0.10f * eye + 0.03f, 0x35FF3A, 0.7f * dim, 0.5f)
+        for (sx in SGN) sc.glowAt(hm, sx * (lensP[0] + 0.012f), lensP[1], lensP[2] + 0.075f, 0.15f * eye + 0.04f, 0x35FF3A, 0.8f * dim, 0.5f)
         val fh = 0.9f + 0.45f * fl + 0.6f * ex
-        if (ex > 0.05f) { val ph = KitA.frac(t * 0.9f); val tip = beakC(1f); sc.glowAt(hm, tip[0], tip[1] - 0.01f + 0.06f * ph, tip[2] + 0.03f + 0.10f * ph, 0.10f + 0.20f * ph, 0x7CFF6A, 0.30f * ex * sin(PI.toFloat() * ph) * dim, 0f) }
+        if (ex > 0.05f) { val ph = KitA.frac(t * 0.9f); val tip = beakTip; sc.glowAt(hm, tip[0], tip[1] - 0.01f + 0.06f * ph, tip[2] + 0.03f + 0.10f * ph, 0.10f + 0.20f * ph, 0x7CFF6A, 0.30f * ex * sin(PI.toFloat() * ph) * dim, 0f) }
         sc.glowAt(lm, 0f, -0.228f, 0.012f, 0.16f * fh + 0.05f * ex, 0x5CFF3A, 0.85f * dim, 0.9f)
         sc.glowAt(lm, 0f, -0.226f, 0.012f, 0.70f * fh + 0.35f * ex, 0x35FF3A, (0.20f + 0.10f * fl + 0.2f * ex) * dim, 0f)
     }

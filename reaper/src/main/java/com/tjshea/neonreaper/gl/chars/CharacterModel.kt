@@ -38,6 +38,7 @@ object Cast {
         ReaperConfig.WILD -> ReaperModel(low = true)
         ReaperConfig.DOCTOR -> DoctorModel()
         ReaperConfig.DEMON -> DemonModel()
+        ReaperConfig.SKULL -> SkullModel()
         ReaperConfig.WRAITH -> WraithModel()
         ReaperConfig.SCATTER -> CoffinModel()
         else -> null
