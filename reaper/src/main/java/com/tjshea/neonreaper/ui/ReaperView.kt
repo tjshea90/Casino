@@ -135,6 +135,16 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
     internal fun debugPhaseAge(): Double = now() - phaseStart
     internal fun debugSeanceActive(): Boolean = seance != null
     internal fun debugFreeSpinsPlayed(): Int = seanceIdx
+    internal fun debugBusy(): Boolean = busy
+    internal fun debugPress(id: String) = onButton(id)
+    /** Advances the game logic by one frame without drawing anything (soak tests). */
+    internal fun debugStepLogic() {
+        val t = now()
+        if (phase == Phase.SPINNING) updateSpin(t)
+        if (phase == Phase.MINI_ACTION) updateAction(t)
+        checkHold(t)
+        updateFlow(t)
+    }
 
     /** The score that should be playing now (used by the activity when the app returns from the background). */
     val musicTrack: Audio.Track get() = when {
