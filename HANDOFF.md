@@ -41,6 +41,7 @@ online slots; the house must keep an edge no matter what and never lose money ov
 **Auto-resume (user request, 2026-11-09):** a server-side scheduled task wakes THIS session every 2 h (minute 17 UTC) so work continues by itself after a usage-limit interruption:
   trigger id `trig_01YVygdMjcNc59gubRRuHrMA` (session `session_01UWi8ZvunJ24iKJFQy597FF`). It re-reads this block, resumes the first unchecked box and re-wakes dead sub-agents.
   When ALL work is shipped, set the line `STATUS: COMPLETE` below and disable it (`update_trigger enabled=false`, or the user can pause it in their scheduled tasks list).
+  **RETIRED 2026-11-09 22:55 UTC:** release build-7 is published, "Build APK" run #82 (the release commit 952df3b) is green, `STATUS: COMPLETE` is set at the top, and the trigger was disabled with `update_trigger enabled=false` (not deleted: re-enable it with `enabled=true` only if new work is started).
   If this session is ever gone, a fresh session can cold-resume from this file; sub-agent worktrees are local to the container, so MERGE agent branches into the session branch and push as soon as they have something.
   Autosave note: `.claude/worktrees/` is git-ignored (autosave once committed agent worktrees as gitlinks; fixed in ed7c4ac).
 
