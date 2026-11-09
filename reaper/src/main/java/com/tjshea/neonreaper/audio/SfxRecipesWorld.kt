@@ -26,7 +26,7 @@ internal fun registerWorldSfx(r: SfxRegistry) {
     val minor = doubleArrayOf(N.D3, N.A3, N.D4, N.F4)
 
     // ============================================================================================ voices
-    r.add(S.REAPER_WHISPER, 1.8, -19.0, 2, fadeOut = 0.45) { b ->
+    r.add(S.REAPER_WHISPER, 1.8, -19.0, 2, fadeOut = 0.45, air = -6.0) { b ->
         val st = doubleArrayOf(0.05, 0.62, 1.12)
         val ln = doubleArrayOf(0.5, 0.42, 0.5)
         val vw = { t: Double -> if (t < 0.55) Vowels.U.mix(Vowels.O, t / 0.55) else if (t < 1.1) Vowels.A.mix(Vowels.E, (t - 0.55) / 0.55) else Vowels.O.mix(Vowels.U, (t - 1.1) / 0.6) }
@@ -75,7 +75,7 @@ internal fun registerWorldSfx(r: SfxRegistry) {
         b.at(0.1, v, 0.6, 0.5, 0.9, 0.0)
         Wet(hall = Rv.CATHEDRAL)
     }
-    r.add(S.DOCTOR_RASP, 1.9, -20.0, 2, fadeOut = 0.4) { b ->
+    r.add(S.DOCTOR_RASP, 1.9, -20.0, 2, fadeOut = 0.4, air = -4.5) { b ->
         b.at(0.0, sweepNoise(0.78, 150, 600.0, 1700.0, 2.0) { p -> sin(PI * p.pow(0.75)).pow(1.2) }, 0.85, 0.0, 0.0, 0.2)
         b.at(0.92, sweepNoise(0.86, 151, 1500.0, 520.0, 2.0) { p -> sin(PI * p.pow(0.6)).pow(1.2) }, 0.95, 0.0, 0.0, 0.2)
         b.at(0.0, sweepNoise(0.78, 152, 1100.0, 1190.0, 22.0) { p -> sin(PI * p) }, 0.22, 0.0, 0.0, 0.2)
@@ -102,7 +102,7 @@ internal fun registerWorldSfx(r: SfxRegistry) {
         b.at(0.0, rumble(1.3, 172, 800.0, 30.0, 0.9) { p -> sin(PI * p) }, 0.4, 0.0, 0.1)
         Wet(hall = Rv.CRYPT, room = Rv.BOX)
     }
-    r.add(S.SKULL_RATTLE, 1.3, -18.0, 2, fadeOut = 0.3) { b ->
+    r.add(S.SKULL_RATTLE, 1.3, -18.0, 2, fadeOut = 0.3, air = -4.0) { b ->
         val rg = Rng(181)
         var t = 0.02
         var k = 0
@@ -147,7 +147,7 @@ internal fun registerWorldSfx(r: SfxRegistry) {
             b.at(t0 + f * 0.13, noiseBurst(0.1, 240L + j * 7 + f, 0.03, lp = 320.0), 0.35, if (j % 2 == 0) -0.5 else 0.5, 0.1, 0.3)
         Wet(hall = Rv.CRYPT, room = Rv.ROOM)
     }
-    r.add(S.WRAITH_WAIL, 2.6, -17.0, 2, fadeOut = 0.9, duckSec = 2.0, duckTo = 0.6) { b ->
+    r.add(S.WRAITH_WAIL, 2.5, -17.0, 2, fadeOut = 0.9, duckSec = 2.0, duckTo = 0.6) { b ->
         val f0 = { t: Double -> if (t < 0.9) lerp(420.0, 880.0, smooth(t / 0.9)) else lerp(880.0, 600.0, smooth((t - 0.9) / 1.4)) }
         val vw = { t: Double -> when { t < 0.7 -> Vowels.O.mix(Vowels.A, t / 0.7); t < 1.5 -> Vowels.A.mix(Vowels.E, (t - 0.7) / 0.8); else -> Vowels.E.mix(Vowels.U, clamp01((t - 1.5) / 0.9)) } }
         val amp = { t: Double -> smooth(t / 0.5) * smooth((2.5 - t) / 0.8) }
@@ -157,25 +157,26 @@ internal fun registerWorldSfx(r: SfxRegistry) {
         Wet(hall = Rv.CATHEDRAL, room = Rv.ROOM)
     }
     r.add(S.HEARTBEAT, 0.75, -20.0, 1, fadeOut = 0.2) { b ->
-        b.at(0.0, thump(0.2, 72.0, 43.0, 0.03, 0.075, 1.6), 1.0, 0.0, 0.1)
-        b.at(0.0, thump(0.1, 150.0, 90.0, 0.02, 0.04, 2.0), 0.3)
-        b.at(0.26, thump(0.2, 66.0, 40.0, 0.03, 0.07, 1.6), 0.75, 0.0, 0.1)
-        b.at(0.26, thump(0.1, 140.0, 85.0, 0.02, 0.04, 2.0), 0.22)
+        b.at(0.0, thump(0.2, 72.0, 43.0, 0.03, 0.075, 1.6), 0.6, 0.0, 0.1)
+        b.at(0.0, thump(0.12, 210.0, 120.0, 0.02, 0.05, 2.2), 0.9)
+        b.at(0.0, bandBurst(0.03, 91, 600.0, 1.5, 0.008), 0.3)
+        b.at(0.26, thump(0.2, 66.0, 40.0, 0.03, 0.07, 1.6), 0.45, 0.0, 0.1)
+        b.at(0.26, thump(0.12, 190.0, 110.0, 0.02, 0.05, 2.2), 0.65)
         Wet(room = Rv.CRYPT)
     }
 
     // ======================================================================================== atmosphere
     r.add(S.THUNDER, 2.8, -17.0, 2, hitAt = 0.05, fadeOut = 0.9) { b ->
         b.at(0.0, noiseBurst(0.25, 301, 0.06, hp = 300.0, lp = 3500.0), 0.7, 0.0, 0.3)
-        b.at(0.02, rumble(2.7, 302, 150.0, 5.0, 0.85) { p -> smooth(p / 0.1) * exp(-1.7 * p) }, 1.0, 0.0, 0.25)
-        b.boom(0.04, 0.8, 1.3)
+        b.at(0.02, rumble(2.7, 302, 260.0, 5.0, 0.85) { p -> smooth(p / 0.1) * exp(-1.7 * p) }, 1.0, 0.0, 0.25)
+        b.boom(0.04, 0.5, 1.3)
         Wet(hall = Rv.HALL)
     }
     r.add(S.LIGHTNING_CRACK, 1.7, -16.0, 2, hitAt = 0.0, fadeOut = 0.6) { b ->
         b.at(0.0, noiseBurst(0.15, 311, 0.022, hp = 700.0, lp = 7000.0), 1.0, 0.0, 0.2)
         b.at(0.0, noiseBurst(0.55, 312, 0.13, hp = 2500.0, lp = 8000.0), 0.22, 0.0, 0.3)
-        b.boom(0.03, 0.8, 0.9, seed = 313)
-        b.at(0.05, rumble(1.5, 314, 160.0, 6.0, 0.85) { p -> smooth(p / 0.08) * exp(-2.2 * p) }, 0.7, 0.0, 0.25)
+        b.boom(0.03, 0.4, 0.9, seed = 313)
+        b.at(0.05, rumble(1.5, 314, 240.0, 6.0, 0.85) { p -> smooth(p / 0.08) * exp(-2.2 * p) }, 0.45, 0.0, 0.25)
         Wet(hall = Rv.HALL)
     }
     r.add(S.DOOR_SLAM, 1.3, -16.0, 2, hitAt = 0.0, fadeOut = 0.45) { b ->
@@ -185,25 +186,25 @@ internal fun registerWorldSfx(r: SfxRegistry) {
         b.at(0.15, thump(0.25, 110.0, 50.0, 0.03, 0.08, 1.8), 0.45, 0.0, 0.2)
         Wet(hall = Rv.CRYPT)
     }
-    r.add(S.WIND_GUST, 2.3, -22.0, 3, fadeOut = 0.8) { b ->
+    r.add(S.WIND_GUST, 2.3, -22.0, 3, fadeOut = 0.8, air = -5.0) { b ->
         b.at(0.0, whoosh(2.2, 322, 350.0, 1100.0, 1.1, 0.45, 1.3), 1.0, 0.0, 0.3, 0.1)
         b.at(0.2, sweepNoise(2.0, 323, 1500.0, 2300.0, 14.0) { p -> sin(PI * p).pow(2.0) }, 0.1, 0.4, 0.4)
         b.at(0.0, rumble(2.2, 324, 200.0, 4.0, 0.7) { p -> sin(PI * p) }, 0.35, 0.0, 0.2)
         Wet(hall = Rv.HALL)
     }
-    r.add(S.CANDLE_WHOOSH, 0.8, -22.0, 3, fadeOut = 0.3) { b ->
+    r.add(S.CANDLE_WHOOSH, 0.8, -22.0, 3, fadeOut = 0.3, air = -6.0) { b ->
         b.at(0.0, whoosh(0.7, 331, 800.0, 2600.0, 0.8, 0.25, 1.0), 0.8, 0.0, 0.0, 0.3)
         b.at(0.0, thump(0.35, 72.0, 44.0, 0.08, 0.1, 1.2), 0.45)
         b.at(0.05, clinks(0.6, 332, 38.0, 2500.0, 6000.0, 0.008) { p -> exp(-3.0 * p) }, 0.15, 0.0, 0.0, 0.2)
         Wet(room = Rv.ROOM)
     }
-    r.add(S.SLASH, 0.42, -17.0, 2, hitAt = 0.0, fadeOut = 0.12) { b ->
+    r.add(S.SLASH, 0.42, -17.0, 2, hitAt = 0.0, fadeOut = 0.12, air = -5.0) { b ->
         b.at(0.0, whoosh(0.3, 341, 4500.0, 900.0, 0.9, 0.2, 1.0), 1.0, 0.0, 0.0, 0.2)
         b.at(0.08, bell(1250.0, 0.35, Bells.GONG, bright = 0.5, decay = 0.15), 0.22, 0.0, 0.0, 0.3)
         b.at(0.07, thump(0.14, 210.0, 90.0, 0.02, 0.05, 1.8), 0.45, 0.0, 0.0, 0.1)
         Wet(room = Rv.BOX)
     }
-    r.add(S.WHOOSH, 0.62, -22.0, 2, fadeOut = 0.2) { b ->
+    r.add(S.WHOOSH, 0.62, -22.0, 2, fadeOut = 0.2, air = -5.0) { b ->
         b.at(0.0, whoosh(0.6, 351, 250.0, 1700.0, 0.9, 0.45, 1.1), 1.0, 0.0, 0.1, 0.2)
         Wet(room = Rv.ROOM)
     }
@@ -214,14 +215,14 @@ internal fun registerWorldSfx(r: SfxRegistry) {
         b.at(0.0, bell(900.0, 0.25, Bells.BLOCK, decay = 0.5), 0.25, 0.0, 0.0, 0.3)
         Wet(room = Rv.ROOM)
     }
-    r.add(S.CHAIN_RATTLE, 1.15, -19.0, 2, fadeOut = 0.3) { b ->
+    r.add(S.CHAIN_RATTLE, 1.15, -19.0, 2, fadeOut = 0.3, air = -5.0) { b ->
         b.at(0.0, clinks(1.05, 371, 62.0, 700.0, 4200.0, 0.03) { p -> sin(PI * p.pow(0.8)) * 0.8 + 0.25 }, 1.0, 0.0, 0.0, 0.3)
         b.at(0.0, rumble(1.0, 372, 400.0, 14.0, 0.8) { p -> sin(PI * p) }, 0.25)
         Wet(room = Rv.ROOM)
     }
     r.add(S.BELL, 2.9, -20.0, 2, fadeOut = 0.9) { b ->
-        b.toll(0.0, N.D3, 2.9, 0.9, 0.4, decay = 0.65)
-        b.at(0.0, thump(0.4, 80.0, 44.0, 0.05, 0.15, 1.4), 0.3, 0.0, 0.1)
+        b.toll(0.0, N.D3, 2.9, 0.9, 0.4, decay = 0.65, bright = 1.15)
+        b.at(0.0, thump(0.4, 80.0, 44.0, 0.05, 0.15, 1.4), 0.12, 0.0, 0.1)
         Wet(hall = Rv.HALL)
     }
     r.add(S.REALITY_CHECK, 2.4, -22.0, 3, fadeOut = 0.9) { b ->
@@ -261,7 +262,7 @@ internal fun registerWorldSfx(r: SfxRegistry) {
         val sw = reverseSwell(src, Rv.CATHEDRAL, 2.6)
         b.at(hit - sw.size / SRD, sw, 0.9, 0.0, 0.2)
         b.at(0.4, riser(2.45, 424, 250.0, 4200.0, 73.0, 440.0, 0.35, 1.2, 2.3), 0.55, 0.0, 0.3)
-        b.drumRoll(1.2, hit - 0.02, 16, 100.0, 0.25, 0.95, 0.3, seed = 425, curve = 1.3)
+        b.drumRoll(1.2, hit - 0.02, 16, 110.0, 0.25, 0.95, 0.3, seed = 425, curve = 1.3)
         b.at(hit, braam(hz(N.D2), 3.2, 426, 4.5, 0.1, 1.3), 0.95, 0.0, 0.25)
         b.boom(hit, 1.2, 1.5)
         b.choir(hit, major, 2.0, 0.6, 0.7, attack = 0.08, release = 1.0, v0 = Vowels.A, v1 = Vowels.O)
@@ -338,11 +339,11 @@ internal fun registerWorldSfx(r: SfxRegistry) {
         b.at(0.1, formantVoice(0.6, 493, { t -> 90.0 - 25.0 * t }, { Vowels.BASS_A }, { t -> exp(-t * 4.0) }, jitter = 0.07, breath = 0.3, growl = 0.5, drive = 2.4, shift = 0.78, sub = 0.6), 0.45, 0.0, 0.3)
         Wet(hall = Rv.CRYPT, room = Rv.BOX)
     }
-    r.add(S.MINI_INTRO, 1.4, -18.0, 2, hitAt = 0.5, fadeOut = 0.5) { b ->
+    r.add(S.MINI_INTRO, 1.4, -18.0, 2, hitAt = 0.5, fadeOut = 0.5, air = -4.0) { b ->
         b.at(0.0, whoosh(0.6, 501, 300.0, 2600.0, 0.9, 0.7, 1.0), 0.6, 0.0, 0.3)
         b.at(0.35, whisper(0.5, 502, { t -> Vowels.O.mix(Vowels.A, t / 0.5) }, { t -> sin(PI * t / 0.5).pow(1.5) }, 500.0, 0.85), 0.8, 0.0, 0.4)
-        b.boom(0.5, 0.8, 0.9, seed = 503)
-        b.toll(0.5, N.D3, 1.0, 0.4, 0.4, decay = 0.45)
+        b.boom(0.5, 0.5, 0.9, seed = 503)
+        b.toll(0.5, N.D3, 1.0, 0.5, 0.4, decay = 0.45, bright = 1.0)
         Wet(hall = Rv.HALL)
     }
     r.add(S.ORB_LAND, 0.6, -21.0, 1, hitAt = 0.0, fadeOut = 0.25) { b ->
@@ -371,7 +372,7 @@ internal fun registerWorldSfx(r: SfxRegistry) {
     r.add(S.VAULT, 3.4, -16.0, 2, hitAt = 2.7, fadeOut = 0.9, duckSec = 3.0, duckTo = 0.5) { b ->
         b.toll(0.0, N.D2, 3.4, 0.8, 0.45, decay = 1.0)
         b.toll(1.1, N.A2, 2.3, 0.5, 0.45, decay = 0.8)
-        b.at(0.0, rumble(3.2, 541, 180.0, 4.0, 0.8) { p -> sin(PI * p.pow(0.8)) }, 0.5, 0.0, 0.3)
+        b.at(0.0, rumble(3.2, 541, 260.0, 4.0, 0.8) { p -> sin(PI * p.pow(0.8)) }, 0.35, 0.0, 0.3)
         val src = choirChord(minor, 0.6, 542, 0.25, 0.3, Vowels.O, Vowels.A)
         val sw = reverseSwell(src, Rv.CATHEDRAL, 2.2)
         b.at(2.7 - sw.size / SRD, sw, 0.9, 0.0, 0.2)
@@ -380,7 +381,7 @@ internal fun registerWorldSfx(r: SfxRegistry) {
         for (k in 0 until 4) b.at(0.4 + 0.65 * k, thump(0.2, 70.0, 42.0, 0.03, 0.07, 1.6), 0.5 + 0.1 * k, 0.0, 0.1)
         Wet(hall = Rv.CATHEDRAL)
     }
-    r.add(S.RELIC, 1.4, -19.0, 1, hitAt = 0.4, fadeOut = 0.5) { b ->
+    r.add(S.RELIC, 1.4, -19.0, 1, hitAt = 0.4, fadeOut = 0.5, air = -4.0) { b ->
         val seq = doubleArrayOf(N.A4, N.D5, N.F5, N.A5)
         for ((k, m) in seq.withIndex()) b.at(0.08 * k, bell(hz(m), 0.9, Bells.GLASS, bright = 0.65, decay = 0.55, soft = 0.001), 0.4, (k - 1.5) * 0.3, 0.35, 0.1)
         b.at(0.0, whoosh(0.4, 551, 500.0, 3000.0, 0.9, 0.7, 1.0), 0.35, 0.0, 0.3)
@@ -389,7 +390,7 @@ internal fun registerWorldSfx(r: SfxRegistry) {
         b.at(0.2, whisper(0.5, 552, { t -> Vowels.I.mix(Vowels.O, t / 0.5) }, { t -> sin(PI * t / 0.5) * 0.7 }, 700.0, 0.85), 0.25, 0.4, 0.5)
         Wet(hall = Rv.HALL)
     }
-    r.add(S.RELIC_FLY, 0.75, -22.0, 1, hitAt = 0.55, fadeOut = 0.25) { b ->
+    r.add(S.RELIC_FLY, 0.75, -22.0, 1, hitAt = 0.55, fadeOut = 0.25, air = -4.5) { b ->
         b.at(0.0, whoosh(0.6, 561, 400.0, 3400.0, 0.9, 0.85, 1.0), 0.6, 0.0, 0.3)
         b.at(0.55, bell(hz(N.A5), 0.45, Bells.GLASS, bright = 0.6, decay = 0.4, soft = 0.001), 0.5, 0.0, 0.4)
         b.at(0.0, bowed(hz(N.D5), 0.6, 562, 0.5, 0.1, flutter = 0.3), 0.18, 0.0, 0.3)
@@ -398,7 +399,7 @@ internal fun registerWorldSfx(r: SfxRegistry) {
     r.add(S.BUY_CONFIRM, 1.6, -17.0, 1, hitAt = 0.5, fadeOut = 0.6, duckSec = 1.2, duckTo = 0.55) { b ->
         for (k in 0 until 6) b.at(0.07 * k, coin(700.0 + 90.0 * (k % 3), 570L + k, 0.5, 1.1), 0.5, (k % 3 - 1) * 0.3, 0.2, 0.2)
         b.at(0.0, thump(0.25, 150.0, 70.0, 0.02, 0.08, 2.0), 0.5)
-        b.at(0.5, drum(80.0, 0.8, 580, 0.95, 1.2), 1.0, 0.0, 0.3, 0.2)
+        b.at(0.5, drum(73.4, 0.8, 580, 0.95, 1.2), 1.0, 0.0, 0.3, 0.2)
         b.horn(0.5, N.D3, 0.8, 0.5, 0.3, attack = 0.03, release = 0.4)
         b.choir(0.5, doubleArrayOf(N.D3, N.A3, N.D4, N.Fs4), 1.0, 0.4, 0.55, attack = 0.1, release = 0.6)
         b.toll(0.5, N.D3, 1.1, 0.45, 0.4, decay = 0.5)

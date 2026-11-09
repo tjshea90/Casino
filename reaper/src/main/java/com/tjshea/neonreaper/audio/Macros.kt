@@ -12,6 +12,7 @@ internal object N {
     const val D1 = 26.0; const val A1 = 33.0
     const val D2 = 38.0; const val Eb2 = 39.0; const val F2 = 41.0; const val G2 = 43.0; const val A2 = 45.0; const val Bb2 = 46.0; const val C3 = 48.0
     const val D3 = 50.0; const val Eb3 = 51.0; const val F3 = 53.0; const val Fs3 = 54.0; const val G3 = 55.0; const val A3 = 57.0; const val Bb3 = 58.0; const val C4 = 60.0; const val Cs4 = 61.0
+    const val E3 = 52.0; const val E4 = 64.0; const val E5 = 76.0
     const val D4 = 62.0; const val Eb4 = 63.0; const val F4 = 65.0; const val Fs4 = 66.0; const val G4 = 67.0; const val A4 = 69.0; const val Bb4 = 70.0; const val C5 = 72.0
     const val D5 = 74.0; const val Eb5 = 75.0; const val F5 = 77.0; const val Fs5 = 78.0; const val G5 = 79.0; const val A5 = 81.0; const val D6 = 86.0
 }

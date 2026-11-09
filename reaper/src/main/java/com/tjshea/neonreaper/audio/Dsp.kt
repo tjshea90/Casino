@@ -150,6 +150,21 @@ internal class SawOsc(startPhase: Double = 0.0) {
     }
 }
 
+/** Table sine oscillator with a wrap-free 32-bit phase accumulator (a quarter of the cost of Math.sin, exact frequency). */
+internal class SineOsc(startPhase: Double = 0.0) {
+    private var ph: Int = ((startPhase - kotlin.math.floor(startPhase)) * 4294967296.0).toLong().toInt()
+
+    fun tickI(incI: Int): Float {
+        ph += incI
+        val i = ph ushr 20
+        val fr = (ph and 0xFFFFF) * 9.536743e-7f
+        val a = Tables.sine[i]
+        return a + (Tables.sine[i + 1] - a) * fr
+    }
+
+    companion object { fun incOf(freqHz: Double): Int = (freqHz / SRD * 4294967296.0).toLong().toInt() }
+}
+
 /** RBJ biquad (transposed direct form II), double precision so low-frequency resonators stay clean. */
 internal class Biquad {
     private var b0 = 1.0; private var b1 = 0.0; private var b2 = 0.0; private var a1 = 0.0; private var a2 = 0.0
@@ -250,7 +265,9 @@ internal class ReverbSpec(
     val mod: Double = 5.0,
     val diff: Double = 0.6,
     /** number of input allpass diffusers (2..4): fewer = cheaper and less smeared (small rooms) */
-    val stages: Int = 4
+    val stages: Int = 4,
+    /** run the network at half the sample rate (long dark tails only): half the CPU */
+    val half: Boolean = rt60 >= 1.5 && damp <= 3600.0
 )
 
 /** Plain helpers on mono float buffers. */

@@ -12,7 +12,7 @@ Needs numpy (and matplotlib for the PNGs).  Output:
     * a markdown table (stdout, and --md FILE): duration, peak, RMS, crest, DC, first/last sample, spectral centroid,
       band energy split, max 200 ms loudness, clipped samples; loop-seam numbers for music_*.wav layers
     * spectrogram contact sheets in --out (default reaper/build/audio_report): sfx_<group>.png, music_<track>.png,
-      escalation.png (win stingers: loudness over time) and layers.png (music layer loudness maps)
+      escalation.png (win and jackpot stingers: loudness over time)
 Open the PNGs to check structure: risers rise, drum patterns are periodic, wins escalate, nothing harsh above ~8 kHz.
 """
 import argparse
@@ -92,9 +92,11 @@ def analyse(path, is_music):
         w2 = int(0.25 * sr)
         before = np.sqrt((a[-w2:] ** 2).mean())
         after = np.sqrt((a[:w2] ** 2).mean())
+        w3 = int(6.0 * sr)            # ~2 bars: rhythmic layers are compared over a phrase, not a single pulse
         r["seam_step"] = step
         r["seam_local"] = float(local)
         r["seam_rms_db"] = db(float(after)) - db(float(before))
+        r["seam_rms6_db"] = db(float(np.sqrt((a[:w3] ** 2).mean()))) - db(float(np.sqrt((a[-w3:] ** 2).mean())))
     return r
 
 
@@ -108,11 +110,11 @@ def md_table(rows, music):
             " | ".join("%.1f" % v for v in r["band"]), r["clipped"]))
     if music:
         out.append("")
-        out.append("| loop layer | sec | seam step | local max step | step/local | RMS after/before (dB) |")
-        out.append("|---|---|---|---|---|---|")
+        out.append("| loop layer | sec | seam step | local max step | step/local | RMS after/before 250 ms (dB) | 6 s (dB) |")
+        out.append("|---|---|---|---|---|---|---|")
         for r in music:
-            out.append("| %s | %.2f | %.5f | %.5f | %.2f | %+.2f |" % (r["name"], r["dur"], r["seam_step"], r["seam_local"],
-                                                                     r["seam_step"] / max(r["seam_local"], 1e-9), r["seam_rms_db"]))
+            out.append("| %s | %.2f | %.5f | %.5f | %.2f | %+.2f | %+.2f |" % (r["name"], r["dur"], r["seam_step"], r["seam_local"],
+                                                                             r["seam_step"] / max(r["seam_local"], 1e-9), r["seam_rms_db"], r["seam_rms6_db"]))
     return "\n".join(out)
 
 

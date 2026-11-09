@@ -285,24 +285,26 @@ internal fun resonateBank(out: FloatArray, c: DoubleArray, r2: DoubleArray, y1: 
 /** Slow "bowed" additive tone: inharmonic partials with a shared swell, flutter and detuned beating pairs (glass harmonica / bowed metal). */
 internal fun bowed(f0: Double, dur: Double, seed: Long, attack: Double, release: Double, ratios: DoubleArray = doubleArrayOf(1.0, 2.0, 3.0, 4.2, 5.9), amps: DoubleArray = doubleArrayOf(1.0, 0.5, 0.3, 0.16, 0.08), flutter: Double = 0.12, beat: Double = 0.0035): FloatArray {
     val n = frames(dur); val out = FloatArray(n); val r = Rng(seed)
-    val np = ratios.size
-    val ph = DoubleArray(np * 2) { r.unit().toDouble() }
-    val inc = DoubleArray(np * 2) { val p = it / 2; f0 * ratios[p] * (1.0 + (if (it % 2 == 1) beat * (1 + 0.4 * p) else 0.0)) / SRD }
-    val amp = DoubleArray(np * 2) { amps[it / 2] * (if (it % 2 == 1) 0.7 else 1.0) }
-    val fl = DoubleArray(np * 2) { 0.17 + 0.23 * r.unit() }       // flutter rates (Hz)
-    val fph = DoubleArray(np * 2) { r.unit().toDouble() }
-    for (p in 0 until np * 2) if (inc[p] * SRD > 0.46 * SRD) amp[p] = 0.0
+    val np = ratios.size * 2
+    val osc = Array(np) { SineOsc(r.unit().toDouble()) }
+    val incI = IntArray(np) { val p = it / 2; SineOsc.incOf(f0 * ratios[p] * (1.0 + (if (it % 2 == 1) beat * (1 + 0.4 * p) else 0.0))) }
+    val amp = DoubleArray(np) { amps[it / 2] * (if (it % 2 == 1) 0.7 else 1.0) }
+    val fl = DoubleArray(np) { 0.17 + 0.23 * r.unit() }       // flutter rates (Hz)
+    val fp = DoubleArray(np) { r.unit().toDouble() }
+    for (p in 0 until np) if (f0 * ratios[p / 2] > 0.46 * SRD) amp[p] = 0.0
     val atk = max(1, frames(attack)); val rel = max(1, frames(release))
-    for (i in 0 until n) {
-        var s = 0.0
-        for (p in 0 until np * 2) {
-            if (amp[p] == 0.0) continue
-            ph[p] += inc[p]; if (ph[p] >= 1.0) ph[p] -= 1.0
-            fph[p] += fl[p] / SRD; if (fph[p] >= 1.0) fph[p] -= 1.0
-            s += Tables.cyc(ph[p]) * amp[p] * (1.0 - flutter + flutter * Tables.cyc(fph[p]))
+    val g = DoubleArray(np)
+    var i = 0
+    while (i < n) {
+        val e = smooth(min(1.0, i.toDouble() / atk)) * smooth(min(1.0, (n - 1 - i).toDouble() / rel))
+        for (p in 0 until np) g[p] = amp[p] * e * (1.0 - flutter + flutter * Tables.cyc(fp[p] + fl[p] * i / SRD))
+        val end = min(n, i + 32)
+        for (j in i until end) {
+            var sm = 0f
+            for (p in 0 until np) sm += osc[p].tickI(incI[p]) * g[p].toFloat()
+            out[j] = sm
         }
-        val e = min(1.0, i.toDouble() / atk).let { smooth(it) } * smooth(min(1.0, (n - 1 - i).toDouble() / rel))
-        out[i] = (s * e).toFloat()
+        i = end
     }
     return out.norm()
 }
@@ -319,30 +321,30 @@ internal fun sawPad(notes: DoubleArray, dur: Double, seed: Long, attack: Double,
     val n = frames(dur); val out = FloatArray(n); val r = Rng(seed)
     val voices = notes.size * unison
     val osc = Array(voices) { SawOsc(0.0) }
-    val inc = DoubleArray(voices); val tabs = Array(voices) { Tables.saw[0] }
+    val incI = IntArray(voices); val tabs = Array(voices) { Tables.saw[0] }
     for (k in notes.indices) for (u in 0 until unison) {
         val v = k * unison + u
         var f = hz(notes[k]) * (1.0 + detune * (if (unison == 1) 0.0 else (u - (unison - 1) / 2.0) / ((unison - 1) / 2.0).coerceAtLeast(1.0)))
         if (snap > 0.0) f = Math.round(f / snap) * snap
-        inc[v] = f / SRD; tabs[v] = Tables.sawFor(f)
+        incI[v] = SawOsc.incOf(f / SRD); tabs[v] = Tables.sawFor(f)
         // random but fixed per-voice phase: with snapped frequencies f*T is an integer, so the result stays loop-periodic
         val ph = f * t0 + r.unit()
         osc[v].phase = ph - kotlin.math.floor(ph)
     }
     val f1 = Svf(); val f2 = Svf()
-    val atk = max(1, frames(attack)); val rel = max(1, frames(release))
+    val atk = frames(attack); val rel = frames(release)       // 0 = no ramp (periodic loop material)
     var env = 0.0; var cut = cutLo
     val gain = 1.0 / sqrt(voices.toDouble())
     for (i in 0 until n) {
         if (i and 31 == 0) {
-            val e = smooth(min(1.0, i.toDouble() / atk)) * smooth(min(1.0, (n - 1 - i).toDouble() / rel))
+            val e = (if (atk == 0) 1.0 else smooth(min(1.0, i.toDouble() / atk))) * (if (rel == 0) 1.0 else smooth(min(1.0, (n - 1 - i).toDouble() / rel)))
             env = e
             val lfo = if (lfoHz > 0) Tables.cyc(lfoHz * (i / SRD + t0)).toDouble() * lfoDepth else 0.0
             cut = (cutLo + (cutHi - cutLo) * e) * (1.0 + lfo)
             f1.set(cut, q); f2.set(cut, 0.7071)
         }
         var s = 0.0
-        for (v in 0 until voices) s += osc[v].tick(inc[v], tabs[v])
+        for (v in 0 until voices) s += osc[v].tickI(incI[v], tabs[v])
         f1.process(s * gain); f2.process(f1.lp)
         out[i] = (f2.lp * env).toFloat()
     }
@@ -396,7 +398,7 @@ internal fun choirChord(notes: DoubleArray, dur: Double, seed: Long, attack: Dou
 internal fun brass(f: Double, dur: Double, seed: Long, attack: Double = 0.12, release: Double = 0.2, cutLo: Double = 350.0, cutHi: Double = 2400.0,
                    unison: Int = 3, detune: Double = 0.004, drive: Double = 1.6, vibHz: Double = 0.0, vibDepth: Double = 0.0): FloatArray {
     val n = frames(dur); val out = FloatArray(n); val r = Rng(seed)
-    val osc = Array(unison) { SawOsc(r.unit().toDouble()) }
+    val osc = Array(unison) { SawOsc(r.unit().toDouble()) }; val incs = IntArray(unison)
     val tab = Tables.sawFor(f * 1.02)
     val flt = Svf(); val flt2 = Svf()
     val atk = max(1, frames(attack)); val rel = max(1, frames(release))
@@ -409,8 +411,9 @@ internal fun brass(f: Double, dur: Double, seed: Long, attack: Double = 0.12, re
             flt.set(cut, 1.1); flt2.set(cut * 1.4, 0.7071)
         }
         val vib = if (vibHz > 0) 1.0 + vibDepth * Tables.cyc(vibHz * i / SRD) else 1.0
+        if (i and 15 == 0) for (u in 0 until unison) incs[u] = SawOsc.incOf(f * vib * (1.0 + detune * (u - (unison - 1) / 2.0)) / SRD)
         var s = 0.0
-        for (u in 0 until unison) s += osc[u].tick(f * vib * (1.0 + detune * (u - (unison - 1) / 2.0)) / SRD, tab)
+        for (u in 0 until unison) s += osc[u].tickI(incs[u], tab)
         flt.process(s / unison); flt2.process(flt.lp)
         out[i] = (softClip(drive * flt2.lp) * e).toFloat()
     }
@@ -487,15 +490,13 @@ internal fun strings(f: Double, dur: Double, seed: Long, tremHz: Double = 11.0, 
 internal fun organ(f: Double, dur: Double, attack: Double = 0.03, release: Double = 0.15, trem: Double = 0.06, tremHz: Double = 5.3, mix: DoubleArray = doubleArrayOf(1.0, 0.7, 0.4, 0.3, 0.18, 0.1)): FloatArray {
     val n = frames(dur); val out = FloatArray(n)
     val parts = doubleArrayOf(0.5, 1.0, 1.5, 2.0, 3.0, 4.0)
-    val ph = DoubleArray(parts.size)
+    val osc = Array(parts.size) { SineOsc(0.0) }
+    val incI = IntArray(parts.size) { SineOsc.incOf(f * parts[it]) }
+    val amp = FloatArray(parts.size) { if (f * parts[it] > 0.45 * SRD) 0f else mix[it].toFloat() }
     val atk = max(1, frames(attack)); val rel = max(1, frames(release))
     for (i in 0 until n) {
-        var s = 0.0
-        for (p in parts.indices) {
-            val fp = f * parts[p]; if (fp > 0.45 * SRD) continue
-            ph[p] += fp / SRD; if (ph[p] >= 1.0) ph[p] -= 1.0
-            s += Tables.cyc(ph[p]) * mix[p]
-        }
+        var s = 0f
+        for (p in parts.indices) if (amp[p] != 0f) s += osc[p].tickI(incI[p]) * amp[p]
         val e = min(1.0, i.toDouble() / atk) * min(1.0, (n - 1 - i).toDouble() / rel)
         out[i] = (s * e * (1.0 - trem + trem * Tables.cyc(tremHz * i / SRD))).toFloat()
     }
