@@ -73,7 +73,7 @@ class MainActivity : Activity(), ReaperView.Host {
     override fun openVault(result: VaultResult) {
         if (vault != null) return
         currentTrack = Audio.Track.VAULT
-        val v = VaultView(this, audio, result) { paid ->
+        val v = VaultView(this, audio, result, game.takeBoughtPrice()) { paid ->
             vault?.let { root.removeView(it); it.release() }
             vault = null
             wallet.markVaultSeen()
