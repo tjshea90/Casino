@@ -19,6 +19,8 @@ import android.view.MotionEvent
 import android.view.View
 import com.tjshea.neonreaper.audio.Audio
 import com.tjshea.neonreaper.audio.Audio.Sfx
+import com.tjshea.neonreaper.data.BuyPlay
+import com.tjshea.neonreaper.data.Feature
 import com.tjshea.neonreaper.data.SpinPlay
 import com.tjshea.neonreaper.data.Wallet
 import com.tjshea.neonreaper.engine.Money
@@ -27,6 +29,8 @@ import com.tjshea.neonreaper.engine.ReaperConfig.REELS
 import com.tjshea.neonreaper.engine.ReaperConfig.ROWS
 import com.tjshea.neonreaper.engine.ReaperConfig.WILD
 import com.tjshea.neonreaper.engine.ReaperEngine
+import com.tjshea.neonreaper.engine.SeanceResult
+import com.tjshea.neonreaper.engine.SeanceSpin
 import com.tjshea.neonreaper.engine.SpinOutcome
 import com.tjshea.neonreaper.engine.VaultResult
 import java.util.Random
@@ -51,11 +55,15 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         fun openWithdraw()
         fun openInfo()
         fun openStats()
-        fun openAutoPicker(onPicked: (Int) -> Unit)
+        fun openAutoPicker(onPicked: (AutoPlan) -> Unit)
         fun openVault(result: VaultResult)
+        fun openBuy(stake: Int, onChoice: (com.tjshea.neonreaper.data.Feature) -> Unit)
+        fun openSettings()
+        fun openRank()
+        fun openReality(onContinue: () -> Unit, onStop: () -> Unit)
     }
 
-    private enum class Phase { IDLE, SPINNING, MINI_ACTION, PRESENT, SHOWCASE, BIG_WIN, VAULT_TRIGGER, IN_VAULT }
+    private enum class Phase { IDLE, SPINNING, MINI_ACTION, PRESENT, SHOWCASE, BIG_WIN, VAULT_TRIGGER, IN_VAULT, SEANCE_TRIGGER, SEANCE_END }
 
     private val wallet get() = host.wallet
     private val audio get() = host.audio
@@ -82,6 +90,27 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
     private var messageUntil = 0.0
     private var creditFlashUntil = 0.0
     private var vaultWinShown = 0L
+
+    // THE SÉANCE (free spins), feature buy, autoplay limits, anticipation
+    private var vaultToShow: VaultResult? = null           // Soul Vault waiting to be shown (from a spin or a buy)
+    private var seanceToStart: SeanceResult? = null        // Séance started by the spin that just stopped
+    private var seance: SeanceResult? = null               // the Séance being replayed (already paid and saved)
+    private var seanceIdx = 0                              // index of the NEXT free spin
+    private var seanceLeft = 0                             // spins left to play (start + retriggers - played)
+    private var seanceMult = 1
+    private var seanceCum = 0L                             // uncapped running total (tokens) of the spins played so far
+    private var seanceRevealed = 0L                        // capped running total shown to the player
+    private var pendingSeance = 0L                         // part of the credit meter that is not revealed yet
+    private var seanceBanner = ""; private var seanceBannerAt = -10.0
+    private var curFree: SeanceSpin? = null                // the free spin being animated / presented
+    private var seanceEndAt = 0.0
+    private var antFrom = -1; private var antStart = 0.0; private var antEnd = 0.0
+    private var antSoundPlayed = false; private var antResolved = true
+    private val scatReel = BooleanArray(REELS)
+    private var autoPlan: AutoPlan? = null
+    private var autoStartBalance = 0L
+    private var lastRoundTokens = 0L
+    private var nextReality = 0.0
 
     // reels
     private val tape = arrayOfNulls<IntArray>(REELS)
@@ -440,7 +469,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
 
     private fun enter(p: Phase) { phase = p; phaseStart = now(); invalidate() }
 
-    private val busy get() = (phase != Phase.IDLE && phase != Phase.PRESENT) || now() < winLockUntil
+    private val busy get() = (phase != Phase.IDLE && phase != Phase.PRESENT) || now() < winLockUntil || seance != null
 
     private fun startSpin() {
         if (busy) return
@@ -455,15 +484,26 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         animateSpin(p)
     }
 
-    /** Animate an already-settled spin. */
-    internal fun animateSpin(p: SpinPlay) {
+    /** Tokens won by this spin as shown to the player (a free spin's lines x its rising multiplier, within the Séance cap). */
+    private var freeWin = 0L
+    private fun spinWin(o: SpinOutcome): Long = if (curFree != null) freeWin else o.payTokens
+
+    /** Animate an already-settled spin ([free] != null: a free spin of the Séance being replayed). */
+    internal fun animateSpin(p: SpinPlay, free: SeanceSpin? = null) {
         play = p
+        curFree = free
         val o = p.outcome
-        pendingWin = o.payTokens
+        pendingWin = spinWin(o)
         pendingVault = p.vault?.payTokens ?: 0L
+        if (free == null) {
+            pendingSeance = p.seance?.payTokens ?: 0L
+            vaultToShow = p.vault
+            seanceToStart = p.seance
+            lastRoundTokens = o.payTokens + (p.vault?.payTokens ?: 0L) + (p.seance?.payTokens ?: 0L)
+        }
         vaultWinShown = 0
         rollTarget = 0
-        audio.play(Sfx.SPIN, 0.6f)
+        audio.play(if (free != null) Sfx.SPIN else Sfx.SPIN_START, 0.7f)
         val t = now()
         val turbo = wallet.turbo || holdMode
         val base = if (turbo) 0.32 else 0.6
@@ -478,13 +518,23 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         miniStart = if (feature && !reaper) t + 0.25 else -1.0
         slashPlayed = false
         if (reaper) audio.play(Sfx.GROWL, 0.9f)
-        if (feature && !reaper) { audio.play(Sfx.WHOOSH); miniVoice(miniType)?.let { audio.play(it, 0.9f) } }
+        if (feature && !reaper) { audio.play(Sfx.MINI_INTRO); audio.play(Sfx.WHOOSH); miniVoice(miniType)?.let { audio.play(it, 0.9f) } }
+        // anticipation: once two coffins have landed and reels are still turning, the remaining reels slow down and the
+        // tension builds. It only reflects what is really on the reels (the outcome was decided before the spin).
+        java.util.Arrays.fill(scatReel, false)
+        for (c in o.scatterCells) scatReel[c / ROWS] = true
+        antFrom = -1
+        var seen = 0
+        for (r in 0 until REELS) { if (r >= 2 && seen >= 2 && antFrom < 0) antFrom = r; if (scatReel[r]) seen++ }
+        antSoundPlayed = false; antResolved = antFrom < 0
+        val strips = if (free != null) ReaperConfig.FS_STRIPS else ReaperConfig.STRIPS
         for (r in 0 until REELS) {
             isWildReel[r] = r in o.wildReels
+            val slow = if (antFrom in 0..4 && r >= antFrom && !isWildReel[r]) 0.95 * (r - antFrom + 1) + 0.35 else 0.0
             val stopAt = when {
                 isWildReel[r] -> slashAt
                 feature -> t + base + step * r + 1.3
-                else -> t + base + step * r
+                else -> t + base + step * r + slow
             }
             liftEnd[r] = t + 0.09
             runEnd[r] = stopAt
@@ -492,7 +542,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
             val run = stopAt - liftEnd[r]
             val s = max(4, ceil(landDist - 0.35 + speed * run).toInt())
             reelS[r] = s.toDouble(); reelV[r] = (s + 0.35 - landDist) / run
-            val strip = ReaperConfig.STRIPS[r]
+            val strip = strips[r]
             val tp = IntArray(s + 3)
             for (i in 0 until s) tp[i] = strip[(o.stops[r] + i) % strip.size]
             if (isWildReel[r]) for (row in 0 until ROWS) tp[row] = WILD
@@ -500,6 +550,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
             tape[r] = tp
             landed[r] = false; done[r] = false
         }
+        if (antFrom >= 1) { antStart = runEnd[antFrom - 1]; antEnd = runEnd[REELS - 1] }
         enter(Phase.SPINNING)
     }
 
@@ -524,7 +575,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
     private fun tapeSym(r: Int, k: Int): Int {
         val tp = tape[r] ?: return grid[r][k.coerceIn(0, 2)]
         if (k in tp.indices) return tp[k]
-        val strip = ReaperConfig.STRIPS[r]
+        val strip = if (curFree != null) ReaperConfig.FS_STRIPS[r] else ReaperConfig.STRIPS[r]
         return strip[Math.floorMod((outcome?.stops?.get(r) ?: 0) + k, strip.size)]
     }
 
@@ -535,11 +586,20 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
             audio.play(Sfx.SLASH); audio.play(Sfx.THUNDER, 0.5f)
             lightningAt = t; makeBolt(); shakeUntil = t + 0.35
         }
+        if (antFrom >= 1 && !antSoundPlayed && t >= antStart) { antSoundPlayed = true; audio.play(Sfx.ANTICIPATE); audio.play(Sfx.HEARTBEAT, 0.8f) }
         for (r in 0 until REELS) {
             if (!landed[r] && t >= runEnd[r]) {
                 landed[r] = true
-                if (!isWildReel[r]) audio.play(Sfx.STOP, 0.75f)
-                performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                if (scatReel[r]) {
+                    var n = 0; for (q in 0..r) if (scatReel[q]) n++
+                    audio.play(Sfx.SCATTER_LAND, 0.95f, 0.85f + 0.14f * n); shakeUntil = t + 0.25
+                    performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                } else if (!isWildReel[r]) { audio.play(Sfx.STOP, 0.75f); performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP) }
+                if (isWildReel[r]) performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                if (!antResolved && r == REELS - 1) {
+                    antResolved = true
+                    audio.play(if (o.scatterCount >= 3) Sfx.ANTICIPATE_HIT else Sfx.ANTICIPATE_MISS)
+                }
             }
             if (!done[r] && t >= runEnd[r] + landTime) {
                 done[r] = true
@@ -556,8 +616,8 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         o.mini.type == ReaperConfig.MINI_PUMPKIN || o.mini.type == ReaperConfig.MINI_SKULL
 
     private fun miniVoice(type: Int): Sfx? = when (type) {
-        ReaperConfig.MINI_RAVEN -> Sfx.CAW; ReaperConfig.MINI_PUMPKIN -> Sfx.CACKLE
-        ReaperConfig.MINI_SKULL -> Sfx.CHATTER; ReaperConfig.MINI_REAPER -> Sfx.LAUGH; else -> null
+        ReaperConfig.MINI_RAVEN -> Sfx.RAVEN_FLOCK; ReaperConfig.MINI_DEMON -> Sfx.DEMON_ROAR
+        ReaperConfig.MINI_SKULL -> Sfx.SKULL_RATTLE; ReaperConfig.MINI_REAPER -> Sfx.REAPER_LAUGH; else -> null
     }
 
     private fun miniSymbol(type: Int) = when (type) {
@@ -1089,8 +1149,9 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
     private fun cellPhase(r: Int, row: Int) = ((r * 0.37 + row * 0.61) % 1.0)
 
     private fun charSound(sym: Int): Sfx? = when (sym) {
-        ReaperConfig.WILD -> Sfx.LAUGH; ReaperConfig.HOODED -> Sfx.GROWL; ReaperConfig.SKULL -> Sfx.CHATTER
-        ReaperConfig.RAVEN -> Sfx.CAW; ReaperConfig.PUMPKIN -> Sfx.CACKLE; ReaperConfig.GHOST -> Sfx.GIGGLE
+        ReaperConfig.WILD -> Sfx.REAPER_LAUGH; ReaperConfig.DOCTOR -> Sfx.DOCTOR_RASP; ReaperConfig.SKULL -> Sfx.SKULL_RATTLE
+        ReaperConfig.RAVEN -> Sfx.CAW; ReaperConfig.DEMON -> Sfx.DEMON_ROAR; ReaperConfig.WRAITH -> Sfx.WRAITH_WAIL
+        ReaperConfig.SCATTER -> Sfx.COFFIN_OPEN
         else -> null
     }
 

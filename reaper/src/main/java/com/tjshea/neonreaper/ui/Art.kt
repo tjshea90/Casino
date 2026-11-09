@@ -15,17 +15,26 @@ import com.tjshea.neonreaper.engine.ReaperConfig
 import kotlin.math.cos
 import kotlin.math.sin
 
-/** Neon palette. */
+/**
+ * "DREAD" palette (3.0): near-black iron and stone, bone, BLOOD red and a sickly toxic green accent (the "neon"). The arcade
+ * purple / cyan / orange of earlier versions are now ash violet, ghost teal and ember so nothing reads as a toy.
+ * The object keeps its old name because the whole UI refers to it.
+ */
 object Neon {
-    const val GREEN = 0xFF76FF03.toInt()
-    const val GREEN_DIM = 0xFF2E7D0A.toInt()
-    const val RED = 0xFFFF1744.toInt()
-    const val RED_DIM = 0xFF7F0019.toInt()
-    const val PURPLE = 0xFFD500F9.toInt()
-    const val CYAN = 0xFF00E5FF.toInt()
-    const val ORANGE = 0xFFFF9100.toInt()
-    const val BONE = 0xFFE8E4D8.toInt()
+    const val GREEN = 0xFF7CF52B.toInt()       // toxic green
+    const val GREEN_DIM = 0xFF2B5E12.toInt()
+    const val RED = 0xFFE0182F.toInt()         // blood
+    const val RED_DIM = 0xFF6E0F1B.toInt()
+    const val PURPLE = 0xFF8B5FBF.toInt()      // ash violet
+    const val CYAN = 0xFF5FB3C4.toInt()        // ghost teal
+    const val ORANGE = 0xFFD9812B.toInt()      // ember
+    const val BONE = 0xFFD9D2BE.toInt()
     const val BLACK = 0xFF050505.toInt()
+    const val IRON = 0xFF16181D.toInt()        // panel base
+    const val IRON_LIGHT = 0xFF3A3F49.toInt()  // bevel highlight
+    const val BRASS = 0xFFA8873A.toInt()       // tarnished brass trim
+    const val BRASS_DIM = 0xFF5C4A1E.toInt()
+    const val INK = 0xFF0B0C0F.toInt()         // deepest panel colour
 }
 
 /**
