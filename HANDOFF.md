@@ -38,8 +38,14 @@ online slots; the house must keep an edge no matter what and never lose money ov
 - [ ] 9. Soul Vault restyle (dark crypt, lit orbs)
 - [ ] 10. Integrate audio; QA; independent math audit; code review; perf budget; README/MATH; release v3.0.0 (`SHIP=1`)
 
+**Auto-resume (user request, 2026-11-09):** a server-side scheduled task wakes THIS session every 2 h (minute 17 UTC) so work continues by itself after a usage-limit interruption:
+  trigger id `trig_01YVygdMjcNc59gubRRuHrMA` (session `session_01UWi8ZvunJ24iKJFQy597FF`). It re-reads this block, resumes the first unchecked box and re-wakes dead sub-agents.
+  When ALL work is shipped, set the line `STATUS: COMPLETE` below and disable it (`update_trigger enabled=false`, or the user can pause it in their scheduled tasks list).
+  If this session is ever gone, a fresh session can cold-resume from this file; sub-agent worktrees are local to the container, so MERGE agent branches into the session branch and push as soon as they have something.
+  Autosave note: `.claude/worktrees/` is git-ignored (autosave once committed agent worktrees as gitlinks; fixed in ed7c4ac).
+
 **In flight (agents / worktrees)** — each works in `/home/user/Casino/.claude/worktrees/agent-<id>` on branch `worktree-agent-<id>` (see `git worktree list`); they never push, I merge their branches:
-  - AUDIO (id a769d05ea7bfc7344): owns `audio/**`, `docs/AUDIO.md`, `tools/audio_report.py`. On finish: merge, then wire the new Sfx/Track calls (see Audio.kt enum doc) into ReaperView/VaultView/MainActivity.
+  - AUDIO (id a769d05ea7bfc7344): owns `audio/**`, `docs/AUDIO.md`, `tools/audio_report.py`. WIP snapshot (~2.8k lines: Dsp, Signal, Reverb, Instruments, Macros, SfxRecipes*) already merged (b3979f5); Audio.kt itself NOT yet rewired to it. On finish: merge, then wire the new Sfx/Track calls (see Audio.kt enum doc) into ReaperView/VaultView/MainActivity.
   - CHARS-A (id ac1b26aad1b3e0b96): DoctorModel / DemonModel / SkullModel in `gl/chars/`.  CHARS-B (id ab4762f79a77a15e1): WraithModel / RavenModel / CoffinModel.
     Both add one line each to `Cast.create` (trivial merge conflict). Judge with `CAST=<id> gradle :reaper:testDebugUnitTest --tests '*CharSheetTest*'` -> `reaper/build/screens/cast_*.png`.
   If an agent died before finishing: its worktree may hold uncommitted work, inspect it, finish or merge what is good.
