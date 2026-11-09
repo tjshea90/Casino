@@ -63,8 +63,12 @@ class ScreensTest {
             override fun openWithdraw() {}
             override fun openInfo() {}
             override fun openStats() {}
-            override fun openAutoPicker(onPicked: (Int) -> Unit) {}
+            override fun openAutoPicker(onPicked: (AutoPlan) -> Unit) {}
             override fun openVault(result: VaultResult) {}
+            override fun openBuy(stake: Int, onChoice: (com.tjshea.neonreaper.data.Feature) -> Unit) {}
+            override fun openSettings() {}
+            override fun openRank() {}
+            override fun openReality(onContinue: () -> Unit, onStop: () -> Unit) {}
         }
         return ReaperView(ctx, host)
     }

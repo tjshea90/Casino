@@ -15,17 +15,26 @@ import com.tjshea.neonreaper.engine.ReaperConfig
 import kotlin.math.cos
 import kotlin.math.sin
 
-/** Neon palette. */
+/**
+ * "DREAD" palette (3.0): near-black iron and stone, bone, BLOOD red and a sickly toxic green accent (the "neon"). The arcade
+ * purple / cyan / orange of earlier versions are now ash violet, ghost teal and ember so nothing reads as a toy.
+ * The object keeps its old name because the whole UI refers to it.
+ */
 object Neon {
-    const val GREEN = 0xFF76FF03.toInt()
-    const val GREEN_DIM = 0xFF2E7D0A.toInt()
-    const val RED = 0xFFFF1744.toInt()
-    const val RED_DIM = 0xFF7F0019.toInt()
-    const val PURPLE = 0xFFD500F9.toInt()
-    const val CYAN = 0xFF00E5FF.toInt()
-    const val ORANGE = 0xFFFF9100.toInt()
-    const val BONE = 0xFFE8E4D8.toInt()
+    const val GREEN = 0xFF7CF52B.toInt()       // toxic green
+    const val GREEN_DIM = 0xFF2B5E12.toInt()
+    const val RED = 0xFFE0182F.toInt()         // blood
+    const val RED_DIM = 0xFF6E0F1B.toInt()
+    const val PURPLE = 0xFF8B5FBF.toInt()      // ash violet
+    const val CYAN = 0xFF5FB3C4.toInt()        // ghost teal
+    const val ORANGE = 0xFFD9812B.toInt()      // ember
+    const val BONE = 0xFFD9D2BE.toInt()
     const val BLACK = 0xFF050505.toInt()
+    const val IRON = 0xFF16181D.toInt()        // panel base
+    const val IRON_LIGHT = 0xFF3A3F49.toInt()  // bevel highlight
+    const val BRASS = 0xFFA8873A.toInt()       // tarnished brass trim
+    const val BRASS_DIM = 0xFF5C4A1E.toInt()
+    const val INK = 0xFF0B0C0F.toInt()         // deepest panel colour
 }
 
 /**
@@ -193,6 +202,7 @@ object Art {
             ReaperConfig.RAVEN -> raven(c, s)
             ReaperConfig.PUMPKIN -> lantern(c, s)
             ReaperConfig.GHOST -> tomb(c, s)
+            ReaperConfig.SCATTER -> coffin(c, s)
             else -> royal(c, s, sym)
         }
     }
@@ -309,6 +319,36 @@ object Art {
         c.drawRect(s * 0.05f, s * 0.84f, s * 0.95f, s * 0.97f, p); p.shader = null
         val mist = glowPaint(0x6676FF03, s * 0.06f)
         c.drawOval(s * 0.1f, s * 0.80f, s * 0.9f, s * 0.92f, mist)
+    }
+
+    /** The scatter: a dark wooden coffin with brass trim and a sickly green light leaking from under the lid. */
+    fun coffin(c: Canvas, s: Float) {
+        val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        val cx = s / 2; val top = s * 0.07f; val bot = s * 0.93f; val hw = s * 0.31f; val sh = top + (bot - top) * 0.27f
+        fun hex(i: Float) = Path().apply {
+            moveTo(cx - (hw * 0.62f - i), top + i); lineTo(cx + (hw * 0.62f - i), top + i)
+            lineTo(cx + (hw - i), sh); lineTo(cx + (hw * 0.66f - i), bot - i)
+            lineTo(cx - (hw * 0.66f - i), bot - i); lineTo(cx - (hw - i), sh); close()
+        }
+        p.shader = RadialGradient(cx, s * 0.5f, s * 0.56f, intArrayOf(0x9976FF03.toInt(), 0x00000000), null, Shader.TileMode.CLAMP)
+        c.drawCircle(cx, s * 0.5f, s * 0.56f, p); p.shader = null
+        val depth = Math.max(2, (s * 0.04f).toInt())
+        p.color = 0xFF120A06.toInt()
+        for (k in depth downTo 1) { c.save(); c.translate(k * 0.7f, k * 0.9f); c.drawPath(hex(0f), p); c.restore() }
+        val body = hex(0f)
+        p.shader = LinearGradient(cx - hw, 0f, cx + hw, 0f, intArrayOf(0xFF5B3523.toInt(), 0xFF3A2015.toInt(), 0xFF1B0E08.toInt()), floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP)
+        c.drawPath(body, p)
+        val lid = hex(s * 0.045f)
+        p.shader = LinearGradient(cx - hw, 0f, cx + hw, 0f, intArrayOf(0xFF4A2B1C.toInt(), 0xFF2A170E.toInt(), 0xFF140A05.toInt()), null, Shader.TileMode.CLAMP)
+        c.drawPath(lid, p); p.shader = null
+        p.style = Paint.Style.STROKE; p.strokeJoin = Paint.Join.ROUND; p.strokeCap = Paint.Cap.ROUND
+        p.strokeWidth = s * 0.018f; p.color = Neon.BRASS; c.drawPath(body, p)
+        p.strokeWidth = s * 0.008f; p.color = Neon.BRASS_DIM; c.drawPath(lid, p)
+        p.strokeWidth = s * 0.026f; p.color = Neon.BRASS
+        c.drawLine(cx, s * 0.22f, cx, s * 0.76f, p); c.drawLine(cx - s * 0.1f, s * 0.38f, cx + s * 0.1f, s * 0.38f, p)
+        // green light leaking through the cracked seam
+        p.strokeWidth = s * 0.01f; p.color = 0xFF9CFF57.toInt(); p.alpha = 200
+        c.drawLine(cx - hw * 0.5f, top + s * 0.02f, cx + hw * 0.5f, top + s * 0.02f, p)
     }
 
     private val ROYAL = mapOf(
