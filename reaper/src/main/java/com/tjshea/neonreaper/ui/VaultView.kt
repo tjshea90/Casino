@@ -495,13 +495,13 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         noise = makeNoise()
         glowBmp = mk(128, 128) { c ->
             val p = Paint(Paint.ANTI_ALIAS_FLAG)
-            p.shader = RadialGradient(64f, 64f, 64f, intArrayOf(0xFFFFFFFF.toInt(), 0x6EFFFFFF, 0x1CFFFFFF, 0x00FFFFFF), floatArrayOf(0f, 0.3f, 0.65f, 1f), Shader.TileMode.CLAMP)
+            p.alpha = 255; p.shader = RadialGradient(64f, 64f, 64f, intArrayOf(0xFFFFFFFF.toInt(), 0x6EFFFFFF, 0x1CFFFFFF, 0x00FFFFFF), floatArrayOf(0f, 0.3f, 0.65f, 1f), Shader.TileMode.CLAMP)
             c.drawCircle(64f, 64f, 64f, p)
         }
         fogBmp = mk(256, 128) { c ->
             val p = Paint(Paint.ANTI_ALIAS_FLAG)
             c.save(); c.scale(1f, 0.5f)
-            p.shader = RadialGradient(128f, 128f, 128f, intArrayOf(0x88FFFFFF.toInt(), 0x40FFFFFF, 0x00FFFFFF), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
+            p.alpha = 255; p.shader = RadialGradient(128f, 128f, 128f, intArrayOf(0x88FFFFFF.toInt(), 0x40FFFFFF, 0x00FFFFFF), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
             c.drawCircle(128f, 128f, 128f, p); c.restore()
         }
         flameBmp = Array(6) { flameFrame(it) }
@@ -529,7 +529,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         crescent = crescentSprite((70 * u).toInt().coerceAtLeast(24))
         mistBmp = mk(max(8, cellW.toInt()), max(8, cellH.toInt())) { c ->
             val p = Paint(Paint.ANTI_ALIAS_FLAG)
-            p.shader = LinearGradient(0f, 0f, 0f, cellH, intArrayOf(0x00000000, 0x3076FF03, 0x00000000), null, Shader.TileMode.CLAMP)
+            p.alpha = 255; p.shader = LinearGradient(0f, 0f, 0f, cellH, intArrayOf(0x00000000, 0x3076FF03, 0x00000000), null, Shader.TileMode.CLAMP)
             c.drawRect(0f, 0f, cellW, cellH, p)
         }
         bakePlates()
@@ -581,13 +581,13 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
         p.color = 0xFF040506.toInt(); c.drawRect(0f, 0f, W, H, p)
         masonry(c, 0f, 0f, W, H, 5, 20)
-        p.shader = BitmapShader(noise, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT); p.alpha = 110
+        p.alpha = 255; p.shader = BitmapShader(noise, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT); p.alpha = 110
         c.drawRect(0f, 0f, W, H, p); p.shader = null; p.alpha = 255
         // damp streaks running down the walls
         val r = Random(21)
         for (k in 0 until 14) {
             val x = r.nextFloat() * W; val sw = (10f + r.nextFloat() * 34f) * u; val sh = (140f + r.nextFloat() * 380f) * u
-            p.shader = LinearGradient(0f, 0f, 0f, sh, 0x66000000, 0x00000000, Shader.TileMode.CLAMP)
+            p.alpha = 255; p.shader = LinearGradient(0f, 0f, 0f, sh, 0x66000000, 0x00000000, Shader.TileMode.CLAMP)
             c.save(); c.translate(x, 0f); c.drawRect(0f, 0f, sw, sh, p); c.restore()
         }
         p.shader = null
@@ -597,13 +597,13 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         val yApex = if (portrait) ry(-10f) else ry(-6f)
         val yBottom = if (portrait) ry(1000f) else ry(700f)
         val arch = Path(); archPath(arch, ax0, ax1, yBottom, ySpring, yApex)
-        p.shader = LinearGradient(0f, yApex, 0f, yBottom, intArrayOf(0xFF0A1311.toInt(), 0xFF060A09.toInt(), 0xFF030404.toInt()), null, Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = LinearGradient(0f, yApex, 0f, yBottom, intArrayOf(0xFF0A1311.toInt(), 0xFF060A09.toInt(), 0xFF030404.toInt()), null, Shader.TileMode.CLAMP)
         c.drawPath(arch, p); p.shader = null
         c.save(); c.clipPath(arch)
         // sickly haze behind the figure + violet wash high up
-        p.shader = RadialGradient(hoodX, hoodY - figK * 0.2f, figK * 4.4f, intArrayOf(0x5A2F7A62, 0x28234F4A, 0x00000000), floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = RadialGradient(hoodX, hoodY - figK * 0.2f, figK * 4.4f, intArrayOf(0x5A2F7A62, 0x28234F4A, 0x00000000), floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP)
         c.drawRect(ax0, yApex, ax1, yBottom, p)
-        p.shader = RadialGradient(hoodX, hoodY - figK * 1.2f, figK * 4.0f, intArrayOf(0x44503A7E, 0x00000000), null, Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = RadialGradient(hoodX, hoodY - figK * 1.2f, figK * 4.0f, intArrayOf(0x44503A7E, 0x00000000), null, Shader.TileMode.CLAMP)
         c.drawRect(ax0, yApex, ax1, yBottom, p); p.shader = null
         // faint masonry inside the recess
         p.color = 0x22000000; c.drawRect(ax0, yApex, ax1, yBottom, p)
@@ -631,7 +631,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         doorLeaf(c, 0f, true); doorLeaf(c, W, false)
         // ---- floor: dark flagstones fading in under the altar
         val fy = if (portrait) ry(996f) else ry(690f)
-        p.shader = LinearGradient(0f, fy - 30f * u, 0f, H, intArrayOf(0x00000000, 0xFF0B0D0C.toInt(), 0xFF030404.toInt()), floatArrayOf(0f, 0.25f, 1f), Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = LinearGradient(0f, fy - 30f * u, 0f, H, intArrayOf(0x00000000, 0xFF0B0D0C.toInt(), 0xFF030404.toInt()), floatArrayOf(0f, 0.25f, 1f), Shader.TileMode.CLAMP)
         c.drawRect(0f, fy - 30f * u, W, H, p); p.shader = null
         p.style = Paint.Style.STROKE; p.strokeWidth = 1.4f * u; p.color = 0x55000000
         var yy = fy
@@ -644,24 +644,24 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         for (i in 0 until fireN) if (fireS[i] > 0.9f * u) brazier(c, fireX[i], fireY[i], fireS[i]) else candelabra(c, fireX[i], fireY[i], fireS[i])
         // static warm light pools around the fires
         for (i in 0 until fireN) {
-            p.shader = RadialGradient(fireX[i], fireY[i] - 30f * u, 300f * u * (fireS[i] / u).coerceAtLeast(0.7f), intArrayOf(0x40FF8A30, 0x18C05A1A, 0x00000000), floatArrayOf(0f, 0.45f, 1f), Shader.TileMode.CLAMP)
+            p.alpha = 255; p.shader = RadialGradient(fireX[i], fireY[i] - 30f * u, 300f * u * (fireS[i] / u).coerceAtLeast(0.7f), intArrayOf(0x40FF8A30, 0x18C05A1A, 0x00000000), floatArrayOf(0f, 0.45f, 1f), Shader.TileMode.CLAMP)
             c.drawRect(0f, 0f, W, H, p)
         }
         p.shader = null
         // vignette (everything dynamic is drawn on top of this, so the edges stay dark and the centre readable)
-        p.shader = RadialGradient(W / 2f, H * 0.46f, max(W, H) * 0.72f, intArrayOf(0x00000000, 0x30000000, 0xE0000000.toInt()), floatArrayOf(0.35f, 0.7f, 1f), Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = RadialGradient(W / 2f, H * 0.46f, max(W, H) * 0.72f, intArrayOf(0x00000000, 0x30000000, 0xE0000000.toInt()), floatArrayOf(0.35f, 0.7f, 1f), Shader.TileMode.CLAMP)
         c.drawRect(0f, 0f, W, H, p); p.shader = null
     }
 
     private fun pillar(c: Canvas, r: RectF) {
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
-        p.shader = LinearGradient(r.left, 0f, r.right, 0f, intArrayOf(0xFF0A0C0B.toInt(), 0xFF3B413C.toInt(), 0xFF202421.toInt(), 0xFF080A09.toInt()), floatArrayOf(0f, 0.3f, 0.62f, 1f), Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = LinearGradient(r.left, 0f, r.right, 0f, intArrayOf(0xFF0A0C0B.toInt(), 0xFF3B413C.toInt(), 0xFF202421.toInt(), 0xFF080A09.toInt()), floatArrayOf(0f, 0.3f, 0.62f, 1f), Shader.TileMode.CLAMP)
         c.drawRect(r, p); p.shader = null
         p.color = 0x33000000
         for (k in 1..2) c.drawRect(r.left + r.width() * k / 3f - 1f * u, r.top, r.left + r.width() * k / 3f + 1f * u, r.bottom, p)
         // capital: brass band + stone block
         val cap = 16f * u
-        p.shader = LinearGradient(0f, r.top, 0f, r.top + cap, intArrayOf(Neon.BRASS, Neon.BRASS_DIM, 0xFF2A1F08.toInt()), null, Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = LinearGradient(0f, r.top, 0f, r.top + cap, intArrayOf(Neon.BRASS, Neon.BRASS_DIM, 0xFF2A1F08.toInt()), null, Shader.TileMode.CLAMP)
         c.drawRect(r.left - 5f * u, r.top, r.right + 5f * u, r.top + cap, p); p.shader = null
         p.color = 0xFF1B1E1C.toInt(); c.drawRect(r.left - 3f * u, r.top - 12f * u, r.right + 3f * u, r.top, p)
         // iron straps with rivets
@@ -692,7 +692,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             x += pw
         }
         // inner shadow toward the crypt
-        p.shader = LinearGradient(if (left) x0 + w else x0, 0f, if (left) x0 + w + 40f * u else x0 - 40f * u, 0f, 0xAA000000.toInt(), 0x00000000, Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = LinearGradient(if (left) x0 + w else x0, 0f, if (left) x0 + w + 40f * u else x0 - 40f * u, 0f, 0xAA000000.toInt(), 0x00000000, Shader.TileMode.CLAMP)
         c.drawRect(if (left) x0 + w else x0 - 40f * u, 0f, if (left) x0 + w + 40f * u else x0, vh, p); p.shader = null
         // strap hinges
         val reach = (if (portrait) 70f else 120f) * u
@@ -705,7 +705,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             if (left) { path.moveTo(sx0, y - 11f * u); path.lineTo(sx1 - 16f * u, y - 7f * u); path.lineTo(tipX + 6f * u, y); path.lineTo(sx1 - 16f * u, y + 7f * u); path.lineTo(sx0, y + 11f * u) }
             else { path.moveTo(sx1, y - 11f * u); path.lineTo(sx0 + 16f * u, y - 7f * u); path.lineTo(tipX - 6f * u, y); path.lineTo(sx0 + 16f * u, y + 7f * u); path.lineTo(sx1, y + 11f * u) }
             path.close()
-            p.shader = LinearGradient(0f, y - 11f * u, 0f, y + 11f * u, intArrayOf(0xFF3A3E46.toInt(), 0xFF111318.toInt(), 0xFF07080A.toInt()), null, Shader.TileMode.CLAMP)
+            p.alpha = 255; p.shader = LinearGradient(0f, y - 11f * u, 0f, y + 11f * u, intArrayOf(0xFF3A3E46.toInt(), 0xFF111318.toInt(), 0xFF07080A.toInt()), null, Shader.TileMode.CLAMP)
             c.drawPath(path, p); p.shader = null
             p.color = 0xFF8A8E96.toInt()
             for (k in 0 until 4) { val rxp = if (left) sx0 + (12f + k * 24f) * u else sx1 - (12f + k * 24f) * u; c.drawCircle(rxp, y, 2.4f * u, p) }
@@ -723,10 +723,10 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         path.reset(); path.moveTo(cx - 60f * s, y - 36f * s); path.lineTo(cx + 60f * s, y - 36f * s)
         path.cubicTo(cx + 56f * s, y - 2f * s, cx + 24f * s, y + 12f * s, cx, y + 12f * s)
         path.cubicTo(cx - 24f * s, y + 12f * s, cx - 56f * s, y - 2f * s, cx - 60f * s, y - 36f * s); path.close()
-        p.shader = LinearGradient(cx - 60f * s, 0f, cx + 60f * s, 0f, intArrayOf(0xFF0A0B0E.toInt(), 0xFF4A4E57.toInt(), 0xFF101216.toInt()), null, Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = LinearGradient(cx - 60f * s, 0f, cx + 60f * s, 0f, intArrayOf(0xFF0A0B0E.toInt(), 0xFF4A4E57.toInt(), 0xFF101216.toInt()), null, Shader.TileMode.CLAMP)
         c.drawPath(path, p); p.shader = null
         p.color = 0xFF9A7A34.toInt(); c.drawRoundRect(cx - 64f * s, y - 42f * s, cx + 64f * s, y - 33f * s, 4f * s, 4f * s, p)
-        p.shader = RadialGradient(cx, y - 38f * s, 56f * s, intArrayOf(0xFFFFB050.toInt(), 0xFFC0381A.toInt(), 0xFF3A0A06.toInt()), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = RadialGradient(cx, y - 38f * s, 56f * s, intArrayOf(0xFFFFB050.toInt(), 0xFFC0381A.toInt(), 0xFF3A0A06.toInt()), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
         c.drawOval(cx - 52f * s, y - 46f * s, cx + 52f * s, y - 30f * s, p); p.shader = null
     }
 
@@ -762,9 +762,9 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             p.color = 0xAA000000.toInt(); p.maskFilter = BlurMaskFilter(14f * u, BlurMaskFilter.Blur.NORMAL)
             c.save(); c.translate(0f, 10f * u); c.drawPath(body, p); c.restore(); p.maskFilter = null
             // stone body
-            p.shader = LinearGradient(0f, 0f, 0f, h, intArrayOf(0xFF454B45.toInt(), 0xFF2B302C.toInt(), 0xFF181B19.toInt()), floatArrayOf(0f, 0.35f, 1f), Shader.TileMode.CLAMP)
+            p.alpha = 255; p.shader = LinearGradient(0f, 0f, 0f, h, intArrayOf(0xFF454B45.toInt(), 0xFF2B302C.toInt(), 0xFF181B19.toInt()), floatArrayOf(0f, 0.35f, 1f), Shader.TileMode.CLAMP)
             c.drawPath(body, p)
-            p.shader = BitmapShader(noise, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT); p.alpha = 150; c.drawPath(body, p); p.shader = null; p.alpha = 255
+            p.alpha = 255; p.shader = BitmapShader(noise, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT); p.alpha = 150; c.drawPath(body, p); p.shader = null; p.alpha = 255
             // bevel
             p.style = Paint.Style.STROKE; p.strokeJoin = Paint.Join.MITER
             p.strokeWidth = 3f * u; p.color = 0x55FFFFF0; c.save(); c.translate(1.5f * u, 1.5f * u); c.clipPath(body); c.drawPath(body, p); c.restore()
@@ -788,7 +788,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             val gx = gridRect.left - a.left; val gy = gridRect.top - a.top
             tmp.set(gx - 8f * u, gy - 8f * u, gx + gridRect.width() + 8f * u, gy + gridRect.height() + 8f * u)
             p.color = 0xFF020303.toInt(); c.drawRoundRect(tmp, 6f * u, 6f * u, p)
-            p.style = Paint.Style.STROKE; p.strokeWidth = 2.6f * u; p.shader = LinearGradient(tmp.left, tmp.top, tmp.right, tmp.bottom, intArrayOf(0xFFD2B060.toInt(), Neon.BRASS, Neon.BRASS_DIM, 0xFF2E230C.toInt()), floatArrayOf(0f, 0.3f, 0.7f, 1f), Shader.TileMode.CLAMP)
+            p.style = Paint.Style.STROKE; p.strokeWidth = 2.6f * u; p.alpha = 255; p.shader = LinearGradient(tmp.left, tmp.top, tmp.right, tmp.bottom, intArrayOf(0xFFD2B060.toInt(), Neon.BRASS, Neon.BRASS_DIM, 0xFF2E230C.toInt()), floatArrayOf(0f, 0.3f, 0.7f, 1f), Shader.TileMode.CLAMP)
             c.drawRoundRect(tmp, 6f * u, 6f * u, p); p.shader = null; p.style = Paint.Style.FILL
             // niches
             val nr = Path()
@@ -797,9 +797,9 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
                 val l = cx0 + 4f * u; val t = cy0 + 4f * u; val r = cx0 + cellW - 4f * u; val b = cy0 + cellH - 4f * u
                 val arch = (r - l) * 0.30f
                 nr.reset(); nr.addRoundRect(RectF(l, t, r, b), floatArrayOf(arch, arch, arch, arch, 4f * u, 4f * u, 4f * u, 4f * u), Path.Direction.CW)
-                p.shader = RadialGradient((l + r) / 2f, (t + b) / 2f + (b - t) * 0.1f, (r - l) * 0.85f, intArrayOf(0xFF18271E.toInt(), 0xFF080D0A.toInt(), 0xFF020303.toInt()), floatArrayOf(0f, 0.6f, 1f), Shader.TileMode.CLAMP)
+                p.alpha = 255; p.shader = RadialGradient((l + r) / 2f, (t + b) / 2f + (b - t) * 0.1f, (r - l) * 0.85f, intArrayOf(0xFF18271E.toInt(), 0xFF080D0A.toInt(), 0xFF020303.toInt()), floatArrayOf(0f, 0.6f, 1f), Shader.TileMode.CLAMP)
                 c.drawPath(nr, p)
-                p.shader = LinearGradient(0f, t, 0f, t + (b - t) * 0.45f, 0xCC000000.toInt(), 0x00000000, Shader.TileMode.CLAMP)
+                p.alpha = 255; p.shader = LinearGradient(0f, t, 0f, t + (b - t) * 0.45f, 0xCC000000.toInt(), 0x00000000, Shader.TileMode.CLAMP)
                 c.save(); c.clipPath(nr); c.drawRect(l, t, r, t + (b - t) * 0.45f, p); c.restore(); p.shader = null
                 // chiselled rim: dark outside edge, light lip along the sill
                 p.style = Paint.Style.STROKE; p.strokeWidth = 2.4f * u; p.color = 0xFF000000.toInt(); c.drawPath(nr, p)
@@ -815,7 +815,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
                 path.reset()
                 path.moveTo(cxp + sx * 2f * u, cyp + sy * 2f * u); path.lineTo(cxp + sx * 46f * u, cyp + sy * 2f * u); path.lineTo(cxp + sx * 40f * u, cyp + sy * 11f * u)
                 path.lineTo(cxp + sx * 11f * u, cyp + sy * 11f * u); path.lineTo(cxp + sx * 11f * u, cyp + sy * 40f * u); path.lineTo(cxp + sx * 2f * u, cyp + sy * 46f * u); path.close()
-                p.shader = LinearGradient(cxp, cyp, cxp + sx * 46f * u, cyp + sy * 46f * u, intArrayOf(0xFFD7B866.toInt(), Neon.BRASS, Neon.BRASS_DIM), null, Shader.TileMode.CLAMP)
+                p.alpha = 255; p.shader = LinearGradient(cxp, cyp, cxp + sx * 46f * u, cyp + sy * 46f * u, intArrayOf(0xFFD7B866.toInt(), Neon.BRASS, Neon.BRASS_DIM), null, Shader.TileMode.CLAMP)
                 c.drawPath(path, p); p.shader = null
                 p.style = Paint.Style.STROKE; p.strokeWidth = 1.2f * u; p.color = 0xCC000000.toInt(); c.drawPath(path, p); p.style = Paint.Style.FILL
                 rivet(c, cxp + sx * 26f * u, cyp + sy * 6.6f * u, 2.3f * u); rivet(c, cxp + sx * 6.6f * u, cyp + sy * 26f * u, 2.3f * u)
@@ -831,7 +831,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             for (f in floatArrayOf(0.30f, 0.70f)) {
                 val x = cx0 + cellW * f - bw / 2
                 val t = cy0 + 5f * u; val b = cy0 + cellH - 5f * u
-                p.shader = LinearGradient(x, 0f, x + bw, 0f, intArrayOf(0xFF07080A.toInt(), 0xFF6A6F79.toInt(), 0xFF111318.toInt()), floatArrayOf(0f, 0.35f, 1f), Shader.TileMode.CLAMP)
+                p.alpha = 255; p.shader = LinearGradient(x, 0f, x + bw, 0f, intArrayOf(0xFF07080A.toInt(), 0xFF6A6F79.toInt(), 0xFF111318.toInt()), floatArrayOf(0f, 0.35f, 1f), Shader.TileMode.CLAMP)
                 p.alpha = 190
                 c.drawRect(x, t, x + bw, b, p)
                 p.shader = null; p.alpha = 255
@@ -844,7 +844,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
     private fun rivet(c: Canvas, x: Float, y: Float, r: Float) {
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
         p.color = 0xCC000000.toInt(); c.drawCircle(x + r * 0.2f, y + r * 0.3f, r * 1.1f, p)
-        p.shader = RadialGradient(x - r * 0.35f, y - r * 0.4f, r * 1.4f, intArrayOf(0xFFFFE9A8.toInt(), Neon.BRASS, Neon.BRASS_DIM), floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = RadialGradient(x - r * 0.35f, y - r * 0.4f, r * 1.4f, intArrayOf(0xFFFFE9A8.toInt(), Neon.BRASS, Neon.BRASS_DIM), floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP)
         c.drawCircle(x, y, r, p)
     }
 
@@ -872,7 +872,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         path.reset(); path.moveTo(cx, cy + s * 0.04f); path.lineTo(cx - s * 0.045f, cy + s * 0.15f); path.lineTo(cx + s * 0.045f, cy + s * 0.15f); path.close(); c.drawPath(path, p)
         if (Color.alpha(eye) > 0) {
             for (sx in floatArrayOf(-1f, 1f)) {
-                p.shader = RadialGradient(cx + sx * s * 0.15f, cy - s * 0.03f, s * 0.09f, intArrayOf(eye, withA(eye, 0)), null, Shader.TileMode.CLAMP)
+                p.alpha = 255; p.shader = RadialGradient(cx + sx * s * 0.15f, cy - s * 0.03f, s * 0.09f, intArrayOf(eye, withA(eye, 0)), null, Shader.TileMode.CLAMP)
                 c.drawCircle(cx + sx * s * 0.15f, cy - s * 0.03f, s * 0.09f, p); p.shader = null
             }
         }
@@ -890,7 +890,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             t.moveTo(x, h * 0.98f)
             t.cubicTo(x - wid, h * 0.80f, x - wid * 0.55f + lean * 0.3f, h * (0.98f - ht) + ht * h * 0.42f, x + lean, h * (0.98f - ht))
             t.cubicTo(x + wid * 0.55f + lean * 0.3f, h * (0.98f - ht) + ht * h * 0.42f, x + wid, h * 0.80f, x, h * 0.98f); t.close()
-            p.shader = shader; c.drawPath(t, p)
+            p.alpha = 255; p.shader = shader; c.drawPath(t, p)
         }
         val ph = i * 1.9f
         val outer = LinearGradient(0f, h, 0f, 0f, intArrayOf(0xFFFFB347.toInt(), 0xFFFF5A12.toInt(), 0x00A01005), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
@@ -913,7 +913,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             t.moveTo(x - wid * 0.95f, h * 0.99f)
             t.cubicTo(x - wid * 1.05f, h * (0.99f - ht * 0.45f), x - wid * 0.4f + lean * 0.3f, h * (0.99f - ht * 0.8f), x + lean, h * (0.99f - ht))
             t.cubicTo(x + wid * 0.4f + lean * 0.3f, h * (0.99f - ht * 0.8f), x + wid * 1.05f, h * (0.99f - ht * 0.45f), x + wid * 0.95f, h * 0.99f); t.close()
-            p.shader = shader; c.drawPath(t, p)
+            p.alpha = 255; p.shader = shader; c.drawPath(t, p)
         }
         val outer = LinearGradient(0f, h, 0f, 0f, intArrayOf(0xFFFFB347.toInt(), 0xFFFF5A12.toInt(), 0x00A01005), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
         p.maskFilter = BlurMaskFilter(3f, BlurMaskFilter.Blur.NORMAL)
@@ -921,7 +921,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         p.maskFilter = null
         val core = LinearGradient(0f, h, 0f, h * 0.35f, intArrayOf(0xFFFFF4C0.toInt(), 0xFFFFC060.toInt(), 0x00FF9A3C), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
         for (k in 0 until 4) tongue(w * (0.18f + 0.64f * k / 3f), w * 0.06f, 0.25f + 0.3f * r.nextFloat(), (r.nextFloat() - 0.5f) * 10f, core)
-        p.shader = LinearGradient(0f, h, 0f, h * 0.6f, 0x00FFFFFF, 0xFFFFFFFF.toInt(), Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = LinearGradient(0f, h, 0f, h * 0.6f, 0x00FFFFFF, 0xFFFFFFFF.toInt(), Shader.TileMode.CLAMP)
         p.xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
         c.drawRect(0f, 0f, w, h, p)
         p.xfermode = null; p.shader = null
@@ -932,7 +932,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         val lw = w.toFloat(); val ll = lw * 1.9f
         var y = 0f; var k = 0
         while (y < len) {
-            p.shader = LinearGradient(0f, y, lw, y, intArrayOf(0xFF1A1C21.toInt(), 0xFF7A7F88.toInt(), 0xFF14161A.toInt()), null, Shader.TileMode.CLAMP)
+            p.alpha = 255; p.shader = LinearGradient(0f, y, lw, y, intArrayOf(0xFF1A1C21.toInt(), 0xFF7A7F88.toInt(), 0xFF14161A.toInt()), null, Shader.TileMode.CLAMP)
             p.strokeWidth = lw * 0.17f
             if (k % 2 == 0) c.drawRoundRect(lw * 0.18f, y + lw * 0.1f, lw * 0.82f, y + ll, lw * 0.3f, lw * 0.3f, p)
             else { p.strokeWidth = lw * 0.22f; c.drawLine(lw * 0.5f, y + lw * 0.2f, lw * 0.5f, y + ll * 0.95f, p) }
@@ -947,18 +947,18 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         val deep = when (tier) { 0 -> 0xFF1F3A12.toInt(); 1 -> SOUL_DEEP; else -> 0xFF1C5A0A.toInt() }
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
         // aura
-        p.shader = RadialGradient(cx, cy, r * 2.1f, intArrayOf(withA(tint, 120), withA(tint, 40), 0x00000000), floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = RadialGradient(cx, cy, r * 2.1f, intArrayOf(withA(tint, 120), withA(tint, 40), 0x00000000), floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP)
         c.drawCircle(cx, cy, r * 2.1f, p); p.shader = null
         // wisp tail
         val tail = Path()
         tail.moveTo(cx - r * 0.62f, cy - r * 0.45f)
         tail.cubicTo(cx - r * 0.55f, cy - r * 1.05f, cx + r * 0.05f, cy - r * 1.05f, cx + r * 0.30f, cy - r * 1.78f)
         tail.cubicTo(cx + r * 0.55f, cy - r * 1.05f, cx + r * 0.72f, cy - r * 0.8f, cx + r * 0.62f, cy - r * 0.45f); tail.close()
-        p.shader = LinearGradient(0f, cy - r * 0.4f, 0f, cy - r * 1.8f, intArrayOf(withA(tint, 230), withA(tint, 100), withA(tint, 0)), floatArrayOf(0f, 0.6f, 1f), Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = LinearGradient(0f, cy - r * 0.4f, 0f, cy - r * 1.8f, intArrayOf(withA(tint, 230), withA(tint, 100), withA(tint, 0)), floatArrayOf(0f, 0.6f, 1f), Shader.TileMode.CLAMP)
         p.maskFilter = BlurMaskFilter(r * 0.06f, BlurMaskFilter.Blur.NORMAL)
         c.drawPath(tail, p); p.maskFilter = null; p.shader = null
         // body
-        p.shader = RadialGradient(cx - r * 0.32f, cy - r * 0.36f, r * 1.35f, intArrayOf(SOUL_HOT, tint, deep), floatArrayOf(0f, 0.42f, 1f), Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = RadialGradient(cx - r * 0.32f, cy - r * 0.36f, r * 1.35f, intArrayOf(SOUL_HOT, tint, deep), floatArrayOf(0f, 0.42f, 1f), Shader.TileMode.CLAMP)
         c.drawCircle(cx, cy, r, p); p.shader = null
         p.style = Paint.Style.STROKE; p.strokeWidth = r * 0.07f; p.color = withA(deep, 200); c.drawCircle(cx, cy, r * 0.97f, p)
         if (tier == 2) { p.strokeWidth = r * 0.09f; p.color = withA(GOLD, 230); c.drawCircle(cx, cy, r * 1.02f, p) }
@@ -967,7 +967,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         p.strokeWidth = r * 0.05f; p.color = 0x66FFFFFF
         for (k in 0..2) c.drawArc(cx - r * 0.7f, cy - r * 0.7f, cx + r * 0.7f, cy + r * 0.7f, 20f + k * 120f, 62f, false, p)
         p.style = Paint.Style.FILL
-        p.shader = RadialGradient(cx - r * 0.36f, cy - r * 0.46f, r * 0.42f, intArrayOf(0xB0FFFFFF.toInt(), 0x00FFFFFF), null, Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = RadialGradient(cx - r * 0.36f, cy - r * 0.46f, r * 0.42f, intArrayOf(0xB0FFFFFF.toInt(), 0x00FFFFFF), null, Shader.TileMode.CLAMP)
         c.drawOval(cx - r * 0.7f, cy - r * 0.84f, cx + r * 0.0f, cy - r * 0.16f, p); p.shader = null
     }
 
@@ -985,7 +985,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
                 p.color = if (k % 2 == 0) GOLD else 0xFFB8862A.toInt(); c.drawPath(path, p)
             }
         }
-        p.shader = SweepGradient(cx, cy, intArrayOf(metalL, metalD, metalL, metalD, metalL), floatArrayOf(0f, 0.25f, 0.5f, 0.75f, 1f))
+        p.alpha = 255; p.shader = SweepGradient(cx, cy, intArrayOf(metalL, metalD, metalL, metalD, metalL), floatArrayOf(0f, 0.25f, 0.5f, 0.75f, 1f))
         c.drawCircle(cx, cy, R, p); p.shader = null
         p.style = Paint.Style.STROKE; p.strokeWidth = s * 0.018f; p.color = 0xDD000000.toInt(); c.drawCircle(cx, cy, R * 0.86f, p); c.drawCircle(cx, cy, R, p)
         p.style = Paint.Style.FILL
@@ -996,7 +996,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             p.color = metalL; c.drawCircle(sx, sy, s * 0.014f, p)
         }
         val gr = R * 0.78f
-        p.shader = RadialGradient(cx - gr * 0.3f, cy - gr * 0.38f, gr * 1.6f, intArrayOf(hot, gem, deep), floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = RadialGradient(cx - gr * 0.3f, cy - gr * 0.38f, gr * 1.6f, intArrayOf(hot, gem, deep), floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP)
         c.drawCircle(cx, cy, gr, p); p.shader = null
         c.save()
         val clip = Path(); clip.addCircle(cx, cy, gr, Path.Direction.CW); c.clipPath(clip)
@@ -1010,16 +1010,16 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         p.style = Paint.Style.FILL
         c.restore()
         skullGlyph(c, cx, cy + gr * 0.02f, gr * 1.28f, withA(shade(deep, 0.45f), 235), withA(hot, 150), withA(hot, 255))
-        p.shader = RadialGradient(cx - gr * 0.38f, cy - gr * 0.5f, gr * 0.55f, intArrayOf(0x77FFFFFF, 0x00FFFFFF), null, Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = RadialGradient(cx - gr * 0.38f, cy - gr * 0.5f, gr * 0.55f, intArrayOf(0x77FFFFFF, 0x00FFFFFF), null, Shader.TileMode.CLAMP)
         c.drawOval(cx - gr * 0.8f, cy - gr * 0.95f, cx + gr * 0.1f, cy - gr * 0.1f, p); p.shader = null
     }
 
     private fun reaperOrbSprite(S: Int): Bitmap = mk(S, S) { c ->
         val s = S.toFloat(); val cx = s / 2f; val cy = s / 2f; val r = s * 0.40f
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
-        p.shader = RadialGradient(cx, cy, r * 1.7f, intArrayOf(0xAAE0182F.toInt(), 0x33E0182F, 0x00000000), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = RadialGradient(cx, cy, r * 1.7f, intArrayOf(0xAAE0182F.toInt(), 0x33E0182F, 0x00000000), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
         c.drawCircle(cx, cy, r * 1.7f, p)
-        p.shader = RadialGradient(cx, cy - r * 0.2f, r * 1.2f, intArrayOf(0xFF2A0A12.toInt(), 0xFF0A0306.toInt(), 0xFF000000.toInt()), floatArrayOf(0f, 0.6f, 1f), Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = RadialGradient(cx, cy - r * 0.2f, r * 1.2f, intArrayOf(0xFF2A0A12.toInt(), 0xFF0A0306.toInt(), 0xFF000000.toInt()), floatArrayOf(0f, 0.6f, 1f), Shader.TileMode.CLAMP)
         c.drawCircle(cx, cy, r, p); p.shader = null
         p.style = Paint.Style.STROKE; p.strokeWidth = r * 0.07f; p.color = Neon.RED; c.drawCircle(cx, cy, r, p)
         p.strokeWidth = r * 0.03f; p.color = withA(BLOOD_HOT, 160); c.drawCircle(cx, cy, r * 0.9f, p)
@@ -1045,7 +1045,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         val s = S.toFloat()
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
         if (lit) {
-            p.shader = RadialGradient(s / 2, s / 2, s * 0.5f, intArrayOf(0x66E0182F, 0x00000000), null, Shader.TileMode.CLAMP)
+            p.alpha = 255; p.shader = RadialGradient(s / 2, s / 2, s * 0.5f, intArrayOf(0x66E0182F, 0x00000000), null, Shader.TileMode.CLAMP)
             c.drawCircle(s / 2, s / 2, s * 0.5f, p); p.shader = null
         }
         skullGlyph(c, s / 2f, s * 0.52f, s * 0.82f, if (lit) 0xFFD9D2BE.toInt() else 0xFF2B2B2E.toInt(), if (lit) 0x88FFFFF0.toInt() else 0x22FFFFFF, if (lit) Neon.RED else 0x00000000)
@@ -1055,7 +1055,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         val s = D.toFloat(); val cx = s / 2; val cy = s / 2; val R = s * 0.44f
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
         p.color = 0xCC000000.toInt(); p.maskFilter = BlurMaskFilter(s * 0.03f, BlurMaskFilter.Blur.NORMAL); c.drawCircle(cx, cy + s * 0.025f, R, p); p.maskFilter = null
-        p.shader = SweepGradient(cx, cy, intArrayOf(0xFF9A9FA8.toInt(), 0xFF1C1F25.toInt(), 0xFF7A7F88.toInt(), 0xFF14161B.toInt(), 0xFF9A9FA8.toInt()), floatArrayOf(0f, 0.28f, 0.5f, 0.78f, 1f))
+        p.alpha = 255; p.shader = SweepGradient(cx, cy, intArrayOf(0xFF9A9FA8.toInt(), 0xFF1C1F25.toInt(), 0xFF7A7F88.toInt(), 0xFF14161B.toInt(), 0xFF9A9FA8.toInt()), floatArrayOf(0f, 0.28f, 0.5f, 0.78f, 1f))
         c.drawCircle(cx, cy, R, p); p.shader = null
         p.style = Paint.Style.STROKE; p.strokeWidth = R * 0.04f; p.color = 0xEE000000.toInt(); c.drawCircle(cx, cy, R, p); c.drawCircle(cx, cy, R * 0.86f, p)
         p.style = Paint.Style.FILL
@@ -1066,12 +1066,12 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         }
         val dr = R * 0.78f
         val dome = if (ready) intArrayOf(0xFFFF8F73.toInt(), Neon.RED, 0xFF5A0A14.toInt(), 0xFF22040A.toInt()) else intArrayOf(0xFF565A63.toInt(), 0xFF2A2D34.toInt(), 0xFF15171C.toInt(), 0xFF0A0B0D.toInt())
-        p.shader = RadialGradient(cx - dr * 0.3f, cy - dr * 0.4f, dr * 1.55f, dome, floatArrayOf(0f, 0.38f, 0.75f, 1f), Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = RadialGradient(cx - dr * 0.3f, cy - dr * 0.4f, dr * 1.55f, dome, floatArrayOf(0f, 0.38f, 0.75f, 1f), Shader.TileMode.CLAMP)
         c.drawCircle(cx, cy, dr, p); p.shader = null
         p.style = Paint.Style.STROKE; p.strokeWidth = dr * 0.05f; p.color = 0xAA000000.toInt(); c.drawCircle(cx, cy, dr, p); p.style = Paint.Style.FILL
         skullGlyph(c, cx, cy - dr * 0.18f, dr * 0.9f, if (ready) 0x30000000 else 0x20000000, 0x00000000, 0x00000000)
         engrave(c, "SPIN", cx, cy + dr * 0.30f, dr * 0.52f, if (ready) 0xFFF8EDD4.toInt() else 0xFF6E727A.toInt(), serif, 0.12f)
-        p.shader = RadialGradient(cx - dr * 0.36f, cy - dr * 0.52f, dr * 0.5f, intArrayOf(if (ready) 0x66FFFFFF else 0x33FFFFFF, 0x00FFFFFF), null, Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = RadialGradient(cx - dr * 0.36f, cy - dr * 0.52f, dr * 0.5f, intArrayOf(if (ready) 0x66FFFFFF else 0x33FFFFFF, 0x00FFFFFF), null, Shader.TileMode.CLAMP)
         c.drawOval(cx - dr * 0.8f, cy - dr * 0.95f, cx + dr * 0.1f, cy - dr * 0.05f, p); p.shader = null
     }
 
@@ -1085,7 +1085,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             val w = (PI / n).toFloat() * (if (k % 2 == 0) 0.34f else 0.16f)
             path.reset(); path.moveTo(cx, cy)
             path.lineTo(cx + cos(a - w) * s * 0.5f, cy + sin(a - w) * s * 0.5f); path.lineTo(cx + cos(a + w) * s * 0.5f, cy + sin(a + w) * s * 0.5f); path.close()
-            p.shader = RadialGradient(cx, cy, s * 0.5f, intArrayOf(0x99FFFFFF.toInt(), 0x44FFFFFF, 0x00FFFFFF), floatArrayOf(0.05f, 0.5f, 1f), Shader.TileMode.CLAMP)
+            p.alpha = 255; p.shader = RadialGradient(cx, cy, s * 0.5f, intArrayOf(0x99FFFFFF.toInt(), 0x44FFFFFF, 0x00FFFFFF), floatArrayOf(0.05f, 0.5f, 1f), Shader.TileMode.CLAMP)
             c.drawPath(path, p)
         }
     }
@@ -1097,7 +1097,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         cr.cubicTo(s * 0.30f, s * 0.04f, s * 0.78f, s * 0.04f, s * 0.97f, s * 0.5f)
         cr.cubicTo(s * 0.70f, s * 0.26f, s * 0.32f, s * 0.30f, s * 0.08f, s * 0.5f); cr.close()
         p.maskFilter = BlurMaskFilter(s * 0.05f, BlurMaskFilter.Blur.NORMAL); p.color = withA(Neon.RED, 200); c.drawPath(cr, p); p.maskFilter = null
-        p.shader = LinearGradient(s * 0.08f, 0f, s * 0.97f, 0f, intArrayOf(withA(BLOOD_HOT, 120), 0xFFFFF4E0.toInt(), 0xFFFFFFFF.toInt()), null, Shader.TileMode.CLAMP)
+        p.alpha = 255; p.shader = LinearGradient(s * 0.08f, 0f, s * 0.97f, 0f, intArrayOf(withA(BLOOD_HOT, 120), 0xFFFFF4E0.toInt(), 0xFFFFFFFF.toInt()), null, Shader.TileMode.CLAMP)
         c.drawPath(cr, p)
     }
 
@@ -1117,7 +1117,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             cloak.cubicTo(-2.55f * k, 0.95f * k, -1.80f * k, 0.55f * k, -1.34f * k, 0.30f * k)
             cloak.cubicTo(-1.20f * k, -0.10f * k, -1.22f * k, -0.55f * k, -1.12f * k, -1.10f * k)
             cloak.cubicTo(-1.00f * k, -1.80f * k, -0.55f * k, -2.28f * k, 0f, -2.3f * k); cloak.close()
-            p.shader = LinearGradient(0f, -2.3f * k, 0f, 3.0f * k, intArrayOf(0xFF101216.toInt(), 0xFF08090B.toInt(), 0xFF040405.toInt()), null, Shader.TileMode.CLAMP)
+            p.alpha = 255; p.shader = LinearGradient(0f, -2.3f * k, 0f, 3.0f * k, intArrayOf(0xFF101216.toInt(), 0xFF08090B.toInt(), 0xFF040405.toInt()), null, Shader.TileMode.CLAMP)
             c.drawPath(cloak, p); p.shader = null
             // folds
             p.style = Paint.Style.STROKE; p.strokeCap = Paint.Cap.ROUND
@@ -1131,7 +1131,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             }
             // rim light: sickly teal on the left, violet on the right
             p.strokeWidth = 2.6f * u
-            p.shader = LinearGradient(-1.4f * k, 0f, 1.4f * k, 0f, intArrayOf(0x8890D8B8.toInt(), 0x2290D8B8, 0x00000000, 0x558A6AC8), floatArrayOf(0f, 0.3f, 0.6f, 1f), Shader.TileMode.CLAMP)
+            p.alpha = 255; p.shader = LinearGradient(-1.4f * k, 0f, 1.4f * k, 0f, intArrayOf(0x8890D8B8.toInt(), 0x2290D8B8, 0x00000000, 0x558A6AC8), floatArrayOf(0f, 0.3f, 0.6f, 1f), Shader.TileMode.CLAMP)
             c.drawPath(cloak, p); p.shader = null
             p.style = Paint.Style.FILL
             // hood lining + face void
@@ -1143,7 +1143,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             face.cubicTo(0.66f * k, 0.15f * k, 0.42f * k, 0.62f * k, 0f, 0.82f * k)
             face.cubicTo(-0.42f * k, 0.62f * k, -0.66f * k, 0.15f * k, -0.66f * k, -0.40f * k)
             face.cubicTo(-0.66f * k, -0.95f * k, -0.42f * k, -1.45f * k, 0f, -1.50f * k); face.close()
-            p.shader = RadialGradient(0f, -0.2f * k, 1.0f * k, intArrayOf(0xFF0B0F10.toInt(), 0xFF020303.toInt(), 0xFF000000.toInt()), floatArrayOf(0f, 0.6f, 1f), Shader.TileMode.CLAMP)
+            p.alpha = 255; p.shader = RadialGradient(0f, -0.2f * k, 1.0f * k, intArrayOf(0xFF0B0F10.toInt(), 0xFF020303.toInt(), 0xFF000000.toInt()), floatArrayOf(0f, 0.6f, 1f), Shader.TileMode.CLAMP)
             c.drawPath(face, p); p.shader = null
             // the skull inside the dark: cheekbones, nasal cavity, teeth (dim bone, so the eyes do the work)
             p.color = 0x14D9D2BE; c.drawOval(-0.46f * k, -1.05f * k, 0.46f * k, 0.42f * k, p)
@@ -1176,18 +1176,18 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             val body = Path(); octagon(body, w, h, min(w, h) * 0.12f)
             p.color = 0xB0000000.toInt(); p.maskFilter = BlurMaskFilter(8f * u, BlurMaskFilter.Blur.NORMAL)
             c.save(); c.translate(0f, 5f * u); c.drawPath(body, p); c.restore(); p.maskFilter = null
-            p.shader = LinearGradient(0f, 0f, 0f, h, intArrayOf(0xFF323640.toInt(), 0xFF1A1C22.toInt(), 0xFF0F1115.toInt()), floatArrayOf(0f, 0.4f, 1f), Shader.TileMode.CLAMP)
+            p.alpha = 255; p.shader = LinearGradient(0f, 0f, 0f, h, intArrayOf(0xFF323640.toInt(), 0xFF1A1C22.toInt(), 0xFF0F1115.toInt()), floatArrayOf(0f, 0.4f, 1f), Shader.TileMode.CLAMP)
             c.drawPath(body, p)
-            p.shader = BitmapShader(noise, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT); p.alpha = 120; c.drawPath(body, p); p.shader = null; p.alpha = 255
+            p.alpha = 255; p.shader = BitmapShader(noise, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT); p.alpha = 120; c.drawPath(body, p); p.shader = null; p.alpha = 255
             // inner dark field
             val ins = 6f * u
             val inner = Path(); octagon(inner, w - 2 * ins, h - 2 * ins, min(w, h) * 0.10f); inner.offset(ins, ins)
-            p.shader = LinearGradient(0f, ins, 0f, h - ins, intArrayOf(0xFF07080A.toInt(), 0xFF101216.toInt()), null, Shader.TileMode.CLAMP)
+            p.alpha = 255; p.shader = LinearGradient(0f, ins, 0f, h - ins, intArrayOf(0xFF07080A.toInt(), 0xFF101216.toInt()), null, Shader.TileMode.CLAMP)
             c.drawPath(inner, p); p.shader = null
             p.style = Paint.Style.STROKE; p.strokeWidth = 1.2f * u; p.color = withA(accent, 150); c.drawPath(inner, p)
             // brass border
             p.strokeWidth = 2.8f * u; p.strokeJoin = Paint.Join.MITER
-            p.shader = LinearGradient(0f, 0f, w, h, intArrayOf(0xFFD7B866.toInt(), Neon.BRASS, Neon.BRASS_DIM, 0xFF2E230C.toInt()), floatArrayOf(0f, 0.3f, 0.7f, 1f), Shader.TileMode.CLAMP)
+            p.alpha = 255; p.shader = LinearGradient(0f, 0f, w, h, intArrayOf(0xFFD7B866.toInt(), Neon.BRASS, Neon.BRASS_DIM, 0xFF2E230C.toInt()), floatArrayOf(0f, 0.3f, 0.7f, 1f), Shader.TileMode.CLAMP)
             c.drawPath(body, p); p.shader = null
             p.strokeWidth = 1.2f * u; p.color = 0xDD000000.toInt(); c.save(); c.scale((w - 6f * u) / w, (h - 6f * u) / h, w / 2, h / 2); c.drawPath(body, p); c.restore()
             p.style = Paint.Style.FILL
@@ -1242,7 +1242,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             val p = Paint(Paint.ANTI_ALIAS_FLAG)
             p.color = 0xFF020203.toInt(); c.drawCircle(nx, ny, nr, p)
             p.style = Paint.Style.STROKE; p.strokeWidth = nr * 0.12f
-            p.shader = LinearGradient(nx - nr, ny - nr, nx + nr, ny + nr, intArrayOf(0xFFD7B866.toInt(), Neon.BRASS, Neon.BRASS_DIM), null, Shader.TileMode.CLAMP)
+            p.alpha = 255; p.shader = LinearGradient(nx - nr, ny - nr, nx + nr, ny + nr, intArrayOf(0xFFD7B866.toInt(), Neon.BRASS, Neon.BRASS_DIM), null, Shader.TileMode.CLAMP)
             c.drawCircle(nx, ny, nr, p); p.shader = null
         }
         // total
@@ -1366,19 +1366,19 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             var x = 0f
             while (x < w) {
                 val sh = 24 + rnd.nextInt(12)
-                p.shader = LinearGradient(x, 0f, x + pw, 0f, Color.rgb(sh + 10, sh + 2, sh - 4), Color.rgb(sh - 6, sh - 12, sh - 16), Shader.TileMode.CLAMP)
+                p.alpha = 255; p.shader = LinearGradient(x, 0f, x + pw, 0f, Color.rgb(sh + 10, sh + 2, sh - 4), Color.rgb(sh - 6, sh - 12, sh - 16), Shader.TileMode.CLAMP)
                 c.drawRect(x, 0f, x + pw, h.toFloat(), p); p.shader = null
                 p.color = 0x26000000
                 for (k in 0 until 7) { val gx = x + rnd.nextFloat() * pw; c.drawLine(gx, 0f, gx + (rnd.nextFloat() - 0.5f) * 8f * u, h.toFloat(), p) }
                 p.color = 0xDD000000.toInt(); c.drawRect(x + pw - 2.4f * u, 0f, x + pw, h.toFloat(), p)
                 x += pw
             }
-            p.shader = BitmapShader(noise, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT); p.alpha = 120; c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), p); p.shader = null; p.alpha = 255
+            p.alpha = 255; p.shader = BitmapShader(noise, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT); p.alpha = 120; c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), p); p.shader = null; p.alpha = 255
             // horizontal iron straps with rivets and a pointed tip toward the seam
             for (yy in floatArrayOf(0.07f, 0.29f, 0.50f, 0.71f, 0.93f)) {
                 val y = h * yy; val th = 30f * u
                 path.reset(); path.moveTo(0f, y - th / 2); path.lineTo(w - 34f * u, y - th / 2); path.lineTo(w - 6f * u, y); path.lineTo(w - 34f * u, y + th / 2); path.lineTo(0f, y + th / 2); path.close()
-                p.shader = LinearGradient(0f, y - th / 2, 0f, y + th / 2, intArrayOf(0xFF3E424B.toInt(), 0xFF14161B.toInt(), 0xFF08090B.toInt()), null, Shader.TileMode.CLAMP)
+                p.alpha = 255; p.shader = LinearGradient(0f, y - th / 2, 0f, y + th / 2, intArrayOf(0xFF3E424B.toInt(), 0xFF14161B.toInt(), 0xFF08090B.toInt()), null, Shader.TileMode.CLAMP)
                 c.drawPath(path, p); p.shader = null
                 p.style = Paint.Style.STROKE; p.strokeWidth = 1.6f * u; p.color = 0xCC000000.toInt(); c.drawPath(path, p); p.style = Paint.Style.FILL
                 var rxp = 26f * u
@@ -1386,15 +1386,15 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             }
             // the seam: a vertical iron band with a heavy brass ring and a skull boss
             val sx = w - 30f * u
-            p.shader = LinearGradient(sx, 0f, sx + 30f * u, 0f, intArrayOf(0xFF2E3138.toInt(), 0xFF0E1014.toInt(), 0xFF050608.toInt()), null, Shader.TileMode.CLAMP)
+            p.alpha = 255; p.shader = LinearGradient(sx, 0f, sx + 30f * u, 0f, intArrayOf(0xFF2E3138.toInt(), 0xFF0E1014.toInt(), 0xFF050608.toInt()), null, Shader.TileMode.CLAMP)
             c.drawRect(sx, 0f, w.toFloat(), h.toFloat(), p); p.shader = null
             p.color = 0x33FFFFFF; c.drawRect(sx, 0f, sx + 1.6f * u, h.toFloat(), p)
             skullGlyph(c, w - 40f * u, h * 0.5f - 66f * u, 52f * u, 0xFF0A0B0D.toInt(), 0x88D9D2BE.toInt(), withA(Neon.RED, 255))
             p.style = Paint.Style.STROKE; p.strokeWidth = 9f * u
-            p.shader = SweepGradient(w - 40f * u, h * 0.5f + 20f * u, intArrayOf(0xFFE3C676.toInt(), Neon.BRASS_DIM, 0xFFC8A24C.toInt(), 0xFF2E230C.toInt(), 0xFFE3C676.toInt()), null)
+            p.alpha = 255; p.shader = SweepGradient(w - 40f * u, h * 0.5f + 20f * u, intArrayOf(0xFFE3C676.toInt(), Neon.BRASS_DIM, 0xFFC8A24C.toInt(), 0xFF2E230C.toInt(), 0xFFE3C676.toInt()), null)
             c.drawCircle(w - 40f * u, h * 0.5f + 20f * u, 34f * u, p); p.shader = null; p.style = Paint.Style.FILL
             // darkness gathers toward the hinges
-            p.shader = LinearGradient(0f, 0f, w * 0.5f, 0f, 0x99000000.toInt(), 0x00000000, Shader.TileMode.CLAMP)
+            p.alpha = 255; p.shader = LinearGradient(0f, 0f, w * 0.5f, 0f, 0x99000000.toInt(), 0x00000000, Shader.TileMode.CLAMP)
             c.drawRect(0f, 0f, w * 0.5f, h.toFloat(), p); p.shader = null
         }
     }
@@ -1892,9 +1892,9 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             p.style = Paint.Style.STROKE; p.strokeWidth = size * 0.095f; p.strokeJoin = Paint.Join.ROUND; p.color = 0xFF0A0604.toInt()
             c.drawText(text, cx, base, p)
             p.style = Paint.Style.FILL; p.strokeWidth = 0f
-            p.shader = LinearGradient(0f, base - size * 0.74f, 0f, base + size * 0.08f, intArrayOf(top, mid, bot), floatArrayOf(0f, 0.48f, 1f), Shader.TileMode.CLAMP)
+            p.alpha = 255; p.shader = LinearGradient(0f, base - size * 0.74f, 0f, base + size * 0.08f, intArrayOf(top, mid, bot), floatArrayOf(0f, 0.48f, 1f), Shader.TileMode.CLAMP)
             c.drawText(text, cx, base, p)
-            p.shader = LinearGradient(0f, base - size * 0.74f, 0f, base - size * 0.40f, 0x77FFFFFF, 0x00FFFFFF, Shader.TileMode.CLAMP)
+            p.alpha = 255; p.shader = LinearGradient(0f, base - size * 0.74f, 0f, base - size * 0.40f, 0x77FFFFFF, 0x00FFFFFF, Shader.TileMode.CLAMP)
             c.drawText(text, cx, base, p); p.shader = null
         }
     }

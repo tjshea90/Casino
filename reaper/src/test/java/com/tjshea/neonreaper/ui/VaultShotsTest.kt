@@ -215,5 +215,20 @@ class VaultShotsTest {
         assertTrue("per-frame allocation $per bytes", per < 16 * 1024)
     }
 
+    /** The crypt is baked once in onSizeChanged on the UI thread: report how long that takes (JIT-warm and cold). */
+    @Test fun bakeIsQuick() {
+        SystemClock.setCurrentTimeMillis(1_000_000)
+        val ms = ArrayList<Long>()
+        for ((w, h) in listOf(1280 to 800, 800 to 1280, 1280 to 800)) {
+            val v = VaultView(ctx, audio, showcase()) {}
+            val t0 = System.nanoTime(); size(v, w, h); val t1 = System.nanoTime()
+            frame(v); val t2 = System.nanoTime()
+            ms += (t1 - t0) / 1_000_000
+            println("VaultView bake ${w}x$h: ${(t1 - t0) / 1_000_000} ms, first frame ${(t2 - t1) / 1_000_000} ms")
+            v.release()
+        }
+        assertTrue("warm bake took ${ms.last()} ms", ms.last() < 2500)
+    }
+
     private companion object { const val VAULT_COLS = ReaperConfig.VAULT_COLS }
 }
