@@ -27,20 +27,20 @@ online slots; the house must keep an edge no matter what and never lose money ov
 
 **Work queue (tick as you go; owner in brackets):**
 - [x] 0. Baseline merged + pushed ([skip ci]); tools/setup_sandbox.sh, checkpoint.sh release-trap guard, autosave + session-start hooks (.claude/settings.json)
-- [ ] 1. docs/DREAD_DESIGN.md (research: what major brands do, what we copy / refuse, sources)
+- [x] 1. docs/DREAD_DESIGN.md (research: what major brands do, what we copy / refuse, sources)
 - [ ] 2. AUDIO (agent, worktree): dark score BASE/SEANCE/VAULT with adaptive intensity + ~50 SFX; contract = `Audio.Sfx`/`Track` enums in Audio.kt
-- [ ] 3. MATH v3 (me): tools/reaper_model.py + engine (scatter, FreeSpins, buy prices, re-tuned strips) + exact/sim/exploit tests + PAR sheet in docs/MATH.md
-- [ ] 4. Wallet: FS + buy persistence (seed based, crash safe), session stats, rank XP, ledger, settings, reality check
-- [ ] 5. GL foundation: FBO + bloom/vignette/grain/grade, multi-light, merged vertex-colour meshes, quality tiers, reduce-flashing
+- [x] 3. MATH v3: tools/reaper_model.py + engine (coffin scatter, Seance.kt, Round.kt, buy prices, re-tuned strips) + exact/sim/exploit tests ALL GREEN. 94.000 % = lines+minis 57.77 + coffin pays 1.11 + SEANCE 14.12 + Vault 21.00; win 1 in 3.2; Seance ~213 spins, Vault ~135; buys 31x/31x (<= 92.8 %). TODO: PAR sheet in docs/MATH.md
+- [x] 4. Wallet v3 (Seance/buy seeds, session stats, Ranks, Achievements, settings; WalletTest green). TODO UI: reality-check dialog, settings dialog
+- [ ] 5. GL foundation: DONE: FBO + bloom/vignette/grain/grade (PostFx), noise texture, point lights, vertex-material shader mode 20, MeshData stride 12, Sculpt.kt. TODO: quality tiers auto-controller in GameGLView, reduce-flashing wiring
 - [ ] 6. New cast meshes + animation (Reaper first as the reference), royals restyle, coffin scatter
 - [ ] 7. New world: gothic crypt/graveyard, altar cabinet, candles/chains/fog/moon, camera moves
 - [ ] 8. HUD restyle + win tiers + anticipation + Séance mode + feature-buy dialog + autoplay limits + settings/rank/ledger
 - [ ] 9. Soul Vault restyle (dark crypt, lit orbs)
 - [ ] 10. Integrate audio; QA; independent math audit; code review; perf budget; README/MATH; release v3.0.0 (`SHIP=1`)
 
-**In flight (agents / worktrees):** none yet.
-**Last verified-green commit:** (baseline 77f3e0b = v2.1.0 tests green per session 6)
-**Status line:** session 7 just started; baseline merged; infra (checkpoint/hooks/setup) done; next = design doc, audio agent, math v3.
+**In flight (agents / worktrees):** AUDIO agent (id a769d05ea7bfc7344) in a git worktree (see `git worktree list`; branch name starts with `worktree-`); it only touches `audio/**`, `docs/AUDIO.md`, `tools/audio_report.py`. When it finishes: merge its branch, wire new Sfx/Track calls into ReaperView/VaultView/MainActivity.
+**Last verified-green commit:** see `git log` entry 'math v3 green' (engine + wallet suites pass; UI/GL not yet migrated to the new symbol names: transitional aliases HOODED/PUMPKIN/GHOST/MINI_PUMPKIN exist in ReaperConfig)
+**Status line:** math v3 + wallet v3 done and green; GL foundation partly done (FBO post-fx, noise texture, vertex-material shader, Sculpt toolkit written); next = characters (Reaper reference), environment, HUD/Seance flow, audio merge.
 
 ---
 # Session 6 status (archived, still accurate for the math background)
