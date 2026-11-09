@@ -37,7 +37,15 @@ class ScreensTest {
         v.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(h, View.MeasureSpec.EXACTLY))
         v.layout(0, 0, w, h)
     }
-    private fun frame(v: View): Bitmap = Bitmap.createBitmap(v.width, v.height, Bitmap.Config.ARGB_8888).also { v.draw(Canvas(it)) }
+    // one reusable frame buffer: allocating a fresh native bitmap per frame (thousands per test) gets the test JVM OOM-killed
+    private var frameBmp: Bitmap? = null
+    private fun frame(v: View): Bitmap {
+        var b = frameBmp
+        if (b == null || b.width != v.width || b.height != v.height) { b?.recycle(); b = Bitmap.createBitmap(v.width, v.height, Bitmap.Config.ARGB_8888); frameBmp = b }
+        b.eraseColor(0)
+        v.draw(Canvas(b))
+        return b
+    }
     private fun shot(v: View, name: String) = File(out, "$name.png").outputStream().use { frame(v).compress(Bitmap.CompressFormat.PNG, 100, it) }
     private fun step(v: View, sec: Double) { var t = 0.0; while (t < sec) { ShadowSystemClock.advanceBy(Duration.ofMillis(40)); frame(v); t += 0.04 } }
     private fun tap(v: View) {

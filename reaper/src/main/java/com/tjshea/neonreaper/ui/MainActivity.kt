@@ -81,6 +81,7 @@ class MainActivity : Activity(), ReaperView.Host {
             glView?.setActive(true)
             game.onVaultFinished(paid)
         }
+        v.calm = wallet.reduceFlash
         vault = v
         glView?.setActive(false)
         root.addView(v, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
