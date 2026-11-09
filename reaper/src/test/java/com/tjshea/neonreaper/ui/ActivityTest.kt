@@ -172,7 +172,8 @@ class ActivityTest {
         buys[1].performClick(); ShadowLooper.idleMainLooper()                    // the second card is the Soul Vault
         click(dlg, "Confirm"); assertEquals(listOf(Feature.VAULT), chosen)
 
-        poke(w, "balance", 200L)            // not enough credit: nothing can be selected
+        assertTrue(w.withdraw(pw, 1_800) is AuthResult.Ok)   // 200 tokens left: not enough credit, nothing can be selected
+        assertEquals(200L, w.balance)
         chosen.clear()
         d.buyFeature(10) { chosen += it }; dlg = latest()
         for (b in views(dlg) { it is Button && it.text.toString().startsWith("Buy for") }) assertFalse("disabled when credit is too low", b.isEnabled)
@@ -286,14 +287,17 @@ class ActivityTest {
 
     @Test fun tiltResetsMachine() {
         val act = Robolectric.buildActivity(MainActivity::class.java).setup().get()
-        val w = act.wallet
-        w.setInitialPassword(pw)
-        poke(w, "status", Wallet.LoadStatus.TAMPERED)           // the dialog is only ever shown for a tampered wallet
+        val ctx = RuntimeEnvironment.getApplication()
+        act.wallet.setInitialPassword(pw); act.wallet.deposit(pw, 80)
+        val f = File(ctx.filesDir, "wallet.dat")                 // edit the signed file by hand, as a cheater would
+        f.writeText(f.readText().replace("\"balance\":80", "\"balance\":8000"))
+        val w = Wallet(ctx)
+        assertEquals(Wallet.LoadStatus.TAMPERED, w.load())
         Dialogs(act, w) {}.tampered()
         val dlg = latest()
         dlg.onBackPressed(); assertTrue("cannot be dismissed", dlg.isShowing)
         click(dlg, "Reset machine")
-        assertFalse(w.hasPassword)
+        assertFalse(w.hasPassword); assertEquals(0L, w.balance)
         assertTrue(allText(latest()).contains("WELCOME TO NEON REAPER"))
     }
 
