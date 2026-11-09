@@ -19,6 +19,13 @@ or file edit that gives the player a positive expected result, or any RTP above 
 * No finding changes the house edge. 12 findings (0 critical / 0 high / 0 medium / 6 low / 6 info) are listed in section 5: the most relevant are AUD-1 (the 25-book cap is per component, so one paid spin can return up to 3 caps = 6000 tokens), AUD-2 (the simulation tests that are said to verify "94 % at every stake" can only resolve about +/- 1 point), AUD-5 / AUD-6 (wall-clock password lockout, no rollback protection of the signed wallet) and AUD-9 (stale rules text).
 * No main source file was changed. 5 new test classes (+ 2 helpers and tools/audit) are added; all pass on the current code (2 tests are `@Ignore`d on purpose to document AUD-6 and AUD-8).
 
+### For the integrator
+
+* Merging this branch changes **no** engine / data / UI file and no `release/*.apk` (so the release trap cannot fire from it); `HANDOFF.md` was not touched.
+* Worth doing, in order: (1) decide AUD-1 (document the per-component cap in the rules dialog, or cap the round); (2) re-check the final DIALOGS rules text against section 1.2 (AUD-9) and refresh `docs/MATH.md` from this file (it can serve as the PAR sheet: exact budget, frequencies, per-stake table);
+  (3) paste the measured column of section 1.3 into `ReaperConfig.RTP_BY_STAKE` (AUD-3, optional, only conservative today); (4) add `--tests "*AuditTest*"` to `.github/workflows/build.yml` (10 s; it also fails when `ReaperConfig` is edited without refreshing the audit snapshot).
+* The audit is reproducible and cheap to repeat after any math change: section 7.
+
 ## 1. RTP, independent measurement
 
 ### 1.1 Method
@@ -41,7 +48,7 @@ The decomposition is exact; how each piece was obtained is what makes the check 
 | Demon's Bargain | exact convolution of the plain-grid pmf with the exact coin-total pmf | none (exact) |
 | Murder of Crows, Skull's Curse | C Monte-Carlo, 4x10^8 spins each (`audit_mc mini`) | <= 0.0008 x stake per mini spin |
 | THE SEANCE for 3 / 4 / 5 coffins | C Monte-Carlo, 10^9 / 6x10^8 / 4x10^8 sessions drawn from the **exact** free-spin pmf, ramp x1..x10 and retrigger rule applied spin by spin | 0.0009 / 0.0019 / 0.0035 x stake |
-| Soul Vault | **exact distribution of the vault total** (`tools/audit/vault_exact.py`: the (filled cells, respins, soul sum, jackpot sum) chain propagated as a probability array, 15 s) - gives E[V] and E[min(V, c)] for every cap with no sampling; cross-checked by a C Monte-Carlo of 3x10^8 vaults written from the rules (28.3489 +/- 0.0013 vs exact 28.351329, z = -1.9) | none (exact) |
+| Soul Vault | **exact distribution of the vault total** (`tools/audit/vault_exact.py`: the (filled cells, respins, soul sum, jackpot sum) chain propagated as a probability array, 15 s) - gives E[V] and E[min(V, c)] for every cap with no sampling; cross-checked by a C Monte-Carlo of 4x10^8 vaults written from the rules (28.3496 +/- 0.0011 vs exact 28.351329, z = -1.5: the first 3x10^8 sit at z = -1.9, the fourth 10^8 batch at +0.3, i.e. noise) | none (exact) |
 | self-test of the MC code | Reaper's Touch and Demon's Bargain also simulated (10^8 each) and compared with their exact values: z = -1.26 and +0.19 | |
 
 The shipped Kotlin engine is tied to this in three further ways (all in the new tests): `AuditDifferentialTest` demands **exact equality** between the engine and a
@@ -101,8 +108,11 @@ RTP is non-increasing in the stake, as the "linear or concave" invariant require
 
 Spin outcomes (lines, minis, coffins, Seance) have the same distribution at every spin and the stake only scales them (cap aside), so the only state a player can
 influence is the relic meter (relics held `r`, sum `S` of the stakes on the relic-revealing spins). A relic is revealed with probability `p = 5/135` whatever the
-stake; between relic events the state does not change, so an optimal policy repeats one stake per state and **a policy is a sequence of five stakes per vault cycle**;
-the vault pays `floor(sum/5)` as bonus bet (`RelicMeter`). Return per token wagered of a cycle: `(sum s_i a(s_i) + p E[min(2000, V b)]) / sum s_i` with `a(s)` the measured non-vault return per token at stake `s`.
+stake and of everything that happened before, and the vault pays `floor(sum/5)` as bonus bet (`RelicMeter`). For a vault cycle whose five relic-revealing spins were staked `(s_1..s_5)` let
+`D = sum s_i / p` be the expected tokens wagered and `N = sum s_i a(s_i) / p + E[min(2000, V b)]`, `b = floor(sum s_i / 5)`, the expected tokens returned (`a(s)` = measured non-vault return per token at stake `s`).
+**For ANY policy (adaptive, history-dependent, randomized, time-varying inside a stretch) the long-run RTP is `sum Pr(tuple) N(tuple) / sum Pr(tuple) D(tuple)`**, where `Pr` is the distribution of the five relic-spin stakes:
+by Wald's identity `P(relic-spin stake = s) = p x (expected number of spins staked at s)`, so the wager and the non-vault return of each stretch are linear in the marginals of `Pr`, and only the vault term depends on the joint distribution.
+A ratio of two linear functionals of `Pr` is maximised at a point mass, so **no policy beats the best single five-stake cycle**; the finite-horizon DP below adds quitting and the two feature buys.
 
 * **Exhaustive cycle search** (`tools/audit/policy_mdp.py`, `AuditTest.noFiveStakeVaultCycle...`): all 4368 multisets of five stakes. Best = (1,1,1,1,1) **94.000 %**; best policy that mixes stakes (1,2,2,2,3) 93.999 %; worst (1,1,1,1,5) 84.66 %; (1,1,1,1,40) = 89.28 %, (1,1,40,40,40) = 89.87 %, constant 40 = 88.93 %.
   Power check (same code, other rounding rule): if the bonus bet were **rounded up** the best cycle (1,1,1,1,2) would return **108.0 %**; rounded to nearest **99.25 %** (1,1,2,2,2). Only the `floor` of the shipped rule keeps every cycle <= 94 %, exactly as `RelicMeter` documents.

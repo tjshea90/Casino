@@ -8,10 +8,13 @@ stake s returns s*a(s) on average without the vault (a(s) from the measured per-
 probability p = RELIC_CHANCE whatever the stake.  The fifth relic pays the vault with bonus bet b = floor(S'/5), worth
 vtab[b] = E[min(MAX_WIN, V*b)] tokens.  So:
 
- (1) LONG RUN.  Between relic events the state does not change, so an optimal policy repeats one stake per state; a policy is a
-     sequence of five stakes (s1..s5) per vault cycle and its return per token wagered is
-         RTP(s1..s5) = ( sum s_i*a(s_i) + p*vtab[floor(sum s_i / 5)] ) / sum s_i .
-     We evaluate ALL 4368 multisets of five stakes: the maximum is the best long-run RTP any staking policy can reach.
+ (1) LONG RUN.  For a vault cycle whose five relic-revealing spins were staked (s1..s5) the expected tokens wagered are
+     D = sum s_i / p and the expected tokens returned N = sum s_i*a(s_i)/p + vtab[floor(sum s_i / 5)].  For ANY policy (adaptive,
+     history dependent, randomised, varying inside a stretch) Wald's identity gives P(relic-spin stake = s) = p * E[# spins staked at s],
+     so its long-run RTP is  sum Pr(tuple) N(tuple) / sum Pr(tuple) D(tuple)  for the distribution Pr of the five relic-spin stakes:
+     a ratio of two linear functionals of Pr, maximal at a point mass.  Hence the best policy is one single five-stake cycle with
+         RTP(s1..s5) = ( sum s_i*a(s_i) + p*vtab[floor(sum s_i / 5)] ) / sum s_i ,
+     and we evaluate ALL 4368 multisets of five stakes: the maximum is the best long-run RTP any staking policy can reach.
  (2) FINITE HORIZON with stopping and buys.  Backward induction over (relics, S) for up to T spins:
          V_t(r,S) = max( 0 [quit], max_s [ s*(a(s)-1) + p*next + (1-p)*V_{t-1}(r,S) ], buy Seance, buy Vault )
      V_T(0,0) > 0 would be a strategy with positive expected profit from an empty meter.  The same recursion with absorption at the
