@@ -30,6 +30,8 @@ object Cast {
 
     private fun create(sym: Int): CharacterModel? = when (sym) {
         ReaperConfig.WILD -> ReaperModel()
+        ReaperConfig.DOCTOR -> DoctorModel()
+        ReaperConfig.DEMON -> DemonModel()
         ReaperConfig.WRAITH -> WraithModel()
         ReaperConfig.SCATTER -> CoffinModel()
         else -> null
