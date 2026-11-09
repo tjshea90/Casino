@@ -136,6 +136,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
     internal fun debugSeanceActive(): Boolean = seance != null
     internal fun debugFreeSpinsPlayed(): Int = seanceIdx
     internal fun debugBusy(): Boolean = busy
+    internal fun debugParts(): String = "phase=$phase win=$pendingWin vault=$pendingVault seance=$pendingSeance roll=$rollTarget/${"%.1f".format(rollDur)} vaultShown=$vaultWinShown toShow=${vaultToShow != null}"
     internal fun debugPress(id: String) = onButton(id)
     /** Advances the game logic by one frame without drawing anything (soak tests). */
     internal fun debugStepLogic() {
@@ -530,7 +531,8 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
 
     private fun enter(p: Phase) { phase = p; phaseStart = now(); invalidate() }
 
-    private val busy get() = (phase != Phase.IDLE && phase != Phase.PRESENT) || now() < winLockUntil || seance != null
+    // busy also covers the short gap between a trigger spin's win presentation and its bonus cinematic (no ERROR click on an early tap)
+    private val busy get() = (phase != Phase.IDLE && phase != Phase.PRESENT) || now() < winLockUntil || seance != null || seanceToStart != null || vaultToShow != null
 
     private fun startSpin() {
         if (busy) return

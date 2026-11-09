@@ -86,12 +86,10 @@ class SoakFlowTest {
             v.debugPress(if (wantBuy != null) "buy" else "spin")
             if (wantBuy == null) spinsDone++
             val sawSeance = BooleanArray(1)
-            val ok = advance(500.0) { if (v.debugSeanceActive()) sawSeance[0] = true; !v.debugBusy() && v.debugPhase() != "SPINNING" }
+            val ok = advance(500.0) { if (v.debugSeanceActive()) sawSeance[0] = true; !v.debugBusy() && v.debugPhase() != "SPINNING" && v.debugHidden() == 0L }
             if (!ok) error("round ${spinsDone} did not finish in 500 simulated seconds: phase=${v.debugPhase()} seance=${v.debugSeanceActive()} hidden=${v.debugHidden()} played=${v.debugFreeSpinsPlayed()}")
             if (sawSeance[0]) seances++
-            // a Soul Vault payout is counted into the credit meter over ~2 s after the vault screen closes: give it time to settle
-            advance(10.0) { v.debugHidden() == 0L }
-            assertEquals("nothing may stay hidden in the credit meter between rounds (spin $spinsDone)", 0L, v.debugHidden())
+            assertEquals("nothing may stay hidden in the credit meter between rounds (spin $spinsDone): ${v.debugParts()}", 0L, v.debugHidden())
             assertTrue("no bonus may stay unseen between rounds", !w.bonusPending)
         }
         // the wallet identity: balance = start + deposits - wagered + won
