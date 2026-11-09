@@ -120,6 +120,12 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
     private var bigHitTime = 0.0                           // (kept after it fired, for the banner animation)
     private var trackSwitchAt = -1.0; private var trackSwitchTo: Audio.Track? = null
     private var lastIntensity = -1f
+    /** Test hooks: the state machine's phase and the part of the credit meter that is still hidden (unrevealed wins). */
+    internal fun debugPhase(): String = phase.name
+    internal fun debugHidden(): Long = pendingWin + pendingVault + pendingSeance
+    internal fun debugSeanceActive(): Boolean = seance != null
+    internal fun debugFreeSpinsPlayed(): Int = seanceIdx
+
     /** The score that should be playing now (used by the activity when the app returns from the background). */
     val musicTrack: Audio.Track get() = when {
         seance != null || phase == Phase.SEANCE_TRIGGER || phase == Phase.SEANCE_END -> Audio.Track.SEANCE

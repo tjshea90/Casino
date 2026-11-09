@@ -27,6 +27,7 @@ object SceneStateIO {
             d.writeFloat(s.reaperTouch); d.writeFloat(s.reaperSwing); d.writeFloat(s.bigWin)
             d.writeInt(s.showcaseSym); d.writeFloat(s.showcaseGrow)
             d.writeFloat(s.flash); d.writeFloat(s.souls); d.writeFloat(s.dim)
+            d.writeFloat(s.mood); d.writeFloat(s.anticipation); d.writeFloat(s.seanceOpen); d.writeFloat(s.shake); d.writeBoolean(s.calm)
             hud.forEach { d.writeInt(it) }
         }
     }
@@ -46,6 +47,7 @@ object SceneStateIO {
         s.reaperTouch = d.readFloat(); s.reaperSwing = d.readFloat(); s.bigWin = d.readFloat()
         s.showcaseSym = d.readInt(); s.showcaseGrow = d.readFloat()
         s.flash = d.readFloat(); s.souls = d.readFloat(); s.dim = d.readFloat()
+        s.mood = d.readFloat(); s.anticipation = d.readFloat(); s.seanceOpen = d.readFloat(); s.shake = d.readFloat(); s.calm = d.readBoolean()
         val hud = IntArray(w * h) { d.readInt() }
         Frame(w, h, win, s, hud)
     }
