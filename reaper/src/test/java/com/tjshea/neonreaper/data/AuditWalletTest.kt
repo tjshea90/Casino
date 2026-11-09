@@ -206,6 +206,19 @@ class AuditWalletTest {
         File(ctx.filesDir, "wallet.tmp").deleteRecursively()
     }
 
+    @Test fun aLeftoverTmpFileFromACrashedSaveIsIgnoredAndThenReplaced() {
+        // the app died after writing wallet.tmp (even a "newer" one) but before the rename: only wallet.dat counts
+        val w = fresh(); val before = w.balance
+        val tmp = File(ctx.filesDir, "wallet.tmp")
+        tmp.writeText(file.readText().replace("\"balance\":$before", "\"balance\":${before * 9}"))
+        val a = restart()
+        assertEquals("a stale tmp file must never be loaded", before, a.balance)
+        assertTrue(a.deposit(pw("grim"), 10) is AuthResult.Ok)         // the next save replaces it
+        assertFalse(tmp.exists())
+        assertEquals(before + 10, restart().balance)
+        tmp.writeText("garbage"); assertEquals(before + 10, restart().balance)
+    }
+
     // ------------------------------------------------------------------------------------------------ feature buys
 
     @Test fun buysSurviveAKillAndCannotStack() {

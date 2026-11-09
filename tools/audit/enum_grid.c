@@ -99,6 +99,14 @@ int main(int argc, char **argv) {
         for (int r = REELS - 1; r >= 0; r--) { a[r] = x % NS; x /= NS; }
         T[i] = (uint16_t)line_pay(a);
     }
+    if (!strcmp(argv[2], "linehash")) {
+        /* fingerprint of the whole rule table (FNV-1a over the 248,832 line pays in base-12 order, reel 0 most significant):
+           AuditTest.enumeratorLineRuleFingerprintMatchesTheEngine recomputes it from ReaperEngine.evaluateLine */
+        uint64_t h = 1469598103934665603ULL, sum = 0;
+        for (int i = 0; i < NS * NS * NS * NS * NS; i++) { h = (h ^ T[i]) * 1099511628211ULL; sum += T[i]; }
+        printf("linetable %d sum %llu fnv1a %llu\n", NS * NS * NS * NS * NS, (unsigned long long)sum, (unsigned long long)h);
+        return 0;
+    }
 
     /* windows: win[r][stop][row]; a wild reel is a single all-wild window (no coffin) */
     static int win[REELS][MAXLEN][3], cof[REELS][MAXLEN], n[REELS];

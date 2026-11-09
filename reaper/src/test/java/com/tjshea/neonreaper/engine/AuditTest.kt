@@ -56,6 +56,25 @@ class AuditTest {
         assertTrue(positive > 10_000)
     }
 
+    /**
+     * The exhaustive enumeration in tools/audit/enum_grid.c uses its own implementation of the line rule. Its table over all 12^5 symbol
+     * combinations has the fingerprint printed by `enum_grid tools/audit/config_snapshot.txt linehash`; the engine must reproduce it, which
+     * proves the enumerated distributions are those of the shipped rule (together with the differential test of the grid composition).
+     */
+    @Test fun enumeratorLineRuleFingerprintMatchesTheEngine() {
+        var h = 1469598103934665603L; var sum = 0L
+        val a = IntArray(5)
+        for (i in 0 until 248_832) {
+            var x = i
+            for (r in 4 downTo 0) { a[r] = x % 12; x /= 12 }
+            val pay = ReaperEngine.evaluateLine(a)?.third ?: 0
+            h = (h xor pay.toLong()) * 1099511628211L
+            sum += pay
+        }
+        assertEquals("sum of all line pays", 24053L, sum)
+        assertEquals("FNV-1a of the line table", "15341535897537601920", java.lang.Long.toUnsignedString(h))
+    }
+
     @Test fun paylinesAreTwentyDistinctRowPathsInsideTheGrid() {
         assertEquals(20, C.PAYLINES.size)
         assertEquals(20, C.PAYLINES.map { it.joinToString(",") }.toSet().size)

@@ -3,8 +3,8 @@
 Auditor: independent agent. Branch `worktree-agent-a8e45ec3c88953e6d`, based on `ccr-4739e32a-lc758b` @ 8752596 ("Merge CHARS-A final").
 Scope: module `:reaper` only (`engine/*`, `data/Wallet.kt`, `tools/reaper_model.py`); `:app` (Dragon's Hoard) was not touched or audited.
 Claim under test: *both games target 94.00 % RTP; the house keeps an edge no matter what the player does and the game cannot lose money over time.*
-Everything below was measured with code that does **not** import the author's `tools/reaper_model.py` or `ExactMath.kt` (the author's model is
-only compared against, never used as an input). All numbers come from the shipped constants: `tools/audit/config_snapshot.txt` is a dump of the real
+Everything below was measured with code that does **not** use the author's `tools/reaper_model.py` or `ExactMath.kt` as an input (the author's model is
+only compared against; `tools/audit/check_author_model.py` is the one script that imports it, to compare). All numbers come from the shipped constants: `tools/audit/config_snapshot.txt` is a dump of the real
 `ReaperConfig.kt`, kept honest by `AuditTest.configSnapshotIsCurrent`.
 
 ## 0. Verdict
@@ -136,7 +136,7 @@ The simulation SE (0.2-1.1 pp) is the honest resolution of this table; the rigor
 | raise the stake only when the RelicMeter is high / only when relics are close | 89-90 % (exact cycle), see above |
 | lower the stake right before a trigger resolves; change stake between trigger and replay | impossible by construction: a spin is settled and saved at press time; the Seance / Vault are paid for the stake that triggered them (`theBonusIsPaidForTheStakeThatTriggered...`, bet 25 stays 25 after the stake is set to 1) |
 | martingale, anti-martingale, ramps, bankroll chasing | all < 94 % (table 2.2); higher stakes only lower RTP (cap) |
-| feature buy "when favourable" (full meter, after / before cap effects, highest stake) | a buy never touches the relic meter (`aBuyNeverTouchesTheRelicMeter`), so meter state cannot make it favourable; buy RTP is 92.79 % / 91.45 % at stake 1 and **decreases** with the stake because the 25-book cap compresses the tail (77.75 % / 82.80 % at 40); the DP never chooses a buy |
+| feature buy "when favourable" (full meter, after / before cap effects, highest stake) | a buy never touches the relic meter (`aBuyNeverTouchesTheRelicMeter`), so meter state cannot make it favourable; buy RTP is 92.79 % / 91.46 % at stake 1 and **decreases** with the stake because the 25-book cap compresses the tail (77.75 % / 82.81 % at 40); the DP never chooses a buy |
 | autoplay with limits, quitting, restarting | stopping rules cannot create expectation; restarting keeps the meter (it is saved), `factoryReset` zeroes it |
 | cash-out rounding to macks | rounds DOWN, odd tokens (< 10) stay on the meter; never pays more than requested or than the balance (`cashOutsRoundDown...`) |
 | Money formatting edge cases | exact for all non-negative Long values (up to 115292150460684697 books 4 macks 7 tokens); negative values are mis-formatted by `describe` / `short` but the app never passes one (net result uses abs) |
@@ -153,7 +153,7 @@ The spin, the debit, the credit, the relic meter and the seeds + bets of any bon
 | same for a Soul Vault (meter pre-loaded to 4 relics, seed searched with the same `Round.play`) | identical replay (cells, kinds, steps, `totalMult`, bonus bet 10), exactly once |
 | one spin that unlocks both bonuses, kill between them | Seance marked seen, kill: the Vault is still pending and identical; both paid once |
 | bonus bet / Seance bet vs stake selected later | paid for the triggering stake (25), unaffected by changing the stake to 1 before the replay |
-| kill between tmp-write and rename (tmp path unwritable -> `IOException`) | wallet.dat untouched, restart shows the pre-spin state: the spin never happened and its result was never shown |
+| the save fails before the rename (tmp path unwritable -> `IOException`) / a crash leaves a stale `wallet.tmp` (even a "richer" one) | wallet.dat untouched, restart shows the pre-spin state: the spin never happened and its result was never shown; a leftover tmp file is never loaded and the next save replaces it |
 | buy then kill; two buys in a row; buy while a bonus is pending | the bought bonus replays identically; second buy refused until it is seen, then allowed; price counted as wagered |
 | buy with insufficient credit (309 tokens for 310) | `null`, nothing changes, nothing written |
 | stake 0, -1, -10, 6, 7, 9, 11, 41, 100, Int.MIN/MAX for spins and buys | refused, balance / counters / file bytes unchanged |
@@ -168,14 +168,14 @@ The spin, the debit, the credit, the relic meter and the seeds + bets of any bon
 
 * **(a) every base-game win >= stake**: true. The engine's line rule equals an independent reference rule on all 12^5 = 248,832 symbol combinations; the smallest positive total over all 2.2 x 10^9 reel stops is 1 x stake; random spins / Seances / vaults at every stake never pay between 0 and the stake (vault >= min(5 bet, cap)).
 * **(b) the cap is applied consistently**: every credit path in `Wallet` uses `payTokens` (= `settle(raw)` = `coerceIn(0, 2000)`) for a spin, a Seance, a Vault and for bought bonuses; no rawTokens reach the balance. **But the cap is per component, not per round** (AUD-1): a spin + the Seance + the Vault it unlocks are capped separately, so one paid spin can return 3 x 2000 = 6000 tokens (75 books). `AuditTest.theCapIsAppliedToASpinASeanceAndAVaultSeparately` builds such a round (6000 tokens). The in-app rules say "per spin and per Soul Vault" and omit the Seance.
-* **(c) buy prices >= exact EV / 0.93**: Seance (3-coffin award) EV 28.7649 x stake -> 30.93 <= 31; Vault EV 28.3489 x bonus bet -> 30.48 <= 31; the author's exact values (28.7652, 28.3513) give 30.93 / 30.49. Margin on the Seance price: 0.07 of 31 (0.2 %).
+* **(c) buy prices >= exact EV / 0.93**: Seance (3-coffin award) EV 28.7649 x stake -> 30.93 <= 31; Vault EV 28.3513 x bonus bet (exact) -> 30.49 <= 31; the author's exact values (28.7652, 28.3513) give 30.93 / 30.49. Margin on the Seance price: 0.07 of 31 (0.2 %).
 * **(d) every money component is linear in the stake or concave**: confirmed in code (the only stake-dependent operations are `raw = mult x stake`, `coerceIn(0, 2000)`, the floored mean in `RelicMeter`, and `price = 31 x stake`) and by test (`everyMoneyComponentIsLinear...`: same random draws at all 12 stakes: the multiple of the stake never depends on the stake, `tokens = min(2000, mult x stake)`, tokens / stake never increases with the stake) for spins, minis, Seances and vaults.
 
 ## 5. Findings
 
 | id | severity | title | reproduce | suggested fix |
 |---|---|---|---|---|
-| AUD-1 | low | The 25-book cap is **per component** (spin, Seance, Vault), so one round can pay up to 6000 tokens (75 books) | `AuditTest.theCapIsAppliedToASpinASeanceAndAVaultSeparately` | either document "per component" everywhere (and add the Seance to the rules sentence) or cap `RoundResult.totalTokens` as a whole (lowers RTP only in astronomically rare rounds; the published table is already below the target) |
+| AUD-1 | low | The 25-book cap is **per component** (spin, Seance, Vault; `ReaperConfig` documents "per spin and per bonus"), so one round can pay up to 6000 tokens (75 books) - the brief's invariant "a round never pays more than the cap" does not hold | `AuditTest.theCapIsAppliedToASpinASeanceAndAVaultSeparately` | either document "per component" everywhere (and add the Seance to the rules sentence) or cap `RoundResult.totalTokens` as a whole (lowers RTP only in astronomically rare rounds; the published table is already below the target) |
 | AUD-2 | low | The simulations that the docs cite as verifying "94 % at every stake" cannot resolve better than about 1 point: `FullGameTest` accepts `max(5 SE, 0.003)` with SE = 0.24 pp at 4M spins (+/- 1.2 pp), `NoExploitTest` policies have SE 0.2-0.4 pp. Only the exact tests carry weight. | read the tolerances | keep them as smoke tests; use `AuditTest` (deterministic 4368-cycle search + engine-vs-reference), `AuditSimTest` and `tools/audit` for real resolution; add `--tests "*AuditTest*"` (10 s) to `build.yml` |
 | AUD-3 | low | Published `RTP_BY_STAKE` is conservative by 0.015-0.031 pp for stakes 15-40 (measured 88.931 % vs 88.90 % at stake 40); `CalibrationTest` tolerance is 0.2 pp | section 1.3, `AuditSimTest.publishedRtpTableIsConservativeAndWithinTolerance` | paste the measured column into `RTP_BY_STAKE` (the player-facing text uses 1 decimal, so only the stake-25 line would change: 91.8 -> 91.9) |
 | AUD-4 | low | `tools/reaper_model.py check` compares only part of the config (reel **counts**, pays, scatter / free-spin tables, feature rate, relic chance, buy prices). Not checked: paylines, the actual strip order, mini-feature / coin / raven / skull tables, every Soul Vault parameter. Today everything is identical. | `python3 tools/audit/check_author_model.py` (0 differences) | run that script (or the snapshot test) in CI |
@@ -192,7 +192,7 @@ The spin, the debit, the credit, the relic meter and the seeds + bets of any bon
 
 * beating the bonus-bet rule: all 4368 five-stake cycles <= 94.000 %; mixing stakes loses to the floor; "bet big when relics arrive fast" (the exploit the previous audit found, 101-104 % on the retired rule) now returns 89-90 %;
 * any stopping rule or quit / restart policy (DP value 0 at every horizon); autoplay limits are stopping rules;
-* feature buys at any stake or meter state (best case 92.79 % / 91.45 %, falling to 77.75 % / 82.80 % at stake 40); buying cannot change the meter;
+* feature buys at any stake or meter state (best case 92.79 % / 91.46 %, falling to 77.75 % / 82.81 % at stake 40); buying cannot change the meter;
 * changing the stake between the trigger and the replay, or after a kill: the bonus keeps the triggering stake (stored with the seed);
 * replaying a Seance / Vault for money: any number of kills, reloads and `markSeen` calls pay exactly once (ledger test with 149 kills);
 * two buys in a row, buying while a bonus is pending, buying without credit, stake 0 / negative / off-list: all refused with no state change;

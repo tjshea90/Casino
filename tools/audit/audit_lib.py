@@ -109,15 +109,3 @@ class Dist:
 
     def prob_gt(self, t):
         return float(self.p[self.y > t].sum())
-
-    def convolve(self, other):
-        """Exact distribution of Y + Y' for independent exact distributions (small supports)."""
-        a = np.zeros(int(self.y.max()) + 1)
-        b = np.zeros(int(other.y.max()) + 1)
-        a[self.y.astype(int)] = self.p
-        b[other.y.astype(int)] = other.p
-        c = np.convolve(a, b)
-        nz = np.nonzero(c)[0]
-        d = Dist(nz, c[nz] * 1.0, exact=self.exact and other.exact)
-        d.n = self.n if not (self.exact and other.exact) else d.n
-        return d
