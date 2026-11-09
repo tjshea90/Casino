@@ -331,4 +331,49 @@ internal object CharKit {
         }
         return m.fixWinding()
     }
+    // ------------------------------------------------------------------------------------------ paths and strands
+    /** Point at parameter [t] (0..1) on the piecewise-linear 3D path [pts]. */
+    fun polyAt(pts: List<FloatArray>, t: Float): FloatArray {
+        val f = t.coerceIn(0f, 1f) * (pts.size - 1)
+        val i = f.toInt().coerceAtMost(pts.size - 2); val u = f - i
+        val a = pts[i]; val b = pts[i + 1]
+        return floatArrayOf(a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u)
+    }
+
+    /** A [Sculpt.tube] whose vertex colour fades along the path (brightness = fade(t)): glowing hair, wisps, streamers. */
+    fun fadeTube(steps: Int, sides: Int, path: (Float) -> FloatArray, radius: (Float) -> Float, fade: (Float) -> Float): MeshData {
+        val m = Sculpt.tube(steps, sides, path, radius)
+        val st = MeshData.STRIDE
+        for (k in 0 until m.vertexCount) { val f = fade(m.v[k * st + 7]); m.v[k * st + 8] = f; m.v[k * st + 9] = f; m.v[k * st + 10] = f }
+        return m
+    }
+
+    /**
+     * A ribbon along a 3D path: [steps] segments, width [width](t), lateral direction [side] (unit), brightness fade [fade](t).
+     * [both] adds a flipped copy so it shows from either side (translucent shrouds).
+     */
+    fun flowRibbon(steps: Int, path: (Float) -> FloatArray, width: (Float) -> Float, side: FloatArray, fade: (Float) -> Float = { 1f }, both: Boolean = false): MeshData {
+        val m = MeshData()
+        for (pass in 0 until (if (both) 2 else 1)) {
+            val flip = if (pass == 0) 1f else -1f
+            val base = m.vertexCount
+            for (k in 0..steps) {
+                val t = k.toFloat() / steps
+                val p = path(t); val q = path(min(1f, t + 0.03f)); val q0 = path(max(0f, t - 0.03f))
+                val tan = unit(q[0] - q0[0], q[1] - q0[1], q[2] - q0[2])
+                val n = unit(tan[1] * side[2] - tan[2] * side[1], tan[2] * side[0] - tan[0] * side[2], tan[0] * side[1] - tan[1] * side[0])
+                val w = width(t) * 0.5f; val f = fade(t)
+                m.vertex(p[0] - side[0] * w, p[1] - side[1] * w, p[2] - side[2] * w, n[0] * flip, n[1] * flip, n[2] * flip, 0f, t, f, f, f)
+                m.vertex(p[0] + side[0] * w, p[1] + side[1] * w, p[2] + side[2] * w, n[0] * flip, n[1] * flip, n[2] * flip, 1f, t, f, f, f)
+            }
+            for (k in 0 until steps) { val a = base + k * 2; m.quad(a, a + 1, a + 3, a + 2) }
+        }
+        return m.fixWinding()
+    }
+    /** Multiplies the vertex colour by k(y): dissolving hems and gradients on a merged mesh. */
+    fun shadeY(m: MeshData, k: (Float) -> Float): MeshData {
+        val st = MeshData.STRIDE
+        for (q in 0 until m.vertexCount) { val f = k(m.v[q * st + 1]); m.v[q * st + 8] *= f; m.v[q * st + 9] *= f; m.v[q * st + 10] *= f }
+        return m
+    }
 }
