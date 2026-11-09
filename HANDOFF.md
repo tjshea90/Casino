@@ -1,5 +1,50 @@
 # >>> LIVE STATUS — READ THIS FIRST (updated every milestone; newest session on top) <<<
 
+## SESSION 7 (2026-11-09) — "NEON REAPER 3.0: DREAD"  (module `:reaper` ONLY — leave Dragon's Hoard `:app` untouched)
+User ask: make Neon Reaper as fun/exciting as possible; far better 3D graphics, sound and music; cool 3D animations and
+characters; dark, scary, NOT childish; copy what major-brand online slots do to be engaging; pick RTP/payout logic like real
+online slots; the house must keep an edge no matter what and never lose money over time.
+
+**Branch:** `ccr-4739e32a-lc758b` (this session's; never push elsewhere). Base = merge of `origin/ccr-5cf48990-4m3710` (v2.1.0, 94 %).
+**Resume protocol (cold start):**
+1. `git fetch origin && git status && git log --oneline -10`; `git worktree list` + `git branch -a` (an agent may have left work in a worktree, see "In flight").
+2. `tools/setup_sandbox.sh` (GL libs, Robolectric jars, local.properties; the SessionStart hook already starts it) — wait for `[setup] done`.
+3. Continue at the first unchecked box below. Max TWO concurrent Gradle runs (4 CPU / 16 GB). Tests: `gradle :reaper:testDebugUnitTest --tests '<Class>'`.
+4. Checkpoint ladder: `tools/checkpoint.sh "msg"` after every step (a throttled hook auto-pushes `wip(auto)` commits every ~8 min);
+   tick boxes + refresh this block at milestones; record the last green commit below. Amending commits is hook-blocked: make a new commit instead.
+   **Release trap:** pushing `release/*.apk` publishes a public GitHub Release; `checkpoint.sh` adds `[skip ci]` automatically when a push would do so by accident; ship only with `SHIP=1`.
+
+**Design decisions (do not re-litigate; reasons in docs/MATH.md + docs/DREAD_DESIGN.md):**
+- RTP stays **94.00 %** (6 % edge): inside the 92–97 % band of real online slots, user chose it in session 6, and every new feature is priced at or below it.
+- **House-edge invariant:** every money component is linear in the stake or concave (25-book cap) so no stake pattern beats it; Soul Vault bonus bet = RelicMeter (Wald-neutral);
+  scatter free spins pay in proportion to the triggering stake; feature BUYS are priced above their exact expected payout; no free-credit promos (rank/ledger are cosmetic).
+  Any money-touching change needs: exact model in tools/reaper_model.py + Kotlin exact test + an adversarial policy test + an independent audit agent.
+- No "loss disguised as a win" (every win >= stake, UKGC-style); anticipation effects only reflect symbols really landed; no inflated near-misses.
+- Player protection like regulated brands: session time + net shown, reality check (default every 30 min), autoplay win/loss limits, "reduce flashing" option.
+- Cast (reel symbols 0..11): Reaper (wild), Plague Doctor, Cursed Skull, Blood Raven, Demon, Wraith, A K Q J 10, Coffin (SCATTER). Minis: Reaper's Touch, Murder of Crows, Demon's Bargain, Skull's Curse.
+- New features: **THE SÉANCE** (3/4/5 coffins -> 8/12/20 free spins, richer reels, rising multiplier x1..x10, retrigger), **Feature Buy** (Séance / Soul Vault),
+  win tiers (SOUL REAPED 10x / DEATH'S TOLL 25x / HELLFIRE 50x / APOCALYPSE 100x), anticipation, Soul Rank + Reaper's Ledger (cosmetic), autoplay limits, settings.
+
+**Work queue (tick as you go; owner in brackets):**
+- [x] 0. Baseline merged + pushed ([skip ci]); tools/setup_sandbox.sh, checkpoint.sh release-trap guard, autosave + session-start hooks (.claude/settings.json)
+- [ ] 1. docs/DREAD_DESIGN.md (research: what major brands do, what we copy / refuse, sources)
+- [ ] 2. AUDIO (agent, worktree): dark score BASE/SEANCE/VAULT with adaptive intensity + ~50 SFX; contract = `Audio.Sfx`/`Track` enums in Audio.kt
+- [ ] 3. MATH v3 (me): tools/reaper_model.py + engine (scatter, FreeSpins, buy prices, re-tuned strips) + exact/sim/exploit tests + PAR sheet in docs/MATH.md
+- [ ] 4. Wallet: FS + buy persistence (seed based, crash safe), session stats, rank XP, ledger, settings, reality check
+- [ ] 5. GL foundation: FBO + bloom/vignette/grain/grade, multi-light, merged vertex-colour meshes, quality tiers, reduce-flashing
+- [ ] 6. New cast meshes + animation (Reaper first as the reference), royals restyle, coffin scatter
+- [ ] 7. New world: gothic crypt/graveyard, altar cabinet, candles/chains/fog/moon, camera moves
+- [ ] 8. HUD restyle + win tiers + anticipation + Séance mode + feature-buy dialog + autoplay limits + settings/rank/ledger
+- [ ] 9. Soul Vault restyle (dark crypt, lit orbs)
+- [ ] 10. Integrate audio; QA; independent math audit; code review; perf budget; README/MATH; release v3.0.0 (`SHIP=1`)
+
+**In flight (agents / worktrees):** none yet.
+**Last verified-green commit:** (baseline 77f3e0b = v2.1.0 tests green per session 6)
+**Status line:** session 7 just started; baseline merged; infra (checkpoint/hooks/setup) done; next = design doc, audio agent, math v3.
+
+---
+# Session 6 status (archived, still accurate for the math background)
+
 **Resume protocol (cold start, nothing else needed):**
 1. `git fetch origin && git branch --show-current` — work on the branch you were assigned (this task: `ccr-5cf48990-4m3710`).
    Never push to another branch without the user's OK. `main` is not used.
