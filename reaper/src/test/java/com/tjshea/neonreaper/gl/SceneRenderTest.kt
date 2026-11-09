@@ -66,6 +66,9 @@ class SceneRenderTest {
         stopped(s, grid); s.bigWin = -1f; s.flash = 0f
         s.mood = 1f; s.hoodedExcited = true; s.reaperExcited = true; s.souls = 0.5f
         scene.render(s, 8f, W, H); hl.save(File("build/screens/gl_seance.png"))
+        s.seanceCoffins = 4
+        for ((i, k) in floatArrayOf(0.2f, 0.4f, 0.75f).withIndex()) { s.seanceOpen = k; s.mood = 0.4f + 0.2f * i; scene.render(s, 8.1f + i * 0.05f, W, H); hl.save(File("build/screens/gl_seance_open$i.png")) }
+        s.seanceOpen = 0f; s.seanceCoffins = 0; s.mood = 1f
         s.mood = 0f; s.anticipation = 0.9f; s.hoodedExcited = false; s.reaperExcited = false; s.souls = 0f
         scene.render(s, 8.4f, W, H); hl.save(File("build/screens/gl_anticipation.png"))
         s.anticipation = 0f; s.shake = 1f; s.bigWin = 0.9f

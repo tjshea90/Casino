@@ -276,6 +276,7 @@ class Scene3D(private val gl: Gl) {
         drawReaperTouch()
         drawBigWin()
         drawShowcase()
+        drawSeanceCoffins()
         drawBats(); mark("effects")
 
         // translucent: fog banks, particles, glows
@@ -961,6 +962,28 @@ class Scene3D(private val gl: Gl) {
         val e = q * q * (3 - 2 * q)
         val mm = m(); Mat4.translate(mm, 0f, -6.2f + 4.6f * e, Layout3D.R + 0.4f); Mat4.scale(mm, 3.6f, 3.6f, 3.6f)
         castOr(ReaperConfig.WILD, mm, t, true, 1f) { drawReaper(mm, t, true, 1f, scythe = true, crimson = false) }
+    }
+
+    private fun smooth(a: Float, b: Float, x: Float): Float { val q = ((x - a) / (b - a)).coerceIn(0f, 1f); return q * q * (3 - 2 * q) }
+
+    /** THE SÉANCE cinematic: the coffins that landed rise out of the floor in front of the reels, shake, and burst open. */
+    private fun drawSeanceCoffins() {
+        val k = S.seanceOpen; val n = S.seanceCoffins
+        if (k <= 0f || n < 3 || Cast.hero(ReaperConfig.SCATTER) == null) return
+        val rise = smooth(0f, 0.28f, k); val open = smooth(0.42f, 0.62f, k)
+        for (i in 0 until n) {
+            val c = (i - (n - 1) / 2f)
+            val x = c * 1.35f
+            val r = smooth(0f, 1f, rise * 1.15f - i * 0.04f)
+            val y = -3.4f + r * 3.0f
+            val shake = if (k in 0.28f..0.46f && !S.calm) sin(t * 60f + i * 3f) * 0.03f else 0f
+            val mm = m(); Mat4.translate(mm, x + shake, y, Layout3D.R + 1.3f); Mat4.rotate(mm, c * -7f, 0f, 1f, 0f); Mat4.scale(mm, 2.05f, 2.05f, 2.05f)
+            drawCharacter(ReaperConfig.SCATTER, mm, t + i * 0.37f, open > 0.3f, 1f, hero = true)
+            if (open > 0f) {
+                glow(x, y + 1.7f, Layout3D.R + 1.6f, 3.4f * open, 0xB6FF8A, 0.30f * open, 0.15f)
+                glow(x, y + 3.2f, Layout3D.R + 1.4f, 1.6f * open, 0xFFFFFF, 0.25f * open, 0.4f)
+            }
+        }
     }
 
     private fun drawShowcase() {

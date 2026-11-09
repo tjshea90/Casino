@@ -140,7 +140,8 @@ class SeanceFlowTest {
         v.animateSpin(SpinPlay(o, -1, null, se))
         val shots = HashMap<String, (ReaperView) -> Boolean>()
         shots["s_spin"] = { x -> x.debugPhase() == "SPINNING" }
-        shots["s_trigger"] = { x -> x.debugPhase() == "SEANCE_TRIGGER" }
+        shots["s_trigger"] = { x -> x.debugPhase() == "SEANCE_TRIGGER" && x.debugPhaseAge() > 2.3 }
+        shots["s_trigger_early"] = { x -> x.debugPhase() == "SEANCE_TRIGGER" && x.debugPhaseAge() > 0.9 }
         var freeShots = 0
         shots["s_free"] = { x -> x.debugSeanceActive() && x.debugPhase() == "PRESENT" && x.debugFreeSpinsPlayed() >= 2 && freeShots++ == 3 }
         shots["s_end"] = { x -> x.debugPhase() == "SEANCE_END" }

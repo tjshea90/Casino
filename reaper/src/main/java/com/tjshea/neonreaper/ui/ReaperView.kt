@@ -128,6 +128,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
     /** Test hooks: the state machine's phase and the part of the credit meter that is still hidden (unrevealed wins). */
     internal fun debugPhase(): String = phase.name
     internal fun debugHidden(): Long = pendingWin + pendingVault + pendingSeance
+    internal fun debugPhaseAge(): Double = now() - phaseStart
     internal fun debugSeanceActive(): Boolean = seance != null
     internal fun debugFreeSpinsPlayed(): Int = seanceIdx
 
@@ -1993,7 +1994,8 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
             s.calm = wallet.reduceFlash
             s.mood = moodNow
             s.anticipation = if (phase == Phase.SPINNING && antFrom >= 1 && t >= antStart) ((t - antStart) / (antEnd - antStart).coerceAtLeast(0.4)).toFloat().coerceIn(0f, 1f) else 0f
-            s.seanceOpen = if (phase == Phase.SEANCE_TRIGGER) ((t - phaseStart) / 3.0).toFloat().coerceIn(0f, 1f) else 0f
+            s.seanceOpen = if (phase == Phase.SEANCE_TRIGGER) ((t - phaseStart) / 3.0).toFloat().coerceIn(0.001f, 1f) else 0f
+            s.seanceCoffins = if (phase == Phase.SEANCE_TRIGGER) (seance?.coffins ?: 0) else 0
             s.shake = if (t < shakeUntil && !wallet.reduceFlash) ((shakeUntil - t) / 0.5).toFloat().coerceIn(0f, 1f) else 0f
         }
     }
@@ -2165,7 +2167,8 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         val e = (t - phaseStart).toFloat()
         val w = width.toFloat(); val h = height.toFloat()
         val q = (e / 0.7f).coerceIn(0f, 1f)
-        pFill.color = Color.argb((215 * q).toInt(), 6, 0, 2); c.drawRect(0f, 0f, w, h, pFill)
+        val g3 = lay3d != null
+        pFill.color = Color.argb(((if (g3) 105 else 215) * q).toInt(), 6, 0, 2); c.drawRect(0f, 0f, w, h, pFill)
         val breathe = if (calm()) 0.8f else 0.75f + 0.25f * sin(e * 5f)
         pFill.shader = RadialGradient(w / 2, h * 0.5f, max(w, h) * 0.65f, intArrayOf(0x00000000, Color.argb((140 * breathe * q).toInt(), 150, 0, 16)), floatArrayOf(0.3f, 1f), Shader.TileMode.CLAMP)
         c.drawRect(0f, 0f, w, h, pFill); pFill.shader = null
@@ -2175,7 +2178,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         val gap = cw * 0.55f
         val rise = (e / 0.9f).coerceIn(0f, 1f); val riseE = 1f - (1f - rise) * (1f - rise)
         val open = ((e - 1.35f) / 0.5f).coerceIn(0f, 1f)
-        for (i in 0 until n) {
+        if (!g3) for (i in 0 until n) {
             val cx0 = w / 2 + (i - (n - 1) / 2f) * (cw + gap)
             val cy0 = h * 0.56f + (1f - riseE) * h * 0.5f
             val shake = if (e in 0.9f..1.35f && !calm()) (fx.nextFloat() - 0.5f) * 8f * u else 0f
