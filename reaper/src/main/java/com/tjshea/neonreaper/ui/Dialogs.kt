@@ -22,7 +22,10 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import com.tjshea.neonreaper.data.Achievements
 import com.tjshea.neonreaper.data.AuthResult
+import com.tjshea.neonreaper.data.Feature
+import com.tjshea.neonreaper.data.Ranks
 import com.tjshea.neonreaper.data.Wallet
 import com.tjshea.neonreaper.engine.ReaperConfig
 import com.tjshea.neonreaper.engine.Money
@@ -30,6 +33,13 @@ import java.text.DateFormat
 import java.util.Date
 import java.util.concurrent.Executors
 import kotlin.math.max
+
+/**
+ * What the autoplay picker returns. [spins] < 0 = until stopped. [stopOnWinX]: stop after a round that pays >= this many times
+ * the stake (0 = off). [lossLimit]: stop once the credit has fallen by this many tokens since autoplay started (0 = off).
+ * (Regulated brands add exactly these limits to autoplay.)
+ */
+class AutoPlan(val spins: Int, val stopOnWinX: Int = 0, val lossLimit: Long = 0L)
 
 /** Casino-styled dialogs built in code (no layout inflation, no AndroidX). */
 class Dialogs(private val act: Activity, private val wallet: Wallet, private val onChanged: () -> Unit) {
@@ -451,15 +461,87 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
         ), cancelable = false)
     }
 
-    fun autoPicker(onPicked: (Int) -> Unit) {
+    fun autoPicker(onPicked: (AutoPlan) -> Unit) {
         lateinit var dlg: Dialog
-        fun pick(n: Int) = button(if (n < 0) "Until stopped" else "$n spins", 0xFF1565C0.toInt()) { dlg.dismiss(); onPicked(n) }
+        var winX = 0; var lossPct = 0
+        val winLabel = text("Stop on a single win of:  OFF", 14f, center = true)
+        val lossLabel = text("Stop if my credit drops by:  OFF", 14f, center = true)
+        fun cycle(label: TextView, text: String, values: IntArray, get: () -> Int, set: (Int) -> Unit, fmt: (Int) -> String) =
+            button("Change", 0xFF37474F.toInt()) {
+                set(values[(values.indexOf(get()) + 1) % values.size]); label.text = text + "  " + fmt(get())
+            }
+        val winBtn = cycle(winLabel, "Stop on a single win of:", intArrayOf(0, 10, 25, 50, 100), { winX }, { winX = it }) { if (it == 0) "OFF" else "${it}x stake" }
+        val lossBtn = cycle(lossLabel, "Stop if my credit drops by:", intArrayOf(0, 10, 25, 50), { lossPct }, { lossPct = it }) { if (it == 0) "OFF" else "$it %" }
+        fun pick(n: Int) = button(if (n < 0) "Until stopped" else "$n spins", 0xFF4A1A1A.toInt()) {
+            dlg.dismiss(); onPicked(AutoPlan(n, winX, if (lossPct == 0) 0L else wallet.balance * lossPct / 100))
+        }
         dlg = show(vbox(
             title("AUTOPLAY"),
-            text("Autoplay stops when you tap SPIN/STOP or credit runs out. It pauses for the Soul Vault.", 14f, center = true),
+            text("Autoplay stops when you tap SPIN/STOP, when credit runs out, or at the limits below. It always pauses for the Soul Vault and THE SÉANCE.", 14f, center = true),
+            row(winLabel, winBtn, weights = true), row(lossLabel, lossBtn, weights = true),
             row(pick(10), pick(25), pick(50)), row(pick(100), pick(-1)),
             button("Cancel", 0xFF424242.toInt()) { dlg.dismiss() }
-        ), widthFrac = 0.5f)
+        ), widthFrac = 0.55f)
+    }
+
+    /** Feature Buy: skip the wait for THE SÉANCE or the SOUL VAULT at a fixed price (priced above its exact expected payout). */
+    fun buyFeature(stake: Int, onChoice: (Feature) -> Unit) {
+        lateinit var dlg: Dialog
+        val sPrice = wallet.buyPrice(Feature.SEANCE, stake); val vPrice = wallet.buyPrice(Feature.VAULT, stake)
+        dlg = show(vbox(
+            title("FEATURE BUY"),
+            text("Skip the wait: THE SÉANCE costs ${ReaperConfig.BUY_SEANCE_X}x your stake (8 free spins, the multiplier climbs to x10), the SOUL VAULT ${ReaperConfig.BUY_VAULT_X}x. " +
+                "A bought round pays about 92 % back on average (the same 94 % machine, never more).", 14f, center = true),
+            button("THE SÉANCE  —  ${Money.fmt(sPrice)} tokens", 0xFF7A1018.toInt()) { dlg.dismiss(); onChoice(Feature.SEANCE) }.also { it.isEnabled = wallet.canBuy(Feature.SEANCE, stake) },
+            button("SOUL VAULT  —  ${Money.fmt(vPrice)} tokens", 0xFF1F5A12.toInt()) { dlg.dismiss(); onChoice(Feature.VAULT) }.also { it.isEnabled = wallet.canBuy(Feature.VAULT, stake) },
+            text("Credit: ${Money.fmt(wallet.balance)} tokens", 13f, center = true),
+            button("Cancel", 0xFF424242.toInt()) { dlg.dismiss() }
+        ), widthFrac = 0.55f)
+    }
+
+    /** Quality, reduce-flashing, reality-check interval and volume. */
+    fun settings(onChanged: () -> Unit) {
+        lateinit var dlg: Dialog
+        val qNames = arrayOf("Auto", "Low", "Medium", "High")
+        val rNames = mapOf(0 to "Off", 15 to "Every 15 min", 30 to "Every 30 min", 60 to "Every hour")
+        val q = button("Graphics quality: ${qNames[wallet.quality]}", 0xFF37474F.toInt()) {}
+        q.setOnClickListener { wallet.quality = (wallet.quality + 1) % 4; q.text = "Graphics quality: ${qNames[wallet.quality]}"; wallet.saveSettings(); onChanged() }
+        val f = button("Reduce flashing: ${if (wallet.reduceFlash) "ON" else "OFF"}", 0xFF37474F.toInt()) {}
+        f.setOnClickListener { wallet.reduceFlash = !wallet.reduceFlash; f.text = "Reduce flashing: ${if (wallet.reduceFlash) "ON" else "OFF"}"; wallet.saveSettings(); onChanged() }
+        val r = button("Reality check: ${rNames[wallet.realityMinutes]}", 0xFF37474F.toInt()) {}
+        r.setOnClickListener {
+            val order = intArrayOf(0, 15, 30, 60); wallet.realityMinutes = order[(order.indexOf(wallet.realityMinutes) + 1) % order.size]
+            r.text = "Reality check: ${rNames[wallet.realityMinutes]}"; wallet.saveSettings(); onChanged()
+        }
+        val mv = button("Music volume: ${wallet.musicVolume} %", 0xFF37474F.toInt()) {}
+        mv.setOnClickListener { wallet.musicVolume = (wallet.musicVolume + 20) % 120; mv.text = "Music volume: ${wallet.musicVolume} %"; wallet.saveSettings(); onChanged() }
+        val sv = button("Effects volume: ${wallet.sfxVolume} %", 0xFF37474F.toInt()) {}
+        sv.setOnClickListener { wallet.sfxVolume = (wallet.sfxVolume + 20) % 120; sv.text = "Effects volume: ${wallet.sfxVolume} %"; wallet.saveSettings(); onChanged() }
+        dlg = show(vbox(title("SETTINGS"), q, f, r, mv, sv, button("Done", 0xFF2E7D32.toInt()) { dlg.dismiss() }), widthFrac = 0.5f)
+    }
+
+    /** Soul Rank (cosmetic, from lifetime tokens wagered) and Reaper's Ledger (achievements). */
+    fun rank() {
+        val rk = wallet.rank
+        val sb = StringBuilder()
+        sb.append("SOUL RANK: ${rk.title.uppercase()}\n")
+        if (rk.isTop) sb.append("You have reached the highest rank.\n") else sb.append("${Money.fmt(Ranks.ALL[rk.index + 1].from - wallet.totalWagered)} more tokens wagered to ${Ranks.ALL[rk.index + 1].title}.\n")
+        sb.append("\nREAPER'S LEDGER\n")
+        for (a in Achievements.ALL) sb.append(if (Achievements.isUnlocked(wallet, a.id)) "✔ ${a.title} — ${a.text}\n" else "✖ ${a.title} — ${a.text}\n")
+        message("RANK & LEDGER", sb.toString())
+    }
+
+    /** Reality check: time played and net result so far this session. */
+    fun reality(onContinue: () -> Unit, onStop: () -> Unit) {
+        lateinit var dlg: Dialog
+        val mins = wallet.sessionMillis / 60000
+        val net = wallet.sessionNet
+        dlg = show(vbox(
+            title("REALITY CHECK"),
+            text("You have been playing for $mins minutes.\nWagered: ${Money.fmt(wallet.sessionWagered)} tokens\nWon: ${Money.fmt(wallet.sessionWon)} tokens\n" +
+                "Net result: ${if (net >= 0) "+" else "-"}${Money.fmt(Math.abs(net))} tokens", 16f, center = true),
+            row(button("Take a break", 0xFF7A1018.toInt()) { dlg.dismiss(); onStop() }, button("Keep playing", 0xFF2E7D32.toInt()) { dlg.dismiss(); onContinue() })
+        ), cancelable = false, widthFrac = 0.5f)
     }
 
     fun message(t: String, body: String) {

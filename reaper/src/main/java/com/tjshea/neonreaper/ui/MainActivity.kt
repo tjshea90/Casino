@@ -41,7 +41,11 @@ class MainActivity : Activity(), ReaperView.Host {
         when {
             status == Wallet.LoadStatus.TAMPERED -> dialogs.tampered()
             !wallet.hasPassword -> dialogs.setupPassword()
-            else -> wallet.pendingVault()?.let { v -> game.post { game.resumeVault(v) } }
+            else -> {
+                val se = wallet.pendingSeance()
+                val v = wallet.pendingVault()
+                if (se != null) game.post { game.resumeSeance(se) } else if (v != null) game.post { game.resumeVault(v) }
+            }
         }
     }
 
@@ -103,7 +107,17 @@ class MainActivity : Activity(), ReaperView.Host {
     override fun openWithdraw() { if (ready()) dialogs.withdraw() else gate() }
     override fun openInfo() = dialogs.info(wallet.stake)
     override fun openStats() { if (ready()) dialogs.stats() else gate() }
-    override fun openAutoPicker(onPicked: (Int) -> Unit) = dialogs.autoPicker(onPicked)
+    override fun openAutoPicker(onPicked: (AutoPlan) -> Unit) = dialogs.autoPicker(onPicked)
+    override fun openBuy(stake: Int, onChoice: (com.tjshea.neonreaper.data.Feature) -> Unit) { if (ready()) dialogs.buyFeature(stake, onChoice) else gate() }
+    override fun openSettings() = dialogs.settings { applySettings() }
+    override fun openRank() = dialogs.rank()
+    override fun openReality(onContinue: () -> Unit, onStop: () -> Unit) = dialogs.reality(onContinue, onStop)
+
+    /** Pushes the saved settings (volumes, quality) into the audio and graphics layers. */
+    private fun applySettings() {
+        audio.sfxVolume = wallet.sfxVolume / 100f; audio.musicVolume = wallet.musicVolume / 100f
+        game.onWalletChanged()
+    }
 
     override fun onPause() {
         super.onPause()

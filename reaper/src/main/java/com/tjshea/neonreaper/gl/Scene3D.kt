@@ -239,6 +239,9 @@ class Scene3D(private val gl: Gl) {
         camX = l.camX; camY = l.camY; camZ = l.camZ
         l.viewProj.copyInto(vp)
         glowUsed = 0
+        plN = 0
+        addWorldLights()
+        plWorld = plN
 
         // shared noise texture on unit 1 (unit 0 is the reel atlas)
         gl.activeTexture(Gl.TEXTURE1); gl.bindTexture(Gl.TEXTURE_2D, noiseTex); gl.activeTexture(Gl.TEXTURE0)
@@ -272,9 +275,29 @@ class Scene3D(private val gl: Gl) {
         gl.depthMask(true)
 
         if (usePost) {
-            postParams.flash = S.flash * 0.35f
-            post.end(target, w, h, quality, time, postParams)
+            val p = postParams; val k = S.mood
+            val beat = if (S.anticipation > 0f) S.anticipation * (0.5f + 0.5f * sin(time * 8.5f)) else 0f
+            p.flash = S.flash * 0.35f
+            p.tint[0] = 1f + 0.16f * k; p.tint[1] = 1f - 0.26f * k; p.tint[2] = 1f - 0.28f * k
+            p.saturation = 0.86f + 0.06f * k
+            p.vignette = 0.62f + 0.10f * k
+            p.pulse = beat
+            p.bloom = 0.85f + 0.30f * S.anticipation + 0.25f * S.seanceOpen + 0.35f * S.bigWin.coerceAtLeast(0f)
+            p.aberration = 0.0045f + 0.006f * S.shake + 0.004f * S.anticipation
+            val amp = 0.012f * S.shake
+            p.shakeX = amp * sin(time * 91f) * cos(time * 37f); p.shakeY = amp * cos(time * 83f) * sin(time * 53f)
+            post.end(target, w, h, quality, time, p)
         }
+    }
+
+    private fun lerp(a: Float, b: Float, k: Float) = a + (b - a) * k
+
+    /** Lights shared by the whole frame (braziers, candles): slots 0..plWorld-1; characters add local lights after them. */
+    private fun addWorldLights() {
+        val fl = 0.85f + 0.15f * sin(t * 11f) * sin(t * 4.1f) + 0.08f * sin(t * 23f)
+        val red = lerp(1f, 1.5f, S.mood)
+        pointLight(-4.9f, -1.0f, 1.6f, 7.5f, 0xFF6A2A, 0.85f * fl * red)       // left brazier
+        pointLight(4.9f, -1.0f, 1.6f, 7.5f, 0xFF6A2A, 0.85f * (1.7f - fl) * red)  // right brazier (out of phase)
     }
 
     /** The sky is expensive per pixel and soft by nature: render it at a fraction of the resolution and stretch it. */
@@ -292,7 +315,7 @@ class Scene3D(private val gl: Gl) {
         }
         gl.bindFramebuffer(Gl.FRAMEBUFFER, skyFbo); gl.viewport(0, 0, sw, sh)
         gl.disable(Gl.DEPTH_TEST); gl.disable(Gl.CULL_FACE); gl.disable(Gl.BLEND)
-        sky.use(); sky.f("uTime", t); sky.f2("uRes", sw.toFloat(), sh.toFloat()); sky.f2("uMoon", 0.83f, 0.8f); sky.f("uMoonR", 0.075f); sky.f("uFlash", S.flash)
+        sky.use(); sky.f("uTime", t); sky.f2("uRes", sw.toFloat(), sh.toFloat()); sky.f2("uMoon", 0.83f, 0.8f); sky.f("uMoonR", 0.075f + 0.02f * S.mood); sky.f("uFlash", S.flash); sky.f("uMood", S.mood)
         mScreen.draw(gl)
         gl.bindFramebuffer(Gl.FRAMEBUFFER, cur); gl.viewport(0, 0, w, h)
         blit.use(); blit.i("uTex", 0)
@@ -302,13 +325,16 @@ class Scene3D(private val gl: Gl) {
 
     private fun setupLit() {
         lit.use()
-        lit.f3("uLightDir", -0.38f, 0.62f, 0.69f)
+        val k = S.mood
+        lit.f3("uLightDir", -0.42f, 0.66f, 0.62f)
         val fl = S.flash
-        lit.f3("uLightColor", 0.95f + fl, 0.72f + fl, 0.68f + fl)
-        lit.f3("uFill", 0.07f, 0.12f, 0.2f)
-        lit.f3("uAmbientTop", 0.16f, 0.11f, 0.22f); lit.f3("uAmbientBottom", 0.04f, 0.07f, 0.03f)
+        lit.f3("uLightColor", lerp(0.66f, 0.95f, k) + fl, lerp(0.70f, 0.24f, k) + fl, lerp(0.92f, 0.20f, k) + fl)
+        lit.f3("uFill", lerp(0.06f, 0.10f, k), lerp(0.10f, 0.02f, k), lerp(0.18f, 0.03f, k))
+        lit.f3("uAmbientTop", lerp(0.13f, 0.22f, k), lerp(0.10f, 0.03f, k), lerp(0.20f, 0.05f, k))
+        lit.f3("uAmbientBottom", lerp(0.04f, 0.10f, k), lerp(0.05f, 0.01f, k), lerp(0.04f, 0.01f, k))
         lit.f3("uCamPos", camX, camY, camZ)
-        lit.f3("uFogColor", 0.05f, 0.08f, 0.05f); lit.f("uFogDensity", 0.035f)
+        lit.f3("uFogColor", lerp(0.035f, 0.14f, k), lerp(0.045f, 0.012f, k), lerp(0.075f, 0.02f, k)); lit.f("uFogDensity", 0.034f)
+        lit.f3("uMood", 1f + 0.12f * k, 1f - 0.34f * k, 1f - 0.38f * k)
         lit.f("uFlash", fl); lit.f("uTime", t)
         lit.i("uTex", 0); lit.i("uNoise", 1)
         uploadPointLights()
@@ -316,10 +342,18 @@ class Scene3D(private val gl: Gl) {
 
     // ---- point lights (candles, eyes, flashes): up to 4 per frame, uploaded once in setupLit()
     private val plPos = FloatArray(16); private val plCol = FloatArray(12); private var plN = 0
+    private var plWorld = 0; private var plDirty = true
+
+    /** Re-uploads the point lights if they changed since the last draw (characters add local lights while they are drawn). */
+    private fun flushLights() { if (plDirty) { uploadPointLights(); plDirty = false } }
+
+    /** Call before drawing a character: drops the previous character's lights, keeps the frame's world lights. */
+    internal fun beginLocalLights() { plN = plWorld; plDirty = true }
 
     /** Adds a point light for this frame (world position, radius, colour 0xRRGGBB scaled by [k]). Extra lights beyond 4 are ignored. */
     internal fun pointLight(x: Float, y: Float, z: Float, radius: Float, color: Int, k: Float = 1f) {
         if (plN >= 4) return
+        plDirty = true
         plPos[plN * 4] = x; plPos[plN * 4 + 1] = y; plPos[plN * 4 + 2] = z; plPos[plN * 4 + 3] = radius
         plCol[plN * 3] = ((color shr 16) and 255) / 255f * k; plCol[plN * 3 + 1] = ((color shr 8) and 255) / 255f * k; plCol[plN * 3 + 2] = (color and 255) / 255f * k
         plN++
@@ -332,6 +366,7 @@ class Scene3D(private val gl: Gl) {
     }
 
     private fun uploadPointLights() {
+        plDirty = false
         for (i in 0 until 4) {
             lit.f4("uPL$i", plPos[i * 4], plPos[i * 4 + 1], plPos[i * 4 + 2], plPos[i * 4 + 3])
             if (i < plN) lit.f3("uPC$i", plCol[i * 3], plCol[i * 3 + 1], plCol[i * 3 + 2]) else lit.f3("uPC$i", 0f, 0f, 0f)
@@ -344,6 +379,7 @@ class Scene3D(private val gl: Gl) {
                      p0: Float = 1f, p1: Float = 1f, emisK: Float = 1f, dim: Float = 1f, cut: Boolean = false) {
         Mat4.mul(mvp, vp, model)
         lit.m4("uMvp", mvp); lit.m4("uModel", model); lit.m3("uNormalMat", Mat4.normalMatrix(nrm, model))
+        flushLights()
         lit.i("uMode", mode)
         lit.rgb("uColor", color, dim); lit.rgb("uEmissive", emis, emisK * dim); lit.rgb("uRim", rim, dim)
         lit.f("uSpec", spec); lit.f("uShine", shine); lit.f("uWave", wave); lit.f("uAlpha", alpha)
@@ -359,6 +395,7 @@ class Scene3D(private val gl: Gl) {
                        spec: Float = 0.3f, shine: Float = 24f, wave: Float = 0f) {
         Mat4.mul(mvp, vp, model)
         lit.m4("uMvp", mvp); lit.m4("uModel", model); lit.m3("uNormalMat", Mat4.normalMatrix(nrm, model))
+        flushLights()
         lit.i("uMode", 20)
         lit.f3("uColor", dim, dim, dim); lit.f3("uEmissive", 0f, 0f, 0f); lit.rgb("uRim", rim, dim)
         lit.f("uSpec", spec); lit.f("uShine", shine); lit.f("uWave", wave); lit.f("uAlpha", alpha)
@@ -503,10 +540,10 @@ class Scene3D(private val gl: Gl) {
                 val excited = cell >= 0 && S.cellExcited[cell]
                 val pop = if (cell >= 0) S.cellPop[cell] else 1f
                 val flash = if (cell >= 0) S.cellFlash[cell] else 0f
-                val character = sym <= ReaperConfig.GHOST
+                val character = sym <= ReaperConfig.WRAITH || (sym == ReaperConfig.SCATTER && Cast.get(sym) != null)
                 if (S.fast[r] || !character) {
                     // painted face from the atlas (blurred when spinning fast)
-                    val idx = if (S.fast[r]) sym + 11 else sym
+                    val idx = if (S.fast[r]) sym + ReaperConfig.SYMBOL_COUNT else sym
                     lit.f4("uUvRect", (idx % atlasCols).toFloat() / atlasCols, (idx / atlasCols).toFloat() / atlasRows, 1f / atlasCols, 1f / atlasRows)
                     gl.activeTexture(Gl.TEXTURE0); gl.bindTexture(Gl.TEXTURE_2D, atlasTex)
                     val f2 = face.copyOf()
@@ -540,7 +577,7 @@ class Scene3D(private val gl: Gl) {
 
     private fun drawCharacter(sym: Int, mm: FloatArray, tt: Float, ex: Boolean, dim: Float = 1f) {
         val model = Cast.get(sym)
-        if (model != null) { model.draw(this, mm, tt, if (ex) 1f else 0f, dim); return }
+        if (model != null) { beginLocalLights(); model.draw(this, mm, tt, if (ex) 1f else 0f, dim); beginLocalLights(); return }
         when (sym) {
             ReaperConfig.WILD -> drawReaper(mm, tt, ex, dim, scythe = true, crimson = false)
             ReaperConfig.HOODED -> drawReaper(mm, tt, ex, dim, scythe = false, crimson = true)
@@ -881,6 +918,7 @@ class Scene3D(private val gl: Gl) {
         plN = 0
         pointLight(-1.2f, 1.1f, 1.6f, 4.0f, 0xFF5A40, 0.5f)       // warm red kicker (candle / hellfire)
         pointLight(1.6f, 0.9f, 1.2f, 4.0f, 0x6FA8FF, 0.35f)       // cold moon fill
+        plWorld = plN
         setupLit()
         val mm = Mat4.identity(); Mat4.translate(mm, 0f, 0f, 0f); Mat4.rotate(mm, yawDeg, 0f, 1f, 0f); Mat4.scale(mm, scale, scale, scale)
         // a dark stone slab to stand on
