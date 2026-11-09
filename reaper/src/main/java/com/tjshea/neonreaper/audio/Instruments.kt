@@ -330,12 +330,12 @@ internal fun sawPad(notes: DoubleArray, dur: Double, seed: Long, attack: Double,
         osc[v].phase = ph - kotlin.math.floor(ph)
     }
     val f1 = Svf(); val f2 = Svf()
-    val atk = max(1, frames(attack)); val rel = max(1, frames(release))
+    val atk = frames(attack); val rel = frames(release)       // 0 = no ramp (periodic loop material)
     var env = 0.0; var cut = cutLo
     val gain = 1.0 / sqrt(voices.toDouble())
     for (i in 0 until n) {
         if (i and 31 == 0) {
-            val e = smooth(min(1.0, i.toDouble() / atk)) * smooth(min(1.0, (n - 1 - i).toDouble() / rel))
+            val e = (if (atk == 0) 1.0 else smooth(min(1.0, i.toDouble() / atk))) * (if (rel == 0) 1.0 else smooth(min(1.0, (n - 1 - i).toDouble() / rel)))
             env = e
             val lfo = if (lfoHz > 0) Tables.cyc(lfoHz * (i / SRD + t0)).toDouble() * lfoDepth else 0.0
             cut = (cutLo + (cutHi - cutLo) * e) * (1.0 + lfo)

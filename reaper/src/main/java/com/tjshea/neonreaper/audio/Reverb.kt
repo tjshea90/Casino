@@ -24,7 +24,6 @@ internal object Reverb {
 
     /** Measured raw network gain for white noise: about CAL * rt60^0.19 * size^-0.2 (see AudioDspTest.reverbGainIsNormalised). */
     private const val CAL = 0.30
-    @JvmField var debugSamples = 0L
 
     /**
      * Runs [src] (first [srcN] samples, then [tailN] samples of silence) through the reverb and ADDS the result times [gain]
@@ -56,7 +55,6 @@ internal object Reverb {
         val norm = gain / (CAL * spec.rt60.pow(0.19) * spec.size.pow(-0.2)).toFloat() * 0.5f
         val dn = dstL.size
         val total = srcN + tailN
-        debugSamples += total
         val modAmp = spec.mod
         val stride = B + 1
         var wp = 0
