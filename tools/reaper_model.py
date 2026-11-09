@@ -64,8 +64,8 @@ CFG = SimpleNamespace(
     pays=[(6, 20, 100), (3, 10, 40), (3, 6, 25), (2, 5, 15), (2, 4, 12), (2, 3, 8),
           (1, 2, 6), (1, 2, 5), (1, 2, 4), (1, 1, 4), (1, 1, 3), (0, 0, 0)],      # x stake for 3/4/5 of a kind
     #       W DOC SK RV DE WR  A  K  Q  J 10 SC
-    counts=[1, 3, 3, 5, 5, 5, 6, 6, 8, 9, 12, 2],                                   # symbols per BASE reel strip (all 5 reels)
-    fs_counts=[2, 3, 3, 4, 4, 4, 5, 5, 6, 6, 7, 2],                                 # symbols per SEANCE reel strip
+    counts=[1, 4, 4, 6, 5, 5, 7, 6, 9, 11, 14, 2],                                  # symbols per BASE reel strip (all 5 reels)
+    fs_counts=[2, 4, 3, 4, 6, 5, 6, 6, 6, 6, 8, 2],                                 # symbols per SEANCE reel strip
     scatter_pay={3: 2, 4: 10, 5: 50},                                               # x stake, any positions on the final grid
     fs_spins={3: 8, 4: 12, 5: 20},                                                  # spins awarded by 3/4/5 coffins
     fs_extra={3: 4, 4: 8, 5: 12},                                                   # extra spins when a Seance spin shows 3/4/5 coffins

@@ -5,7 +5,10 @@ package com.tjshea.neonreaper.engine
  * the stake, so every win is an exact number of tokens (rounding to the mack only
  * happens at cash-out). Wins are capped at 25 books (2000 tokens) per spin and per bonus (Séance, Soul Vault).
  *
- * RTP design (94.00 %, house edge 6 %) -- BUDGET_PLACEHOLDER (exact, see tools/reaper_model.py and RtpExactTest).
+ * RTP design (94.00 %, house edge 6 %), stake 1, exact (tools/reaper_model.py, RtpExactTest):
+ * lines + mini features 57.77 % + coffin pays 1.11 % + THE SÉANCE 14.12 % + Soul Vault 21.00 % = 94.000 %.
+ * plain-spin win frequency 31.3 % (1 in 3.2), a Séance every ~213 spins (avg 30x the stake), a Soul Vault every ~135 spins
+ * (avg 28x the bonus bet), a mini feature every ~154 spins.
  * The mini-feature rate is the SAME at every stake on purpose: the 25-book cap can then only ever LOWER the
  * return at high stakes (RTP_BY_STAKE). THE SÉANCE (3+ coffins) and the feature buys pay in proportion to the stake that
  * started them, so they cannot be gamed either; buys are priced above their exact expected payout.
@@ -49,13 +52,13 @@ object ReaperConfig {
         intArrayOf(3, 10, 40),   // HOODED
         intArrayOf(3, 6, 25),    // SKULL
         intArrayOf(2, 5, 15),    // RAVEN
-        intArrayOf(2, 4, 10),    // PUMPKIN
+        intArrayOf(2, 4, 12),    // DEMON
         intArrayOf(2, 3, 8),     // GHOST
         intArrayOf(1, 2, 6),     // ACE
         intArrayOf(1, 2, 5),     // KING
         intArrayOf(1, 2, 4),     // QUEEN
-        intArrayOf(1, 2, 4),     // JACK
-        intArrayOf(1, 2, 3),     // TEN
+        intArrayOf(1, 1, 4),     // JACK
+        intArrayOf(1, 1, 3),     // TEN
         intArrayOf(0, 0, 0),     // SCATTER: no line pay (coffins pay anywhere, see SCATTER_PAY)
     )
 
@@ -68,7 +71,7 @@ object ReaperConfig {
     )
 
     //                          W  DC SK RV DE WR A  K  Q  J  10 SC  (same on all 5 reels)
-    private val COUNTS = intArrayOf(1, 3, 3, 5, 5, 5, 6, 6, 8, 9, 12, 2)
+    private val COUNTS = intArrayOf(1, 4, 4, 6, 5, 5, 7, 6, 9, 11, 14, 2)
     val STRIPS: Array<IntArray> = Array(REELS) { buildStrip(COUNTS, it) }
 
     // ---- scatter coffins + THE SÉANCE (free spins) ----
@@ -81,10 +84,10 @@ object ReaperConfig {
     /** The multiplier of Séance spin number t is min(FS_RAMP_CAP, t): x1, x2, x3 ... Retrigger spins continue the climb. */
     const val FS_RAMP_CAP = 10
     //                              W  DC SK RV DE WR A  K  Q  J  10 SC  (richer reels: more wilds and characters)
-    private val FS_COUNTS = intArrayOf(2, 3, 3, 4, 4, 4, 5, 5, 6, 6, 7, 2)
+    private val FS_COUNTS = intArrayOf(2, 4, 3, 4, 6, 5, 6, 6, 6, 6, 8, 2)
     val FS_STRIPS: Array<IntArray> = Array(REELS) { buildStrip(FS_COUNTS, it) }
     /** Feature buy prices in multiples of the stake: just above the exact expected payout / 0.93 (a buy returns <= 93 %). */
-    const val BUY_SEANCE_X = 35
+    const val BUY_SEANCE_X = 31
     const val BUY_VAULT_X = 31
 
     // ---- mini features: a character floats out and changes this one spin ----
@@ -109,23 +112,23 @@ object ReaperConfig {
     val STAKES = intArrayOf(1, 2, 3, 4, 5, 8, 10, 15, 20, 25, 30, 40)
 
     /** Chance a spin gets a mini feature (about 1 spin in 100), the same at every stake. Solved so RTP at stake 1 is exactly 94 %. */
-    const val FEATURE_RATE = 0.009924
+    const val FEATURE_RATE = 0.006486
 
     /**
      * Theoretical RTP at each stake in STAKES (exact means, 25-book cap measured with millions of samples;
      * tools/reaper_model.py, checked by CalibrationTest). Identical to 94.00 % up to stake 5; the cap trims the top stakes.
      */
-    val RTP_BY_STAKE = doubleArrayOf(0.9400, 0.9400, 0.9400, 0.9399, 0.9399, 0.9397, 0.9393, 0.9355, 0.9316, 0.9274, 0.9224, 0.9092)
+    val RTP_BY_STAKE = doubleArrayOf(0.9400, 0.9400, 0.9400, 0.9399, 0.9398, 0.9391, 0.9382, 0.9326, 0.9260, 0.9184, 0.9097, 0.8890)
 
     /** Published figures (verified by FullGameTest): base-game win frequency; every win returns at least the stake. */
     const val HIT_FREQUENCY_TEXT = "about 1 in 3"
     /** Range the measured plain-spin win frequency must stay inside (FullGameTest / RtpExactTest). */
-    val HIT_RATE_RANGE = 0.27..0.33
+    val HIT_RATE_RANGE = 0.295..0.33
     /** Published bonus frequencies (average spins between bonuses) and the range the simulation must stay inside. */
     const val VAULT_EVERY_TEXT = "135"
     val VAULT_EVERY_RANGE = 115.0..155.0
-    const val SEANCE_EVERY_TEXT = "195"
-    val SEANCE_EVERY_RANGE = 165.0..230.0
+    const val SEANCE_EVERY_TEXT = "213"
+    val SEANCE_EVERY_RANGE = 180.0..250.0
 
     // ---- relics & Soul Vault bonus ----
     const val RELIC_COUNT = 5
