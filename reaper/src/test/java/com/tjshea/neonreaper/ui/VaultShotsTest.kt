@@ -13,6 +13,8 @@ import com.tjshea.neonreaper.engine.SoulVault
 import com.tjshea.neonreaper.engine.VaultResult
 import com.tjshea.neonreaper.engine.VaultStep
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -213,6 +215,39 @@ class VaultShotsTest {
         val per = (heap() - b0) / n
         println("VaultView steady-state heap allocation: $per bytes/frame")
         assertTrue("per-frame allocation $per bytes", per < 16 * 1024)
+    }
+
+    /**
+     * AUD-10 ("no loss disguised as a win"): a Vault that was BOUGHT (31x the stake) and pays less than its price is not
+     * celebrated: no win stinger, no ember rain, a quiet plaque with the plain "BOUGHT FOR ... NET ..." line. The same
+     * Vault bought below its payout keeps the normal celebration (and also shows the line).
+     */
+    @Test fun boughtBelowPriceIsQuiet() {
+        SystemClock.setCurrentTimeMillis(1_000_000)
+        val low = small()                                            // bet 10, pays 80 tokens
+        val price = 31L * low.bet                                    // 310 tokens
+        assertTrue("fixture pays below its price", low.payTokens < price)
+        val v = VaultView(ctx, audio, low, price) {}
+        size(v, 1280, 800); step(v, 1.0); tap(v)
+        until(8.0, v) { v.awaitingSpin }; step(v, 0.3)
+        repeat(3) { nextRespin(v) }
+        assertTrue(until(30.0, v) { v.summaryAge in 1.3..1.5 }); shot(v, "vs_land_17_summary_bought_below_price")
+        assertTrue("quiet summary", v.quietSummary)
+        assertNull("win stinger skipped", v.summaryStinger)
+        assertEquals("no embers", 0f, v.emberRainLevel, 0f)
+
+        // a big result that clears its price: celebrated as usual, bought line included
+        val big = VB(5).apply { start(0 to 25, 1 to 25, 2 to 15, 3 to 15, 4 to 10); step(); step(); step() }.build()
+        val cheap = 31L * big.bet                                    // 155 tokens, the Vault pays 450
+        assertTrue(big.payTokens >= cheap)
+        val w = VaultView(ctx, audio, big, cheap) {}
+        size(w, 1280, 800); step(w, 1.0); tap(w)
+        until(8.0, w) { w.awaitingSpin }; step(w, 0.3)
+        repeat(3) { nextRespin(w) }
+        assertTrue(until(30.0, w) { w.summaryAge in 1.3..1.5 }); shot(w, "vs_land_18_summary_bought_above_price")
+        assertTrue("celebrated", !w.quietSummary)
+        assertNotNull("win stinger plays", w.summaryStinger)
+        assertTrue("embers fall on a big win", w.emberRainLevel > 0f)
     }
 
     /**

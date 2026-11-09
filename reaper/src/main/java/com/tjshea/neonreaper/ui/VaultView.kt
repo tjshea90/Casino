@@ -67,7 +67,15 @@ private const val EMBER_HOT = 0xFFFFD27A.toInt()
  */
 @SuppressLint("ViewConstructor")
 class VaultView(context: Context, private val audio: Audio, private val result: VaultResult,
+                /** Price paid for a bought Vault (31x the stake), or 0 when it was won by relics. */
+                private val boughtPrice: Long = 0L,
                 private val onFinished: (Long) -> Unit) : View(context) {
+
+    /**
+     * A bought Vault that pays less than its price must not be celebrated ("no loss disguised as a win"): the summary is
+     * quiet (no win stinger, no embers, no big-tier title) and just states the price and the net result.
+     */
+    private val belowPrice: Boolean = boughtPrice > 0L && result.payTokens < boughtPrice
 
     /** Optional bake profiler: (stage, milliseconds). Null in production. */
     internal var bakeTrace: ((String, Long) -> Unit)? = null
@@ -128,6 +136,11 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
     internal val begun: Boolean get() = started
     internal val leaving: Boolean get() = outroAt > 0
     internal val reaperAge: Double get() = vt - reaperAt
+    internal val quietSummary: Boolean get() = belowPrice
+    internal val emberRainLevel: Float get() = rainLevel
+    /** The win stinger chosen when the summary appeared (null when it was skipped). */
+    internal var summaryStinger: Sfx? = null
+        private set
     internal val tallyMult: Int get() = totalMult
     internal val liveCells: Array<Orb?> get() = cells
     internal fun liveValue(i: Int): Int = cellValue[i]
@@ -317,6 +330,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             val e = events[evIndex++]
             when (e.kind) {
                 Kind.RESPIN_START -> {
+                    if (e.step == result.steps.size - 1) prebakeFinale()
                     spinStepStart = e.time
                     for (c in 0 until SoulVault.CELLS) revealAt[c] = if (cells[c] == null) e.time + 0.9 + (c % VAULT_COLS) * 0.17 else -1.0
                     audio.play(Sfx.SPIN_START, 0.5f)
@@ -360,7 +374,9 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
                 Kind.SUMMARY -> {
                     summaryAt = vt
                     val x = result.payTokens.toDouble() / result.bet
-                    audio.play(when { x >= 100 -> Sfx.WIN_APOCALYPSE; x >= 50 -> Sfx.WIN_EPIC; x >= 25 -> Sfx.WIN_MEGA; x >= 10 -> Sfx.WIN_BIG; x >= 3 -> Sfx.WIN_MED; x >= 1 -> Sfx.WIN else -> Sfx.WIN_SMALL })
+                    val stinger = if (belowPrice) null else when { x >= 100 -> Sfx.WIN_APOCALYPSE; x >= 50 -> Sfx.WIN_EPIC; x >= 25 -> Sfx.WIN_MEGA; x >= 10 -> Sfx.WIN_BIG; x >= 3 -> Sfx.WIN_MED; x >= 1 -> Sfx.WIN else -> Sfx.WIN_SMALL }
+                    summaryStinger = stinger
+                    if (stinger != null) audio.play(stinger)
                 }
             }
         }
@@ -490,7 +506,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         for (b in owned) if (!b.isRecycled) b.recycle()
         owned.clear()
         for (i in plates.indices) plates[i] = null
-        introTitle = null; introPlate = null; grandTitle = null; summaryTitle = null; summaryPlate = null; summaryTier = -1; doorBmp = null; raysCache = null
+        introTitle = null; introPlate = null; grandTitle = null; summaryTitle = null; summaryPlate = null; summaryTier = -1; doorBmp = null; raysCache = null; finaleStep = 0
         for (k in jpTitle.indices) jpTitle[k] = null
     }
 
@@ -567,7 +583,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             }
         }
         stage("plates") { bakePlates() }
-        stage("intro") { bakeIntro() }
+        stage("intro") { bakeIntro(); for (k in 0..2) jpTitleFor(k) }
     }
 
     private fun makeNoise(): Bitmap {
@@ -1344,7 +1360,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         if (!ready) {
             // still baking (one stage per frame): hold the host's end-of-trigger white so the hand-over is seamless
             if (bakeSteps.isNotEmpty()) bakeNext()
-            c.drawColor(0xFFECE6D6.toInt())
+            c.drawColor(if (introStart == 0.0) 0xFFECE6D6.toInt() else 0xFF050607.toInt())   // white only for the very first bake
             postInvalidateOnAnimation()
             return
         }
@@ -1352,6 +1368,8 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         if (introStart == 0.0) { introStart = real; lastFrame = real }
         if (!started && real - introStart > 4.0) { started = true; startReal = real; lastReal = real }
         if (started) { vt += (real - lastReal) * speed; lastReal = real; process() }
+        // while the player waits to press the LAST respin, bake the finale a piece per frame (no hitch when it appears)
+        if (finaleStep < 3 && waitingForSpin && nextStep >= result.steps.size - 1) prebakeStep()
         val dt = (real - lastFrame).toFloat().coerceIn(0f, 0.1f); lastFrame = real
         val t = (real - introStart).toFloat()
         updateAmbient(dt, t)
@@ -1373,7 +1391,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         drawEmbers(c)
         if (vt - jackpotFlash < 1.4) drawJackpotFlash(c, t)
         if (grandAt >= 0 && vt - grandAt < 3.0) drawGrand(c, t)
-        if (!started) drawIntro(c, t)
+        if (!started) drawIntro(c, t, 1f) else if (real - startReal < 0.45) drawIntro(c, t, (1.0 - (real - startReal) / 0.45).toFloat())
         if (summaryAt >= 0) drawSummary(c, t)
         // fade in from the end of the trigger flash, out to black on leaving
         val fin = (real - introStart).toFloat()
@@ -2058,15 +2076,38 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         pAdd.colorFilter = null; pAdd.alpha = 255
         c.restore()
         glow(c, cx, cy, gridRect.height() * 0.8f, jpTint[idx], 0.32f * a)
-        var tb = jpTitle[idx]
-        if (tb == null) {
-            tb = titleBitmap(jpBang[idx], gridRect.height() * 0.2f, gridRect.width() * 0.8f, jpHot[idx], jpColor[idx], shade(jpColor[idx], 0.45f), jpColor[idx])
-            jpTitle[idx] = tb
-        }
+        val tb = jpTitleFor(idx)
         val s = 1f + 0.16f * (1f - a)
         pBmp.alpha = (255 * min(1f, a * 2.4f)).toInt()
         sprite(c, tb, cx, cy + gridRect.height() * 0.02f, tb.width * s, tb.height * s); pBmp.alpha = 255
     }
+
+    private fun jpTitleFor(idx: Int): Bitmap {
+        jpTitle[idx]?.let { return it }
+        val b = titleBitmap(jpBang[idx], gridRect.height() * 0.2f, gridRect.width() * 0.8f, jpHot[idx], jpColor[idx], shade(jpColor[idx], 0.45f), jpColor[idx])
+        jpTitle[idx] = b; return b
+    }
+
+    private fun grandTitleBmp(): Bitmap {
+        grandTitle?.let { return it }
+        val b = titleBitmap("GRAND", vh * 0.24f, vw * 0.8f, 0xFFFFFFFF.toInt(), GOLD, 0xFFB5541A.toInt(), EMBER, 0.12f)
+        grandTitle = b; return b
+    }
+
+    private var finaleStep = 0
+
+    /** One piece of the finale's artwork per call (summary plaque + title, GRAND title, outro door). */
+    private fun prebakeStep() {
+        when (finaleStep) {
+            0 -> ensureSummary(summaryTierOf())
+            1 -> if (result.grand) grandTitleBmp()
+            else -> ensureDoor()
+        }
+        finaleStep++
+    }
+
+    /** Guarantees the finale's artwork exists: normally baked a piece per idle frame before the last SPIN, this finishes any leftovers. */
+    private fun prebakeFinale() { while (finaleStep < 3) prebakeStep() }
 
     private fun drawGrand(c: Canvas, t: Float) {
         val e = (vt - grandAt).toFloat()
@@ -2079,8 +2120,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         pAdd.colorFilter = null; pAdd.alpha = 255
         c.restore()
         glow(c, cx, cy, H * 0.55f, tintGold, 0.32f * smooth(e * 2f))
-        var gt = grandTitle
-        if (gt == null) { gt = titleBitmap("GRAND", H * 0.24f, W * 0.8f, 0xFFFFFFFF.toInt(), GOLD, 0xFFB5541A.toInt(), EMBER, 0.12f); grandTitle = gt }
+        val gt = grandTitleBmp()
         val s = (1f + 0.035f * sin(e * 4.2f)) * (0.7f + 0.3f * smooth(e * 2.2f))
         pBmp.alpha = (255 * smooth(e * 3f)).toInt()
         sprite(c, gt, cx, cy, gt.width * s, gt.height * s); pBmp.alpha = 255
@@ -2092,29 +2132,35 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
     }
 
     // ------------------------------------------------------------------ intro and summary
-    private fun drawIntro(c: Canvas, t: Float) {
+    private fun drawIntro(c: Canvas, t: Float, ia: Float) {
         val W = width.toFloat(); val H = height.toFloat()
-        pFill.color = Color.argb(236, 2, 3, 4); c.drawRect(0f, 0f, W, H, pFill)
+        pFill.color = Color.argb((236 * ia).toInt(), 2, 3, 4); c.drawRect(0f, 0f, W, H, pFill)
         val e = t
-        val a = smooth(e * 2.2f)
+        val a = smooth(e * 2.2f) * ia
         val tb = introTitle ?: return
         val s = 0.94f + 0.06f * smooth(e * 1.6f)
         glow(c, W / 2f, introTitleY, W * 0.42f, tintRed, 0.16f * a)
         pBmp.alpha = (255 * a).toInt(); sprite(c, tb, W / 2f, introTitleY, tb.width * s, tb.height * s); pBmp.alpha = 255
         ornament(c, W / 2f, introOrnY, min(W * 0.30f, 330f * u), a)
-        pBmp.alpha = (255 * smooth((e - 0.25f) * 2f)).toInt()
+        pBmp.alpha = (255 * smooth((e - 0.25f) * 2f) * ia).toInt()
         c.drawBitmap(introPlate!!, introRect.left - plateM, introRect.top - plateM, pBmp); pBmp.alpha = 255
         val pa = 0.55f + 0.45f * sin(t * 2.6f)
-        label(c, "TAP TO BEGIN", W / 2f, introPromptY, H * (if (portrait) 0.034f else 0.045f), mix(0xFF7A0F18.toInt(), 0xFFFF3B4E.toInt(), pa), serif, 0.22f, true, W * 0.9f)
+        if (ia >= 1f) label(c, "TAP TO BEGIN", W / 2f, introPromptY, H * (if (portrait) 0.034f else 0.045f), mix(0xFF7A0F18.toInt(), 0xFFFF3B4E.toInt(), pa), serif, 0.22f, true, W * 0.9f)
     }
 
     private fun summaryTierOf(): Int {
+        if (belowPrice) return 0
         if (result.grand) return 4
         val x = result.payTokens.toDouble() / result.bet
         return if (x >= 100) 3 else if (x >= 40) 2 else if (x >= 18) 1 else 0
     }
 
     private val wonLine by lazy { "TOKENS WON  •  ${Money.describe(result.payTokens)}" }
+    /** "BOUGHT FOR 310 TOKENS  •  NET -230": plain, no celebration. */
+    private val boughtLine by lazy {
+        val net = result.payTokens - boughtPrice
+        "BOUGHT FOR ${Money.fmt(boughtPrice)} TOKENS  •  NET " + (if (net > 0) "+${Money.fmt(net)}" else if (net < 0) "-${Money.fmt(-net)}" else "0")
+    }
     private val noteLine by lazy {
         when {
             result.capped -> "Harvest of ${Money.fmt(result.rawTokens)} tokens capped at the 25-book maximum win"
@@ -2149,7 +2195,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             tmp.set(20f * u, 20f * u, w - 20f * u, h - 20f * u); c.drawRoundRect(tmp, 8f * u, 8f * u, p)
             if (tier >= 3) { p.strokeWidth = 2.4f * u; p.color = withA(GOLD, 120); tmp.inset(7f * u, 7f * u); c.drawRoundRect(tmp, 6f * u, 6f * u, p) }
         }
-        val title = when (tier) { 0 -> "THE VAULT IS EMPTY"; 1 -> "SOULS HARVESTED"; 2 -> "THE VAULT YIELDS"; 3 -> "THE VAULT RUNS RED"; else -> "THE GRAND VAULT FALLS" }
+        val title = if (belowPrice) "THE VAULT FALLS SHORT" else when (tier) { 0 -> "THE VAULT IS EMPTY"; 1 -> "SOULS HARVESTED"; 2 -> "THE VAULT YIELDS"; 3 -> "THE VAULT RUNS RED"; else -> "THE GRAND VAULT FALLS" }
         val sz = sumRect.height() * (if (portrait) 0.105f else 0.125f)
         val mw = sumRect.width() * 0.9f
         summaryTitle = when (tier) {
@@ -2192,9 +2238,11 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         if (wd > r.width() * 0.86f) pText.textSize = asz * r.width() * 0.86f / wd
         pText.style = Paint.Style.STROKE; pText.strokeWidth = pText.textSize * 0.13f; pText.color = 0xFF000000.toInt(); c.drawText(nb, nbStart, n, r.centerX(), ay, pText)
         pText.style = Paint.Style.FILL; pText.shader = sh; c.drawText(nb, nbStart, n, r.centerX(), ay, pText); pText.shader = null
-        label(c, wonLine, r.centerX(), r.top + r.height() * 0.675f, r.height() * (if (portrait) 0.052f else 0.062f), 0xFFE9E1CB.toInt(), cond, 0f, true, r.width() * 0.9f)
-        label(c, noteLine, r.centerX(), r.top + r.height() * 0.765f, r.height() * (if (portrait) 0.036f else 0.044f), 0xFFA9A596.toInt(), cond, 0f, true, r.width() * 0.9f)
-        label(c, "Added to your credit", r.centerX(), r.top + r.height() * 0.83f, r.height() * (if (portrait) 0.036f else 0.044f), 0xFFA9A596.toInt(), cond, 0f)
+        val bought = boughtPrice > 0L
+        label(c, wonLine, r.centerX(), r.top + r.height() * (if (bought) 0.655f else 0.675f), r.height() * (if (portrait) 0.052f else 0.062f), 0xFFE9E1CB.toInt(), cond, 0f, true, r.width() * 0.9f)
+        if (bought) label(c, boughtLine, r.centerX(), r.top + r.height() * 0.735f, r.height() * (if (portrait) 0.04f else 0.048f), 0xFFD2CBB6.toInt(), cond, 0f, true, r.width() * 0.9f)
+        label(c, noteLine, r.centerX(), r.top + r.height() * (if (bought) 0.805f else 0.765f), r.height() * (if (portrait) 0.036f else 0.044f), 0xFFA9A596.toInt(), cond, 0f, true, r.width() * 0.9f)
+        label(c, "Added to your credit", r.centerX(), r.top + r.height() * (if (bought) 0.868f else 0.83f), r.height() * (if (portrait) 0.036f else 0.044f), 0xFFA9A596.toInt(), cond, 0f)
         c.restore()
         if (e > 0.8f) {
             val pa = 0.55f + 0.45f * sin(t * 2.6f)
