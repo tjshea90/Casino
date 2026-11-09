@@ -215,13 +215,47 @@ class VaultShotsTest {
         assertTrue("per-frame allocation $per bytes", per < 16 * 1024)
     }
 
+    /**
+     * On a device the crypt is baked one stage per frame (behind the host's white flash). That path must give exactly
+     * the same picture as the synchronous bake, and the first frames must be the plain white placeholder.
+     */
+    @Test fun slicedBakeMatchesSyncBake() {
+        fun run(sliced: Boolean): IntArray {
+            SystemClock.setCurrentTimeMillis(1_000_000)
+            val v = VaultView(ctx, audio, showcase()) {}
+            v.forceSlicedBake = sliced
+            size(v, 1280, 800)
+            var frames = 0
+            if (sliced) {
+                assertTrue("not baked yet", !v.isReady)
+                val first = frame(v)
+                assertEquals("placeholder is the flash colour", 0xFFECE6D6.toInt(), first.getPixel(640, 400))
+                frames++
+                while (!v.isReady && frames < 40) { ShadowSystemClock.advanceBy(Duration.ofMillis(40)); frame(v); frames++ }
+                println("VaultView sliced bake finished after $frames frames")
+                assertTrue("baked within a dozen frames", v.isReady && frames <= 14)
+            } else assertTrue(v.isReady)
+            frame(v)                                                      // first real frame: starts the intro clock
+            step(v, 1.0)
+            val b = frame(v); val px = IntArray(b.width * b.height); b.getPixels(px, 0, b.width, 0, 0, b.width, b.height)
+            v.release(); return px
+        }
+        val a = run(false); val b = run(true)
+        var diff = 0
+        for (i in a.indices) if (a[i] != b[i]) diff++
+        assertEquals("sliced and synchronous bakes differ in $diff pixels", 0, diff)
+    }
+
     /** The crypt is baked once in onSizeChanged on the UI thread: report how long that takes (JIT-warm and cold). */
     @Test fun bakeIsQuick() {
         SystemClock.setCurrentTimeMillis(1_000_000)
         val ms = ArrayList<Long>()
         for ((w, h) in listOf(1280 to 800, 800 to 1280, 1280 to 800)) {
             val v = VaultView(ctx, audio, showcase()) {}
+            val parts = StringBuilder()
+            v.bakeTrace = { name, t -> parts.append(name).append('=').append(t).append("ms ") }
             val t0 = System.nanoTime(); size(v, w, h); val t1 = System.nanoTime()
+            println("VaultView bake stages: $parts")
             frame(v); val t2 = System.nanoTime()
             ms += (t1 - t0) / 1_000_000
             println("VaultView bake ${w}x$h: ${(t1 - t0) / 1_000_000} ms, first frame ${(t2 - t1) / 1_000_000} ms")
