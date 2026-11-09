@@ -231,6 +231,90 @@ class AuditWalletTest {
         sameVault(b2.vault!!, c.pendingVault()!!); assertEquals(after2, c.balance)
     }
 
+    @Test fun aBuyNeverTouchesTheRelicMeter() {
+        fresh(); rewrite { it.put("relics", 3); it.put("rSum", 90L) }
+        val w = restart()
+        assertEquals(3, w.relics)
+        w.stakeIndex = ReaperConfig.STAKES.indexOf(10)
+        val bet = w.projectedBonusBet
+        assertEquals((90 + 2 * 10) / 5, bet)
+        w.buy(Feature.VAULT, 10) ?: error("refused"); w.markVaultSeen()
+        w.buy(Feature.SEANCE, 40) ?: error("refused"); w.markSeanceSeen()
+        assertEquals("buys give no relic and spend none", 3, w.relics)
+        assertEquals(bet, w.projectedBonusBet)
+        val a = restart(); assertEquals(3, a.relics); assertEquals(bet, a.projectedBonusBet)
+        assertTrue(file.readText().contains("\"rSum\":90"))
+    }
+
+    /**
+     * A long random session with kills at random moments (before / between / after watching each bonus, buys included) against an
+     * independent running ledger: balance, wagered, won and the pending flags must match after EVERY operation and every restart.
+     */
+    @Test fun randomSessionsWithKillsKeepTheLedgerExactAndPayEveryBonusOnce() {
+        var w = fresh(balance = 3_000_000)
+        val rng = Random(424242)
+        var expected = w.balance; var wagered = 0L; var won = 0L
+        var pendS: com.tjshea.neonreaper.engine.SeanceResult? = null; var pendV: com.tjshea.neonreaper.engine.VaultResult? = null
+        var kills = 0; var buys = 0; var spins = 0; var bothPending = 0
+        fun verify() {
+            assertEquals(expected, w.balance); assertEquals(wagered, w.totalWagered); assertEquals(won, w.totalWon)
+            assertEquals(pendS != null || pendV != null, w.bonusPending)
+        }
+        repeat(3_500) {
+            if (pendS != null || pendV != null) {
+                if (pendS != null && pendV != null) bothPending++
+                when (rng.nextInt(5)) {
+                    0 -> {      // the app is killed before the bonus was shown
+                        w = restart(); kills++
+                        val s = pendS; val v = pendV
+                        if (s != null) sameSeance(s, w.pendingSeance() ?: error("seance lost")) else assertNull(w.pendingSeance())
+                        if (v != null) sameVault(v, w.pendingVault() ?: error("vault lost")) else assertNull(w.pendingVault())
+                    }
+                    1 -> if (pendS != null) { w.markSeanceSeen(); pendS = null }
+                    2 -> if (pendV != null) { w.markVaultSeen(); pendV = null }
+                    3 -> { assertNull(w.playSpin(10)); assertNull(w.buy(Feature.SEANCE, 10)); assertNull(w.buy(Feature.VAULT, 10)) }
+                    else -> { w.markSeanceSeen(); w.markVaultSeen(); pendS = null; pendV = null }      // watched everything
+                }
+            } else if (rng.nextInt(12) == 0) {
+                val stake = ReaperConfig.STAKES[rng.nextInt(ReaperConfig.STAKES.size)]
+                val feature = if (rng.nextBoolean()) Feature.SEANCE else Feature.VAULT
+                val price = w.buyPrice(feature, stake)
+                val b = w.buy(feature, stake) ?: error("refused")
+                buys++
+                expected += -price + (b.vault?.payTokens ?: 0L) + (b.seance?.payTokens ?: 0L)
+                wagered += price; won += (b.vault?.payTokens ?: 0L) + (b.seance?.payTokens ?: 0L)
+                pendS = b.seance; pendV = b.vault
+            } else {
+                val stake = ReaperConfig.STAKES[rng.nextInt(ReaperConfig.STAKES.size)]
+                val p = w.playSpin(stake) ?: error("refused")
+                spins++
+                val pay = p.outcome.payTokens + (p.vault?.payTokens ?: 0L) + (p.seance?.payTokens ?: 0L)
+                expected += pay - stake; wagered += stake; won += pay
+                pendS = p.seance; pendV = p.vault
+            }
+            verify()
+            if (rng.nextInt(400) == 0) { w = restart(); kills++; verify() }          // a kill while nothing is pending
+        }
+        println("random session: $spins spins, $buys buys, $kills kills, both bonuses pending at once $bothPending times, ledger exact")
+        assertTrue(spins > 2_000 && buys > 100 && kills > 50)
+        val last = restart(); assertEquals(expected, last.balance); assertEquals(wagered, last.totalWagered); assertEquals(won, last.totalWon)
+    }
+
+    /**
+     * AUD-5 (code review; the JVM test clock cannot be moved): Wallet.authenticate() locks with `lockUntil = System.currentTimeMillis() + ...`
+     * and tests `lockUntil > now`, so setting the device date forward ends a lockout and every wrong guess can be followed by another.
+     * What CAN be checked here is that the lockout state itself is persisted and enforced for the right password too.
+     */
+    @Test fun lockoutAfterFiveWrongPasswordsIsPersistedAndRefusesEvenTheRightPassword() {
+        val w = fresh(balance = 0)
+        repeat(4) { assertTrue(w.deposit(pw("bad$it"), 1) is AuthResult.Wrong) }
+        assertTrue(w.deposit(pw("bad4"), 1) is AuthResult.Locked)
+        assertTrue("the right password is refused while locked", w.deposit(pw("grim"), 1) is AuthResult.Locked)
+        val a = restart()                                              // killing the app does not reset the counter
+        assertTrue(a.deposit(pw("grim"), 1) is AuthResult.Locked); assertEquals(0L, a.balance)
+        assertTrue(a.withdraw(pw("grim"), 10) is AuthResult.Failed)    // nothing to withdraw, and never reaches authentication
+    }
+
     @Test fun buyWithInsufficientCreditChangesNothing() {
         val w = fresh(balance = 309)                                   // one token short of 31 x 10
         val saved = file.readText()
@@ -402,7 +486,9 @@ class AuditWalletTest {
         assertTrue(text.contains("android:allowBackup=\"false\""))
         assertFalse(text.contains("android:debuggable=\"true\""))
         val rules = File(manifest.parentFile, "res/xml/data_extraction_rules.xml").readText()
-        assertTrue(rules.contains("<cloud-backup><exclude domain=\"file\""))
-        assertTrue(rules.contains("<device-transfer><exclude domain=\"file\""))
+        for (section in listOf("cloud-backup", "device-transfer")) {
+            val body = Regex("<$section>(.*?)</$section>", RegexOption.DOT_MATCHES_ALL).find(rules)?.groupValues?.get(1) ?: ""
+            assertTrue("$section must exclude the app files (wallet.dat)", body.contains("<exclude domain=\"file\""))
+        }
     }
 }

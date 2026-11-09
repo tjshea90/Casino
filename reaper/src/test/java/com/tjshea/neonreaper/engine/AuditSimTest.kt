@@ -25,7 +25,7 @@ class AuditSimTest {
 
     private fun check(label: String, st: Stat, reference: Double, referenceSe: Double = 0.0) {
         val z = (st.mean - reference) / sqrt(st.se * st.se + referenceSe * referenceSe)
-        println("%-44s engine %.4f +/- %.4f   reference %.4f   z %+.2f   (N=%,d)".format(label, st.mean, st.se, reference, z, st.n))
+        println("%-44s engine %.4f +/- %.4f   reference %.4f   z %+.2f   (N=%,d, SD of one sample %.2f)".format(label, st.mean, st.se, reference, z, st.n, st.se * sqrt(st.n.toDouble())))
         assertTrue("$label: engine ${st.mean} vs reference $reference (z = $z)", abs(z) < 5.0)
     }
 

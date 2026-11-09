@@ -183,6 +183,38 @@ class AuditTest {
         }
     }
 
+    /**
+     * Deterministic (no sampling noise) version of the exploit search. Because a relic stretch is played at one stake per state, every
+     * staking policy is a vault cycle of five stakes; its return per token wagered is
+     * (sum s_i * a(s_i) + p * vaultTokens[bonusBet]) / sum s_i, with a(s) and vaultTokens[b] from the audited tables. All 4368 multisets
+     * of five stakes are tried with the REAL RelicMeter turning stakes into the bonus bet. A change of the rounding rule (up / nearest)
+     * makes this fail by several points (power check below).
+     */
+    @Test fun noFiveStakeVaultCycleBeatsTheTargetAndTheFloorRuleIsWhatPreventsIt() {
+        val p = C.RELIC_CHANCE
+        val s = C.STAKES
+        fun rtp(combo: IntArray, bet: Int): Double =
+            (combo.sumOf { it * AuditReference.NON_VAULT_BY_STAKE[s.indexOf(it)] } + p * AuditReference.VAULT_TOKENS_BY_BET[bet]) / combo.sum()
+        var best = 0.0; var bestCombo = ""; var bestCeil = 0.0; var bestHalfUp = 0.0; var n = 0
+        for (a in s.indices) for (b in a until s.size) for (c in b until s.size) for (d in c until s.size) for (e in d until s.size) {
+            val combo = intArrayOf(s[a], s[b], s[c], s[d], s[e])
+            val meter = RelicMeter(); var bet = 0
+            for (x in combo) bet = meter.collect(x)
+            val r = rtp(combo, bet)
+            if (r > best) { best = r; bestCombo = combo.joinToString(",") }
+            val sum = combo.sum()
+            bestCeil = maxOf(bestCeil, rtp(combo, ((sum + 4) / 5).coerceIn(1, 40)))
+            bestHalfUp = maxOf(bestHalfUp, rtp(combo, ((sum + 2) / 5).coerceIn(1, 40)))
+            n++
+        }
+        println("best of $n five-stake cycles with the shipped rule: %.4f %% (%s); if the bonus bet were rounded up: %.2f %%; half-up: %.2f %%"
+            .format(100 * best, bestCombo, 100 * bestCeil, 100 * bestHalfUp))
+        assertEquals(4368, n)
+        assertTrue("best cycle $bestCombo returns $best", best <= C.TARGET_RTP + 2e-5)
+        assertTrue("power check: rounding the mean up would be a ${bestCeil} RTP exploit", bestCeil > 1.0)
+        assertTrue("power check: rounding to nearest would exceed the target ($bestHalfUp)", bestHalfUp > C.TARGET_RTP + 0.01)
+    }
+
     @Test fun bonusBetIsNeverAboveTheMeanOfTheFiveRelicStakesOrBelowTheSmallest() {
         val rng = Random(9)
         repeat(100_000) {
@@ -243,4 +275,11 @@ object AuditReference {
     /** Measured RTP of a constant stake at each ReaperConfig.STAKES entry, 25-book cap included (SE <= 0.0011 percentage points). */
     val RTP_BY_STAKE = doubleArrayOf(0.93998, 0.93997, 0.93994, 0.93990, 0.93982, 0.93915, 0.93828, 0.93275, 0.92616, 0.91863, 0.90994, 0.88931)
     const val RTP_SE = 0.00002
+    /** Per token wagered at each stake: lines + minis + coins + coffin pays + THE SEANCE, cap included, without the Soul Vault. */
+    val NON_VAULT_BY_STAKE = doubleArrayOf(0.729990, 0.729989, 0.729980, 0.729951, 0.729878, 0.729269, 0.728585, 0.725918, 0.721809, 0.716805, 0.711288, 0.699165)
+    /** Tokens a Soul Vault pays on average for bonus bet 0..40, cap included: E[min(2000, V * bet)]. */
+    val VAULT_TOKENS_BY_BET = doubleArrayOf(0.0000, 28.3489, 56.6961, 85.0350, 113.3739, 141.7121, 170.0471, 198.3676, 226.6767, 254.9465,
+        283.0916, 310.9496, 338.3047, 365.2170, 392.0431, 418.8330, 445.5752, 472.2548, 498.8554, 525.3580, 551.7437, 577.9896, 604.0773,
+        629.9848, 655.6883, 681.1708, 706.4028, 731.3725, 756.0557, 780.4521, 804.5297, 828.2910, 851.7224, 874.8164, 897.5715, 919.9761,
+        942.0203, 963.7381, 985.0734, 1006.0803, 1026.7633)
 }

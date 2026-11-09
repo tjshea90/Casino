@@ -99,7 +99,8 @@ class AuditDifferentialTest {
             }
             val counts = if (type == C.MINI_RAVEN) C.RAVEN_WILDS else intArrayOf(C.SKULL_WILDS)
             val cw = if (type == C.MINI_RAVEN) C.RAVEN_WILD_WEIGHTS else doubleArrayOf(1.0)
-            for (i in counts.indices) assertClose("type $type wild count ${counts[i]}", z(countHits[counts[i]].toDouble(), n.toDouble(), cw[i] / cw.sum()))
+            if (counts.size == 1) assertEquals("always exactly ${counts[0]} wild cells", n, countHits[counts[0]])
+            else for (i in counts.indices) assertClose("type $type wild count ${counts[i]}", z(countHits[counts[i]].toDouble(), n.toDouble(), cw[i] / cw.sum()))
             val meanCells = counts.indices.sumOf { counts[it] * cw[it] } / cw.sum()
             for (c in 0 until 15) assertClose("type $type cell $c", z(cellHits[c], n.toDouble() * meanCells, 1.0 / 15))
             if (type == C.MINI_SKULL) for (i in multHits.indices)
