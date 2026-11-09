@@ -58,7 +58,6 @@ private const val SOUL_DEEP = 0xFF0F3A06.toInt()
 private const val STEEL = 0xFF8E939C.toInt()
 private const val STEEL_DARK = 0xFF1C1F25.toInt()
 private const val EMBER = 0xFFFF9A3C.toInt()
-private const val EMBER_HOT = 0xFFFFD27A.toInt()
 
 /**
  * The Soul Vault bonus: a Hold & Spin replay of an already-paid [VaultResult], staged as a dark gothic CRYPT.
@@ -1249,7 +1248,6 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
     }
 
     private fun bakePlates() {
-        val cm = plateM
         // jackpots
         for (i in 0 until 4) {
             val r = jpRect[i]
@@ -1311,7 +1309,6 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             tp.color = 0xCC000000.toInt(); tp.style = Paint.Style.STROKE; tp.strokeWidth = h * 0.05f; c.drawText(v, w / 2f, h * 0.80f, tp)
             tp.style = Paint.Style.FILL; tp.color = 0xFFF2EBD8.toInt(); c.drawText(v, w / 2f, h * 0.80f, tp)
         }
-        if (cm < 0) return
     }
 
     private fun fit(p: Paint, s: String, maxW: Float, size: Float): Float { p.textSize = size; val w = p.measureText(s); return if (w > maxW && w > 0f) size * maxW / w else size }
@@ -1384,7 +1381,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         c.drawBitmap(barsBmp, gridRect.left, gridRect.top, null)
         drawValues(c, t)
         drawBeams(c, t)
-        drawSparks(c, dt)
+        drawSparks(c)
         drawFog(c, t, true)
         drawPlates(c, t)
         drawSpinButton(c, t)
@@ -1850,7 +1847,7 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
         }
     }
 
-    private fun drawSparks(c: Canvas, dt: Float) {
+    private fun drawSparks(c: Canvas) {
         val tx = totalRect.centerX(); val ty = totalRect.centerY()
         for (i in 0 until spN) {
             if (spT[i] < 0) continue
@@ -1863,7 +1860,6 @@ class VaultView(context: Context, private val audio: Audio, private val result: 
             glow(c, x, y, 20f * u, f, 0.9f * (1f - q * 0.5f))
             val e2 = smooth((q - 0.12f).coerceAtLeast(0f)); glow(c, bez(spX[i], mx, tx, e2), bez(spY[i], my, ty, e2), 12f * u, f, 0.5f)
         }
-        if (dt < 0f) return
     }
 
     // ------------------------------------------------------------------ plates, counters
