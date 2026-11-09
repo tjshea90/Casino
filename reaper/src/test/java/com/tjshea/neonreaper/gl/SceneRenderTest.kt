@@ -37,7 +37,7 @@ class SceneRenderTest {
         // reel window where the HUD places it (matches ReaperView's landscape layout)
         scene.setLayout(Layout3D(W.toFloat(), H.toFloat(), 230f, 168f, 1050f, 628f))
         val (aw, ah, ab) = atlas(); scene.setAtlas(aw, ah, ab, 8, 4)
-        val grid = arrayOf(intArrayOf(9, 2, 5), intArrayOf(0, 4, 7), intArrayOf(1, 6, 3), intArrayOf(10, 0, 8), intArrayOf(4, 5, 2))
+        val grid = arrayOf(intArrayOf(9, 2, 5), intArrayOf(0, 11, 7), intArrayOf(1, 6, 3), intArrayOf(10, 0, 8), intArrayOf(4, 11, 2))
         val s = SceneState()
         stopped(s, grid)
         scene.render(s, 3.0f, W, H); hl.save(File("build/screens/gl_idle.png"))

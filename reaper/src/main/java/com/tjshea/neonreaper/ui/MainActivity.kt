@@ -61,6 +61,7 @@ class MainActivity : Activity(), ReaperView.Host {
         }
         root.addView(gv, 0, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         glView = gv
+        gv.qualitySetting = wallet.quality
         game.gl3d = gv
     }
 
@@ -118,6 +119,7 @@ class MainActivity : Activity(), ReaperView.Host {
     /** Pushes the saved settings (volumes, quality) into the audio and graphics layers. */
     private fun applySettings() {
         audio.sfxVolume = wallet.sfxVolume / 100f; audio.musicVolume = wallet.musicVolume / 100f
+        glView?.qualitySetting = wallet.quality
         game.onWalletChanged()
     }
 

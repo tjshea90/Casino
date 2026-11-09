@@ -37,6 +37,7 @@ class SceneState {
     var anticipation = 0f                 // 0..1 while the last reels slow down with two coffins landed
     var seanceOpen = 0f                   // 0..1 across the coffin-burst cinematic
     var shake = 0f                        // camera shake 0..1
+    var calm = false                      // "reduce flashing": no pulses, shake or strobing, softer flicker
 
     fun copyFrom(o: SceneState) {
         for (r in 0 until 5) { o.faceSym[r].copyInto(faceSym[r]); o.facePos[r].copyInto(facePos[r]) }
@@ -49,6 +50,6 @@ class SceneState {
         reaperTouch = o.reaperTouch; reaperSwing = o.reaperSwing; bigWin = o.bigWin
         showcaseSym = o.showcaseSym; showcaseGrow = o.showcaseGrow
         flash = o.flash; souls = o.souls; dim = o.dim
-        mood = o.mood; anticipation = o.anticipation; seanceOpen = o.seanceOpen; shake = o.shake
+        mood = o.mood; anticipation = o.anticipation; seanceOpen = o.seanceOpen; shake = o.shake; calm = o.calm
     }
 }

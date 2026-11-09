@@ -27,6 +27,7 @@ class GameGLView(context: Context) : GLSurfaceView(context), SceneSink {
         private var applied: FloatArray? = null
         private val start = SystemClock.uptimeMillis()
         private var lastFrame = 0L; private var slowFrames = 0; private var frames = 0
+        private var autoTier = 2; private var ceilTier = 3; private var fastWindows = 0; private var justRaised = false
 
         override fun onSurfaceCreated(unused: GL10?, config: EGLConfig?) {
             try {
@@ -49,6 +50,7 @@ class GameGLView(context: Context) : GLSurfaceView(context), SceneSink {
             if (win != null && win !== applied) { s.setLayout(Layout3D(w.toFloat(), h.toFloat(), win[0], win[1], win[2], win[3])); applied = win }
             synchronized(lock) { snapshot.copyFrom(state) }
             snapshot.miniX *= scale; snapshot.miniY *= scale   // HUD pixels → surface pixels
+            s.quality = if (qualitySetting in 1..3) qualitySetting else autoTier
             try {
                 s.render(snapshot, (SystemClock.uptimeMillis() - start) / 1000f, w, h)
             } catch (e: Throwable) {
@@ -60,11 +62,20 @@ class GameGLView(context: Context) : GLSurfaceView(context), SceneSink {
         /** Low-end GPUs: if frames stay slow, render the world at a reduced resolution (scaled up by the compositor). */
         private fun watchFrameRate() {
             val now = SystemClock.uptimeMillis()
-            if (lastFrame != 0L && !reduced) {
+            if (lastFrame != 0L && !reduced && qualitySetting !in 1..3) {
                 frames++
                 if (now - lastFrame > 38) slowFrames++
                 if (frames >= 90) {
-                    if (slowFrames > 45) { reduced = true; post { reduceResolution() } }
+                    // automatic quality: step the post-processing tier down when frames stay slow (then the resolution as a last
+                    // resort) and carefully back up when they stay fast; a tier that failed right after being raised becomes the ceiling
+                    if (slowFrames > 45) {
+                        if (autoTier > 1) { autoTier--; if (justRaised) ceilTier = autoTier }
+                        else { reduced = true; post { reduceResolution() } }
+                        fastWindows = 0; justRaised = false
+                    } else if (slowFrames < 6) {
+                        fastWindows++
+                        if (fastWindows >= 4 && autoTier < ceilTier) { autoTier++; justRaised = true; fastWindows = 0 }
+                    } else fastWindows = 0
                     frames = 0; slowFrames = 0
                 }
             }
@@ -86,6 +97,9 @@ class GameGLView(context: Context) : GLSurfaceView(context), SceneSink {
     }
 
     @Volatile private var reduced = false
+
+    /** 0 = automatic (adapts to the frame rate), 1 = low, 2 = medium, 3 = high post-processing. */
+    @Volatile var qualitySetting = 0
 
     private fun reduceResolution() {
         if (width <= 0 || height <= 0) return

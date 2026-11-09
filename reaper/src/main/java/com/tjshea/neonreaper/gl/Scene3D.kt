@@ -285,7 +285,7 @@ class Scene3D(private val gl: Gl) {
 
         if (usePost) {
             val p = postParams; val k = S.mood
-            val beat = if (S.anticipation > 0f) S.anticipation * (0.5f + 0.5f * sin(time * 8.5f)) else 0f
+            val beat = if (S.anticipation > 0f) S.anticipation * (if (S.calm) 0.6f else 0.5f + 0.5f * sin(time * 8.5f)) else 0f
             p.flash = S.flash * 0.35f
             p.tint[0] = 1f + 0.16f * k; p.tint[1] = 1f - 0.26f * k; p.tint[2] = 1f - 0.28f * k
             p.saturation = 0.86f + 0.06f * k
@@ -303,7 +303,8 @@ class Scene3D(private val gl: Gl) {
 
     /** Lights shared by the whole frame (braziers, candles): slots 0..plWorld-1; characters add local lights after them. */
     private fun addWorldLights() {
-        val fl = 0.85f + 0.15f * sin(t * 11f) * sin(t * 4.1f) + 0.08f * sin(t * 23f)
+        val fk = if (S.calm) 0.25f else 1f
+        val fl = 0.85f + fk * (0.15f * sin(t * 11f) * sin(t * 4.1f) + 0.08f * sin(t * 23f))
         val red = lerp(1f, 1.45f, S.mood)
         val px = Layout3D.WORLD_W / 2 + 0.35f
         pointLight(-px - 0.3f, 0.5f, 2.3f, 7.0f, 0xFF8A3A, 0.95f * fl * red)          // candles on the left pillar

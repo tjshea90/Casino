@@ -1923,6 +1923,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
             val dtp = (t - lastPub).coerceIn(0.0, 0.1).toFloat(); lastPub = t
             val moodTarget = if (seance != null || phase == Phase.SEANCE_TRIGGER) 1f else 0f
             moodNow += (moodTarget - moodNow) * min(1f, dtp * 1.6f)
+            s.calm = wallet.reduceFlash
             s.mood = moodNow
             s.anticipation = if (phase == Phase.SPINNING && antFrom >= 1 && t >= antStart) ((t - antStart) / (antEnd - antStart).coerceAtLeast(0.4)).toFloat().coerceIn(0f, 1f) else 0f
             s.seanceOpen = if (phase == Phase.SEANCE_TRIGGER) ((t - phaseStart) / 3.0).toFloat().coerceIn(0f, 1f) else 0f
