@@ -91,6 +91,10 @@ class Wallet(private val context: Context) {
     var bonuses = 0L; private set
     var bonusWon = 0L; private set
     var biggestWin = 0L; private set
+    var winSpins = 0L; private set                 // spins whose lines paid (lifetime; the hit rate shown in Stats)
+    private var sessionSpins0 = 0L
+    private var sessionWinSpins0 = 0L
+    var sessionBiggestWin = 0L; private set
     var ticketNo = 1000; private set
     val ledger = ArrayList<LedgerEntry>()
     private var pwSalt: ByteArray? = null
@@ -104,6 +108,11 @@ class Wallet(private val context: Context) {
     val sessionWagered: Long get() = totalWagered - sessionWagered0
     val sessionWon: Long get() = totalWon - sessionWon0
     val sessionNet: Long get() = sessionWon - sessionWagered
+    val sessionSpins: Long get() = spins - sessionSpins0
+    val sessionWinSpins: Long get() = winSpins - sessionWinSpins0
+
+    /** Records a round's win for the "biggest win" statistics (lifetime and this session). */
+    private fun noteWin(x: Long) { if (x > biggestWin) biggestWin = x; if (x > sessionBiggestWin) sessionBiggestWin = x }
     val rank: Ranks.Rank get() = Ranks.of(totalWagered)
     val stake: Int get() = ReaperConfig.STAKES[stakeIndex.coerceIn(0, ReaperConfig.STAKES.size - 1)]
 
@@ -124,7 +133,7 @@ class Wallet(private val context: Context) {
             val json = text.substring(0, nl)
             val mac = Security.unb64(text.substring(nl + 1).trim())
             if (!Security.constantTimeEquals(mac, Security.sign(context, json.toByteArray()))) LoadStatus.TAMPERED
-            else { fromJson(JSONObject(json)); sessionWagered0 = totalWagered; sessionWon0 = totalWon; LoadStatus.OK }
+            else { fromJson(JSONObject(json)); sessionWagered0 = totalWagered; sessionWon0 = totalWon; sessionSpins0 = spins; sessionWinSpins0 = winSpins; sessionBiggestWin = 0; LoadStatus.OK }
         } catch (e: Exception) {
             LoadStatus.TAMPERED
         }
@@ -150,7 +159,7 @@ class Wallet(private val context: Context) {
         totalDeposited = o.optLong("dep"); totalWithdrawn = o.optLong("wd")
         totalWagered = o.optLong("wag"); totalWon = o.optLong("won")
         spins = o.optLong("spins"); features = o.optLong("features"); bonuses = o.optLong("bonuses")
-        bonusWon = o.optLong("bonusWon"); biggestWin = o.optLong("big"); ticketNo = o.optInt("ticket", 1000)
+        bonusWon = o.optLong("bonusWon"); biggestWin = o.optLong("big"); winSpins = o.optLong("winSpins"); ticketNo = o.optInt("ticket", 1000)
         o.optString("salt").takeIf { it.isNotEmpty() }?.let { pwSalt = Security.unb64(it) }
         o.optString("hash").takeIf { it.isNotEmpty() }?.let { pwHash = Security.unb64(it) }
         pwIter = o.optInt("iter", Security.PBKDF2_ITERATIONS)
@@ -176,7 +185,7 @@ class Wallet(private val context: Context) {
         put("musicVol", musicVolume); put("sfxVol", sfxVolume)
         put("dep", totalDeposited); put("wd", totalWithdrawn); put("wag", totalWagered); put("won", totalWon)
         put("spins", spins); put("features", features); put("bonuses", bonuses); put("bonusWon", bonusWon)
-        put("big", biggestWin); put("ticket", ticketNo)
+        put("big", biggestWin); put("winSpins", winSpins); put("ticket", ticketNo)
         pwSalt?.let { put("salt", Security.b64(it)) }
         pwHash?.let { put("hash", Security.b64(it)) }
         put("iter", pwIter); put("fails", failedAttempts); put("lockUntil", lockUntil)
@@ -285,7 +294,7 @@ class Wallet(private val context: Context) {
         seances = 0; seanceWon = 0; achievements = 0; miniSeen = 0; maxSeanceMult = 0; buys = 0
         sessionWagered0 = 0; sessionWon0 = 0; newAchievements.clear()
         totalDeposited = 0; totalWithdrawn = 0; totalWagered = 0; totalWon = 0
-        spins = 0; features = 0; bonuses = 0; bonusWon = 0; biggestWin = 0; ledger.clear()
+        spins = 0; winSpins = 0; sessionBiggestWin = 0; sessionSpins0 = 0; sessionWinSpins0 = 0; features = 0; bonuses = 0; bonusWon = 0; biggestWin = 0; ledger.clear()
         pwSalt = null; pwHash = null; failedAttempts = 0; lockUntil = 0
         status = LoadStatus.NEW
         return AuthResult.Ok
@@ -327,16 +336,17 @@ class Wallet(private val context: Context) {
         balance += win
         totalWon += win
         spins++
+        if (win > 0) winSpins++
         if (outcome.feature) { features++; miniSeen = miniSeen or (1 shl (outcome.mini.type - 1)) }
         val vault = r.vault
         if (vault != null) {
             balance += vault.payTokens; totalWon += vault.payTokens; bonusWon += vault.payTokens; bonuses++
-            if (vault.payTokens > biggestWin) biggestWin = vault.payTokens
+            noteWin(vault.payTokens)
             pendingVaultSeed = vault.seed; pendingVaultBet = vault.bet; vaultUnseen = true
         }
         val seance = r.seance
         if (seance != null) recordSeance(seance)
-        if (win > biggestWin) biggestWin = win
+        noteWin(win)
         Achievements.afterSpin(this, r)
         save()
         return SpinPlay(outcome, r.relicIndex, vault, seance)
@@ -344,7 +354,7 @@ class Wallet(private val context: Context) {
 
     private fun recordSeance(s: SeanceResult) {
         balance += s.payTokens; totalWon += s.payTokens; seanceWon += s.payTokens; seances++
-        if (s.payTokens > biggestWin) biggestWin = s.payTokens
+        noteWin(s.payTokens)
         pendingSeanceSeed = s.seed; pendingSeanceBet = s.bet; pendingSeanceCoffins = s.coffins; seanceUnseen = true
         maxSeanceMult = maxOf(maxSeanceMult, s.spins.maxOfOrNull { it.multiplier } ?: 0)
     }
@@ -373,7 +383,7 @@ class Wallet(private val context: Context) {
         if (feature == Feature.VAULT) {
             vault = Round.boughtVault(rng, stake)
             balance += vault.payTokens; totalWon += vault.payTokens; bonusWon += vault.payTokens; bonuses++
-            if (vault.payTokens > biggestWin) biggestWin = vault.payTokens
+            noteWin(vault.payTokens)
             pendingVaultSeed = vault.seed; pendingVaultBet = vault.bet; vaultUnseen = true
         } else {
             seance = Round.boughtSeance(rng, stake)

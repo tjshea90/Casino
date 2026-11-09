@@ -57,6 +57,9 @@ internal class Ledger(private val ui: Ui, private val wallet: Wallet) {
             ui.stat("Won", fmt(wallet.sessionWon), maxSp = 20f)), ui.lp(t = 8))
         val back = if (wallet.sessionWagered > 0) "%.1f %%".format(wallet.sessionWon * 100.0 / wallet.sessionWagered) else "-"
         session.addView(ui.kv("Returned this session", back), ui.lp(t = 6))
+        val sessHit = if (wallet.sessionSpins > 0) "%.0f %%".format(wallet.sessionWinSpins * 100.0 / wallet.sessionSpins) else "-"
+        session.addView(ui.kv("Spins / winning spins", "${fmt(wallet.sessionSpins)} / ${fmt(wallet.sessionWinSpins)}  ($sessHit)"), ui.lp(t = 6))
+        session.addView(ui.kv("Biggest win this session", "${fmt(wallet.sessionBiggestWin)} tokens"), ui.lp(t = 6))
         cols.addView(session)
 
         // ---- lifetime
@@ -68,6 +71,7 @@ internal class Ledger(private val ui: Ui, private val wallet: Wallet) {
                 addView(ui.kv(k, v, color), ui.lp()); if (!last) addView(hair(), ui.lp())
             }
             row("Spins played", fmt(wallet.spins))
+            row("Winning spins", if (wallet.spins > 0) "${fmt(wallet.winSpins)}  (${"%.1f".format(wallet.winSpins * 100.0 / wallet.spins)} %)" else "-")
             row("Total wagered", "${fmt(wallet.totalWagered)} tokens")
             row("Total won", "${fmt(wallet.totalWon)} tokens")
             row("Your actual return", rtp)

@@ -38,6 +38,11 @@ class MainActivity : Activity(), ReaperView.Host {
         attach3d()
         dialogs = Dialogs(this, wallet) { game.onWalletChanged(); hideSystemUi() }
         dialogs.toastBanner = { game.showMessage(it) }
+        dialogs.onCue = { when (it) {
+            Dialogs.Cue.TAP -> audio.play(Audio.Sfx.CLICK, 0.7f)
+            Dialogs.Cue.OPEN -> audio.play(Audio.Sfx.UI_OPEN, 0.8f)
+            Dialogs.Cue.CLOSE -> audio.play(Audio.Sfx.UI_CLOSE, 0.7f)
+        } }
         when {
             status == Wallet.LoadStatus.TAMPERED -> dialogs.tampered()
             !wallet.hasPassword -> dialogs.setupPassword()
@@ -104,7 +109,7 @@ class MainActivity : Activity(), ReaperView.Host {
     private fun ready() = wallet.status == Wallet.LoadStatus.OK && wallet.hasPassword
     private fun gate() { if (wallet.status == Wallet.LoadStatus.TAMPERED) dialogs.tampered() else dialogs.setupPassword() }
 
-    private fun uiOpen() = audio.play(Audio.Sfx.UI_OPEN, 0.8f)
+    private fun uiOpen() {}   // the dialogs themselves play the open / close / tap cues (Dialogs.onCue)
 
     override fun openDeposit() { uiOpen(); if (ready()) dialogs.deposit() else gate() }
     override fun openWithdraw() { uiOpen(); if (ready()) dialogs.withdraw() else gate() }
