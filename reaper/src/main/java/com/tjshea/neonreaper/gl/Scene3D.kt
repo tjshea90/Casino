@@ -503,10 +503,10 @@ class Scene3D(private val gl: Gl) {
                 val excited = cell >= 0 && S.cellExcited[cell]
                 val pop = if (cell >= 0) S.cellPop[cell] else 1f
                 val flash = if (cell >= 0) S.cellFlash[cell] else 0f
-                val character = sym <= ReaperConfig.GHOST
+                val character = sym <= ReaperConfig.WRAITH || (sym == ReaperConfig.SCATTER && Cast.get(sym) != null)
                 if (S.fast[r] || !character) {
                     // painted face from the atlas (blurred when spinning fast)
-                    val idx = if (S.fast[r]) sym + 11 else sym
+                    val idx = if (S.fast[r]) sym + ReaperConfig.SYMBOL_COUNT else sym
                     lit.f4("uUvRect", (idx % atlasCols).toFloat() / atlasCols, (idx / atlasCols).toFloat() / atlasRows, 1f / atlasCols, 1f / atlasRows)
                     gl.activeTexture(Gl.TEXTURE0); gl.bindTexture(Gl.TEXTURE_2D, atlasTex)
                     val f2 = face.copyOf()

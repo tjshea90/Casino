@@ -33,6 +33,10 @@ class SceneState {
     var flash = 0f                        // lightning 0..1
     var souls = 0f                        // particle burst intensity 0..1
     var dim = 0f                          // darken scene (overlays)
+    var mood = 0f                         // 0 = graveyard night, 1 = the Séance (blood-red, candles gutter, low fog)
+    var anticipation = 0f                 // 0..1 while the last reels slow down with two coffins landed
+    var seanceOpen = 0f                   // 0..1 across the coffin-burst cinematic
+    var shake = 0f                        // camera shake 0..1
 
     fun copyFrom(o: SceneState) {
         for (r in 0 until 5) { o.faceSym[r].copyInto(faceSym[r]); o.facePos[r].copyInto(facePos[r]) }
@@ -45,5 +49,6 @@ class SceneState {
         reaperTouch = o.reaperTouch; reaperSwing = o.reaperSwing; bigWin = o.bigWin
         showcaseSym = o.showcaseSym; showcaseGrow = o.showcaseGrow
         flash = o.flash; souls = o.souls; dim = o.dim
+        mood = o.mood; anticipation = o.anticipation; seanceOpen = o.seanceOpen; shake = o.shake
     }
 }

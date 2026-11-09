@@ -41,7 +41,11 @@ class MainActivity : Activity(), ReaperView.Host {
         when {
             status == Wallet.LoadStatus.TAMPERED -> dialogs.tampered()
             !wallet.hasPassword -> dialogs.setupPassword()
-            else -> wallet.pendingVault()?.let { v -> game.post { game.resumeVault(v) } }
+            else -> {
+                val se = wallet.pendingSeance()
+                val v = wallet.pendingVault()
+                if (se != null) game.post { game.resumeSeance(se) } else if (v != null) game.post { game.resumeVault(v) }
+            }
         }
     }
 

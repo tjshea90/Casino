@@ -103,7 +103,10 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
     private var pendingSeance = 0L                         // part of the credit meter that is not revealed yet
     private var seanceBanner = ""; private var seanceBannerAt = -10.0
     private var curFree: SeanceSpin? = null                // the free spin being animated / presented
-    private var seanceEndAt = 0.0
+    private var seanceEndAt = 0.0; private var seanceEndTotal = 0L
+    private var seanceBase = 0L                           // Séance total revealed before the current free spin
+    private var seanceMultAt = -10.0
+    private var moodNow = 0f; private var lastPub = 0.0
     private var antFrom = -1; private var antStart = 0.0; private var antEnd = 0.0
     private var antSoundPlayed = false; private var antResolved = true
     private val scatReel = BooleanArray(REELS)
@@ -294,8 +297,11 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         val spinCy = panelRect.bottom - spinR - 6 * u
         buttons += Btn("spin", "SPIN", RectF(spinCx - spinR, spinCy - spinR, spinCx + spinR, spinCy + spinR), round = true)
         val autoW = ph * 0.6f
-        val auto = RectF(spinCx - spinR - autoW - 14 * u, panelRect.centerY() - ph * 0.2f, spinCx - spinR - 14 * u, panelRect.centerY() + ph * 0.2f)
+        val colL = spinCx - spinR - autoW - 14 * u; val colR = spinCx - spinR - 14 * u
+        val auto = RectF(colL, panelRect.top + ph * 0.1f, colR, panelRect.centerY() - ph * 0.025f)
+        val buyBtn = RectF(colL, panelRect.centerY() + ph * 0.025f, colR, panelRect.bottom - ph * 0.1f)
         buttons += Btn("auto", "AUTO", auto)
+        buttons += Btn("buy", "BUY", buyBtn)
         val mTop = panelRect.top + ph * 0.1f; val mBot = panelRect.bottom - ph * 0.1f
         val avail = auto.left - 14 * u - (panelRect.left + 12 * u)
         val cw = (avail - 2 * 12 * u) / 3.2f
@@ -311,7 +317,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         buttons += Btn("deposit", "DEPOSIT", RectF(m, by, m + bw, by + bh))
         buttons += Btn("withdraw", "CASH OUT", RectF(2 * m + bw, by, 2 * m + 2 * bw, by + bh))
         val rw4 = (w * 0.25f - 5 * m) / 4
-        val ids = listOf("info" to "INFO", "stats" to "STATS", "sound" to "SOUND", "turbo" to "TURBO")
+        val ids = listOf("info" to "INFO", "sound" to "SOUND", "turbo" to "TURBO", "menu" to "MENU")
         for ((i, pair) in ids.withIndex()) {
             val x = w * 0.75f + m + i * (rw4 + m)
             buttons += Btn(pair.first, pair.second, RectF(x, by, x + rw4, by + bh))
@@ -661,10 +667,17 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         featureStart = -1.0
         val p = play
         if (p != null && p.relicIndex >= 0) { relicFly = p.relicIndex; relicStart = t + 0.2 }
-        val win = o.payTokens
+        val win = spinWin(o)
         val x = win.toDouble() / o.stake
         tier = when { x >= 100 -> 4; x >= 50 -> 3; x >= 25 -> 2; x >= 10 -> 1; else -> 0 }
-        showcaseSym = o.lineWins.filter { it.count == 5 && it.symbol <= ReaperConfig.RAVEN }.minByOrNull { it.symbol }?.symbol ?: -1
+        showcaseSym = if (curFree != null) -1 else o.lineWins.filter { it.count == 5 && it.symbol <= ReaperConfig.RAVEN }.minByOrNull { it.symbol }?.symbol ?: -1
+        curFree?.let { f ->
+            // the money of a free spin was paid with the trigger: here it is only revealed in the running total
+            seanceCum += f.winMult.toLong() * o.stake
+            seanceRevealed += freeWin
+            if (f.extraSpins > 0) { seanceBanner = "+${f.extraSpins} SPINS"; seanceBannerAt = t; audio.play(Sfx.SEANCE_RETRIGGER) }
+        }
+        if (o.scatterCount >= 3 && curFree == null) { audio.play(Sfx.COFFIN_OPEN, 0.8f); shakeUntil = t + 0.5 }
         if (win > 0) {
             rollTarget = win; rollStart = t
             // small wins show instantly; bigger ones count up (suspense, but never slow)
@@ -673,16 +686,24 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
                 x >= 2 -> (0.9 + 0.35 * ln(x)).coerceAtMost(2.0)
                 else -> 0.0
             }
+            if (curFree != null && tier == 0) rollDur = min(rollDur, 1.1)
             countEndPlayed = rollDur == 0.0
-            bannerHold = rollDur + if (x >= 2) 1.3 else 1.4
+            bannerHold = rollDur + if (curFree != null) (if (wallet.turbo) 0.45 else 0.85) else if (x >= 2) 1.3 else 1.4
             winLockUntil = t + rollDur + 0.9
-            // the best character in the win gets to laugh / chatter / caw
-            val star = o.lineWins.map { it.symbol }.filter { it <= ReaperConfig.GHOST }.minOrNull()
+            // the best character in the win gets to growl / chatter / caw
+            val star = o.lineWins.map { it.symbol }.filter { it <= ReaperConfig.WRAITH }.minOrNull()
             star?.let { sym -> charSound(sym)?.let { snd -> audio.play(snd, 0.85f) } }
             when {
-                tier > 0 -> { audio.play(Sfx.FANFARE); audio.play(Sfx.BIG_WIN, 0.8f); audio.play(Sfx.LAUGH); soulRate = 30f + tier * 20f; shakeUntil = t + 0.6; sideLaughUntil = t + 3; enter(Phase.BIG_WIN); return }
+                tier > 0 -> {
+                    audio.play(when (tier) { 1 -> Sfx.WIN_BIG; 2 -> Sfx.WIN_MEGA; 3 -> Sfx.WIN_EPIC; else -> Sfx.WIN_APOCALYPSE })
+                    audio.play(Sfx.FANFARE, 0.7f); audio.duck(rollDur.toFloat() + 2f, 0.3f)
+                    soulRate = 30f + tier * 20f; shakeUntil = t + 0.6; sideLaughUntil = t + 3; enter(Phase.BIG_WIN); return
+                }
                 showcaseSym >= 0 -> { audio.play(Sfx.WIN_MED); enter(Phase.SHOWCASE); return }
-                else -> { audio.play(if (x >= 3) Sfx.WIN_MED else Sfx.WIN, 0.9f); if (x < 2) audio.play(Sfx.COINS, 0.6f) }
+                else -> {
+                    audio.play(if (x >= 3) Sfx.WIN_MED else if (x >= 2) Sfx.WIN else Sfx.WIN_SMALL, 0.9f)
+                    if (x < 2) audio.play(Sfx.COINS, 0.5f)
+                }
             }
             if (x >= 4) soulRate = 18f
         } else {
@@ -698,7 +719,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
     private fun schedule() {
         val o = outcome ?: return
         // every win pauses long enough to read the amount, autoplay included
-        val delay = if (o.payTokens > 0) bannerHold + 0.3 else if (holdMode) 0.12 else if (wallet.turbo) 0.25 else 0.45
+        val delay = (if (spinWin(o) > 0) bannerHold + 0.3 else if (holdMode) 0.12 else if (wallet.turbo) 0.25 else 0.45) * (if (curFree != null) 0.8 else 1.0)
         nextAt = now() + delay
     }
 
@@ -714,7 +735,124 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
 
     private fun relicBusy(t: Double) = relicFly >= 0 && t < relicStart + relicDur
 
+    private fun seanceEndValue(t: Double): Long {
+        if (seanceEndTotal <= 0L) return 0L
+        val q = ((t - seanceEndAt) / 2.4).coerceIn(0.0, 1.0)
+        return if (q >= 1) seanceEndTotal else (seanceEndTotal * (1 - (1 - q) * (1 - q) * (1 - q))).toLong()
+    }
+
+    // ================================================================== THE SÉANCE, feature buy, autoplay limits, reality check
+    private fun startVaultTrigger() {
+        audio.play(Sfx.BELL); audio.play(Sfx.VAULT_DOOR)
+        enter(Phase.VAULT_TRIGGER)
+    }
+
+    /** The coffins burst open: cinematic, then the free spins replay (the money was paid and saved with the trigger). */
+    private fun startSeanceTrigger(se: SeanceResult) {
+        seance = se; seanceToStart = null
+        seanceIdx = 0; seanceLeft = se.startSpins; seanceMult = 1; seanceCum = 0; seanceRevealed = 0; seanceBase = 0
+        settleRoll(); rollTarget = 0
+        pendingSeance = se.payTokens; pendingWin = 0; curFree = null; play = null
+        audio.play(Sfx.COFFIN_OPEN); audio.play(Sfx.SEANCE_START); audio.duck(4.5f, 0.25f)
+        soulRate = 70f; shakeUntil = now() + 0.9
+        performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+        enter(Phase.SEANCE_TRIGGER)
+    }
+
+    private fun beginFreeSpins() {
+        soulRate = 0f
+        audio.playTrack(Audio.Track.SEANCE)
+        nextFreeSpin()
+    }
+
+    private fun nextFreeSpin() {
+        val se = seance ?: return
+        if (seanceIdx >= se.spins.size) { finishSeance(); return }
+        val f = se.spins[seanceIdx++]
+        if (f.multiplier != seanceMult) seanceMultAt = now()
+        seanceBase = seanceRevealed
+        seanceMult = f.multiplier
+        seanceLeft = f.spinsLeftAfter
+        val raw = f.winMult.toLong() * se.bet
+        freeWin = raw.coerceAtMost((ReaperConfig.MAX_WIN_TOKENS - seanceRevealed).coerceAtLeast(0L))
+        // the credit meter keeps everything unrevealed hidden, apart from this spin's win which its count-up reveals
+        pendingSeance = (se.payTokens - seanceRevealed - freeWin).coerceAtLeast(0L)
+        audio.play(Sfx.SEANCE_MULT_UP, 0.8f, (0.75f + 0.09f * f.multiplier).coerceAtMost(2f))
+        settleRoll()
+        animateSpin(SpinPlay(f.outcome, -1, null, null), f)
+    }
+
+    private fun finishSeance() {
+        val se = seance ?: return
+        settleRoll(); rollTarget = 0
+        pendingSeance = 0; pendingWin = 0; curFree = null; play = null
+        wallet.markSeanceSeen()
+        audio.play(Sfx.SEANCE_END); audio.duck(4f, 0.3f)
+        // the money was revealed spin by spin: this recap only counts the total up, the credit meter is already right
+        seanceEndTotal = se.payTokens; seanceEndAt = now()
+        if (se.payTokens > 0) { audio.play(Sfx.COINS, 0.8f); audio.play(Sfx.FANFARE, 0.6f) }
+        soulRate = if (se.payTokens > 0) 40f else 0f
+        enter(Phase.SEANCE_END)
+    }
+
+    private fun endSeanceFlow() {
+        seance = null; curFree = null; soulRate = 0f
+        audio.playTrack(Audio.Track.BASE)
+        if (vaultToShow == null) vaultToShow = wallet.pendingVault()       // a spin that unlocked both: the Vault comes next
+        if (vaultToShow != null) { vaultWinShown = 0; startVaultTrigger(); return }
+        play = null
+        enter(Phase.IDLE)
+        nextAt = now() + 0.7
+    }
+
+    /** App restarted with a paid-but-unseen Séance: replay it first. */
+    fun resumeSeance(se: SeanceResult) {
+        startSeanceTrigger(se)
+    }
+
+    private fun startBuy(f: Feature) {
+        val stake = wallet.stake
+        val b = wallet.buy(f, stake) ?: run { audio.play(Sfx.ERROR); showMessage("That can't be bought right now"); return }
+        audio.play(Sfx.BUY_CONFIRM)
+        performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+        settleRoll(); play = null; curFree = null; pendingWin = 0
+        val se = b.seance; val v = b.vault
+        if (se != null) startSeanceTrigger(se)
+        else if (v != null) {
+            vaultToShow = v; pendingVault = v.payTokens; vaultWinShown = 0
+            startVaultTrigger()
+        }
+    }
+
+    private fun stopAuto(msg: String) { autoLeft = 0; autoPlan = null; showMessage(msg, 3.0) }
+
+    /** Autoplay continues unless a limit chosen in the picker was reached. */
+    private fun autoStep() {
+        val plan = autoPlan
+        if (plan != null) {
+            if (plan.stopOnWinX > 0 && lastRoundTokens >= plan.stopOnWinX.toLong() * wallet.stake) { stopAuto("Autoplay stopped: a big win"); return }
+            if (plan.lossLimit > 0 && autoStartBalance - wallet.balance >= plan.lossLimit) { stopAuto("Autoplay stopped: loss limit reached"); return }
+        }
+        if (autoLeft > 0) autoLeft--
+        startSpin()
+    }
+
+    /** Regulated brands interrupt play with a reality check: time played and the net result so far. */
+    private fun checkReality(t: Double) {
+        val mins = wallet.realityMinutes
+        if (mins <= 0) { nextReality = 0.0; return }
+        if (nextReality == 0.0) { nextReality = t + mins * 60.0; return }
+        val calm = (phase == Phase.IDLE || (phase == Phase.PRESENT && curFree == null)) && seance == null && t >= winLockUntil
+        if (t >= nextReality && calm) {
+            nextReality = t + mins * 60.0
+            autoLeft = 0; holdMode = false; autoPlan = null
+            audio.play(Sfx.REALITY_CHECK)
+            host.openReality({}, {})
+        }
+    }
+
     private fun updateFlow(t: Double) {
+        checkReality(t)
         if (!countEndPlayed && rollTarget > 0 && t - rollStart >= rollDur) {
             countEndPlayed = true
             audio.play(Sfx.COUNT_END); audio.play(Sfx.COINS, 0.7f)
@@ -738,24 +876,25 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
             Phase.BIG_WIN -> if (t - rollStart > rollDur + 2.0) { soulRate = 0f; enter(Phase.PRESENT); presentStart = t - 10; nextAt = t + 0.8 }
             Phase.SHOWCASE -> if (t - phaseStart > 2.0) { enter(Phase.PRESENT); presentStart = t; rollStart = min(rollStart, t); schedule() }
             Phase.PRESENT -> if (t >= nextAt && t >= winLockUntil && !relicBusy(t)) {
-                val v = play?.vault
-                if (v != null && vaultWinShown == 0L) {
-                    audio.play(Sfx.BELL); audio.play(Sfx.VAULT)
-                    enter(Phase.VAULT_TRIGGER)
-                } else if (holdMode) {
-                    startSpin()
-                } else if (autoLeft != 0) {
-                    if (autoLeft > 0) autoLeft--
-                    startSpin()
+                val se = seanceToStart
+                val v = vaultToShow
+                when {
+                    curFree != null -> nextFreeSpin()
+                    se != null -> startSeanceTrigger(se)
+                    v != null && vaultWinShown == 0L -> startVaultTrigger()
+                    holdMode -> startSpin()
+                    autoLeft != 0 -> autoStep()
                 }
             }
-            Phase.IDLE -> if (holdMode) startSpin() else if (autoLeft != 0 && t >= nextAt) { if (autoLeft > 0) autoLeft--; startSpin() }
+            Phase.IDLE -> if (holdMode) startSpin() else if (autoLeft != 0 && t >= nextAt) autoStep()
             Phase.VAULT_TRIGGER -> if (t - phaseStart > 3.2) {
-                val v = play?.vault
+                val v = vaultToShow
                 enter(Phase.IN_VAULT)
                 audio.playTrack(Audio.Track.VAULT)
                 if (v != null) host.openVault(v)
             }
+            Phase.SEANCE_TRIGGER -> if (t - phaseStart > 3.6) beginFreeSpins()
+            Phase.SEANCE_END -> if (t - phaseStart > 3.8) endSeanceFlow()
             else -> {}
         }
     }
@@ -764,6 +903,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
 
     /** Called by the activity when the Soul Vault screen closes. */
     fun onVaultFinished(paid: Long) {
+        vaultToShow = null
         audio.playTrack(Audio.Track.BASE)
         vaultWinShown = max(1L, paid)
         rollTarget = paid; rollStart = now(); rollDur = if (paid > 0) 2.0 else 0.1
@@ -779,6 +919,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
 
     /** App restarted with a paid-but-unseen Soul Vault: show it first. */
     fun resumeVault(v: VaultResult) {
+        vaultToShow = v
         pendingVault = v.payTokens
         enter(Phase.IN_VAULT)
         audio.playTrack(Audio.Track.VAULT)
@@ -829,6 +970,8 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
             Phase.SPINNING -> slamStop()
             Phase.BIG_WIN -> if (t - rollStart > rollDur + 1.0) rollStart = t - rollDur - 2.0
             Phase.SHOWCASE -> if (t - phaseStart > 1.2) phaseStart = t - 2.0
+            Phase.SEANCE_TRIGGER -> if (t - phaseStart in 1.4..3.1) phaseStart = t - 3.2
+            Phase.SEANCE_END -> if (t - phaseStart in 1.6..3.3) phaseStart = t - 3.4
             else -> {}
         }
     }
@@ -838,14 +981,16 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         when (id) {
             "spin" -> when {
                 phase == Phase.SPINNING -> slamStop()
-                autoLeft != 0 -> { autoLeft = 0; showMessage("Autoplay stopped") }
+                autoLeft != 0 -> { autoLeft = 0; autoPlan = null; showMessage("Autoplay stopped") }
                 busy -> onTap()
                 else -> startSpin()
             }
-            "auto" -> if (autoLeft != 0) { autoLeft = 0; showMessage("Autoplay stopped") } else if (!busy) host.openAutoPicker { n ->
-                autoLeft = n
-                if (n != 0 && !busy) { if (autoLeft > 0) autoLeft--; startSpin() }
+            "auto" -> if (autoLeft != 0) { autoLeft = 0; autoPlan = null; showMessage("Autoplay stopped") } else if (!busy) host.openAutoPicker { plan ->
+                autoLeft = plan.spins; autoPlan = plan; autoStartBalance = wallet.balance
+                if (plan.spins != 0 && !busy) { if (autoLeft > 0) autoLeft--; startSpin() }
             }
+            "buy" -> if (!busy && autoLeft == 0) host.openBuy(wallet.stake) { f -> startBuy(f) } else showMessage("Wait for the reels to stop")
+            "menu" -> host.openSettings()
             "stake" -> if (!busy) {
                 wallet.stakeIndex = (wallet.stakeIndex + 1) % ReaperConfig.STAKES.size
                 wallet.save()
@@ -892,7 +1037,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
             drawCharacters(canvas, t)
         }
         drawTitle(canvas, t)
-        drawRelics(canvas, t)
+        if (seance != null) drawSeanceHud(canvas, t) else drawRelics(canvas, t)
         if (!g3) drawReels(canvas, ch, t)
         drawMiniEffects(canvas, t)
         drawWins(canvas, t)
@@ -912,8 +1057,12 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
             Phase.BIG_WIN -> drawBigWin(canvas, t)
             Phase.SHOWCASE -> drawShowcase(canvas, t)
             Phase.VAULT_TRIGGER -> drawVaultTrigger(canvas, t)
+            Phase.SEANCE_TRIGGER -> drawSeanceTrigger(canvas, t)
+            Phase.SEANCE_END -> drawSeanceEnd(canvas, t)
             else -> {}
         }
+        drawAnticipation(canvas, t)
+        drawSeanceBanner(canvas, t)
         drawMessage(canvas, t)
         if (g3) publishScene(t)
         if (phase == Phase.IN_VAULT) postInvalidateDelayed(250) else postInvalidateOnAnimation()
@@ -1069,7 +1218,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         val trigger = phase == Phase.VAULT_TRIGGER
         for (i in 0 until 5) {
             val r = relicSlots[i]
-            val on = trigger || i < have.coerceAtLeast(0) || (play?.vault != null && phase != Phase.IN_VAULT && relicFly < 0 && vaultWinShown == 0L)
+            val on = trigger || i < have.coerceAtLeast(0) || (vaultToShow != null && phase != Phase.IN_VAULT && relicFly < 0 && vaultWinShown == 0L)
             if (on) {
                 val pulse = (1 + 0.08 * sin(t * 4 + i)).toFloat()
                 c.save(); c.scale(pulse, pulse, r.centerX(), r.centerY())
@@ -1336,7 +1485,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
     }
 
     private fun drawPanel(c: Canvas, t: Double) {
-        val shown = (wallet.balance - pendingWin - pendingVault).coerceAtLeast(0)
+        val shown = (wallet.balance - pendingWin - pendingVault - pendingSeance).coerceAtLeast(0)
         meterLabel(c, creditRect, "CREDIT")
         val flash = t < creditFlashUntil && ((t * 8).toInt() % 2 == 0)
         pText.typeface = serif; pText.color = if (flash) Neon.RED else Color.WHITE
@@ -1348,8 +1497,18 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         c.drawText(sub, creditRect.centerX(), creditRect.bottom - creditRect.height() * 0.1f, pText)
 
         val o = outcome
-        meterLabel(c, winRect, if ((o?.mini?.multiplier ?: 1) > 1 && phase != Phase.SPINNING) "WIN  ×${o!!.mini.multiplier}" else "WIN")
-        val wv = if (phase == Phase.SPINNING) 0L else rollValue(t)
+        val fsm = curFree?.multiplier ?: 0
+        meterLabel(c, winRect, when {
+            phase == Phase.SEANCE_END -> "SÉANCE TOTAL"
+            fsm > 1 && phase != Phase.SPINNING -> "SPIN WIN  ×$fsm"
+            (o?.mini?.multiplier ?: 1) > 1 && phase != Phase.SPINNING -> "WIN  ×${o!!.mini.multiplier}"
+            else -> "WIN"
+        })
+        val wv = when {
+            phase == Phase.SPINNING -> 0L
+            phase == Phase.SEANCE_END -> seanceEndValue(t)
+            else -> rollValue(t)
+        }
         pText.typeface = serif; pText.color = if (wv > 0) Neon.GREEN else 0xFF3A4A3A.toInt()
         fit(Money.fmt(wv), winRect.width() * 0.9f, winRect.height() * 0.38f)
         if (wv > 0) pText.setShadowLayer(12 * u, 0f, 0f, Neon.GREEN)
@@ -1357,7 +1516,8 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         pText.clearShadowLayer()
         pText.typeface = cond; pText.color = 0xFF8A9A80.toInt()
         val wsub = when {
-            o != null && o.capped && phase != Phase.SPINNING -> "TOKENS • 25-BOOK MAX WIN"
+            o != null && o.capped && phase != Phase.SPINNING && curFree == null -> "TOKENS • 25-BOOK MAX WIN"
+            phase == Phase.SEANCE_END && seanceRevealed >= ReaperConfig.MAX_WIN_TOKENS -> "TOKENS • 25-BOOK MAX WIN"
             wv >= 10 -> "TOKENS • ${Money.short(wv)}"
             else -> "TOKENS"
         }
@@ -1369,7 +1529,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         for (b in buttons) {
             b.enabled = when (b.id) {
                 "stake" -> !busy
-                "deposit", "withdraw" -> !busy && autoLeft == 0
+                "deposit", "withdraw", "buy" -> !busy && autoLeft == 0
                 else -> true
             }
             when {
@@ -1405,6 +1565,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
             !b.enabled -> 0xFF333333.toInt()
             b.id == "deposit" -> Neon.GREEN
             b.id == "withdraw" -> Neon.RED
+            b.id == "buy" -> Neon.ORANGE
             b.id == "auto" && autoLeft != 0 -> Neon.CYAN
             b.id == "turbo" && wallet.turbo -> Neon.ORANGE
             b.id == "sound" && !wallet.soundOn -> 0xFF555555.toInt()
@@ -1449,11 +1610,11 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         pFill.shader = null
         pText.typeface = serif; pText.color = Color.WHITE; pText.textSize = rad * 0.36f
         pText.setShadowLayer(10 * u, 0f, 3 * u, 0xCC000000.toInt())
-        val label = when { holdMode -> "RAPID"; stop -> "STOP"; locked -> "WIN"; else -> "SPIN" }
+        val label = when { holdMode -> "RAPID"; stop -> "STOP"; locked -> "WIN"; seance != null -> "FREE"; else -> "SPIN" }
         c.drawText(label, cx, cy + rad * 0.02f - (pText.fontMetrics.ascent + pText.fontMetrics.descent) / 2, pText)
         pText.clearShadowLayer()
         pText.typeface = cond; pText.textSize = rad * 0.12f; pText.color = 0xDDFFFFFF.toInt()
-        c.drawText(if (holdMode) "RELEASE TO STOP" else "HOLD FOR RAPID", cx, cy + rad * 0.5f, pText)
+        c.drawText(if (seance != null) "THE SÉANCE" else if (holdMode) "RELEASE TO STOP" else "HOLD FOR RAPID", cx, cy + rad * 0.5f, pText)
     }
 
     private fun drawMessage(c: Canvas, t: Double) {
@@ -1470,7 +1631,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         c.drawText(m, reelRect.centerX(), cy + 10 * u, pText)
     }
 
-    private val tierNames = arrayOf("", "BIG WIN", "HUGE WIN", "MASSIVE WIN", "DEADLY WIN")
+    private val tierNames = arrayOf("", "SOUL REAPED", "DEATH'S TOLL", "HELLFIRE", "APOCALYPSE")
 
     private fun drawBigWin(c: Canvas, t: Double) {
         val e = t - phaseStart
@@ -1508,7 +1669,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         c.drawText(Money.fmt(v), width / 2f, height * 0.63f, pText); pText.clearShadowLayer()
         pText.typeface = cond; pText.textSize = height * 0.04f; pText.color = 0xFFCCFF90.toInt()
         c.drawText("TOKENS  •  ${Money.describe(v)}", width / 2f, height * 0.7f, pText)
-        if (outcome?.capped == true && q >= 1) {
+        if ((outcome?.capped == true || seanceRevealed >= ReaperConfig.MAX_WIN_TOKENS) && q >= 1) {
             pText.color = Neon.RED; c.drawText("25-BOOK MAXIMUM WIN", width / 2f, height * 0.76f, pText)
         }
     }
@@ -1538,7 +1699,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
     /** Big, clear win amount over the reels for every winning spin: "WIN  8  TOKENS". */
     private fun drawWinBanner(c: Canvas, t: Double) {
         val o = outcome ?: return
-        if (phase != Phase.PRESENT || o.payTokens <= 0 || vaultWinShown != 0L) return
+        if (phase != Phase.PRESENT || spinWin(o) <= 0 || vaultWinShown != 0L) return
         val e = (t - presentStart).toFloat()
         val hold = bannerHold.toFloat()
         if (e > hold + 0.35f) return
@@ -1559,7 +1720,7 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         c.drawPath(path, pStroke)
         pText.typeface = serif; pText.textAlign = Paint.Align.CENTER
         pText.textSize = bh * 0.16f; pText.color = Neon.GREEN; pText.alpha = a
-        c.drawText("YOU WIN", tmp.centerX(), tmp.top + bh * 0.2f, pText)
+        c.drawText(curFree?.let { "YOU WIN  ×${it.multiplier}" } ?: "YOU WIN", tmp.centerX(), tmp.top + bh * 0.2f, pText)
         c.save(); c.scale(beat, beat, tmp.centerX(), tmp.top + bh * 0.55f)
         pText.color = Color.WHITE; pText.alpha = a
         fit(Money.fmt(v), bw * 0.9f, bh * 0.5f)
@@ -1667,8 +1828,12 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
                     s.cellFlash[cell] = if (fl in 0f..0.5f) (0.5f - fl) / 0.5f else 0f
                 }
             }
-            val excited = phase == Phase.BIG_WIN || phase == Phase.SHOWCASE || phase == Phase.VAULT_TRIGGER ||
-                (phase == Phase.PRESENT && (o?.payTokens ?: 0) > 0 && t - presentStart < 2.2)
+            val excited = phase == Phase.BIG_WIN || phase == Phase.SHOWCASE || phase == Phase.VAULT_TRIGGER || phase == Phase.SEANCE_TRIGGER ||
+                (phase == Phase.PRESENT && (o?.let { spinWin(it) } ?: 0L) > 0 && t - presentStart < 2.2)
+            // coffins that carry the Séance rattle in their cells once three or more have landed
+            if (o != null && o.scatterCount >= 3 && (phase == Phase.PRESENT || phase == Phase.SEANCE_TRIGGER)) {
+                for (cellIdx in o.scatterCells) { s.cellExcited[cellIdx] = true; s.cellDim[cellIdx] = 1f; s.cellPop[cellIdx] = pulse }
+            }
             s.hoodedExcited = excited
             s.reaperExcited = excited || t < sideLaughUntil
             s.reaperAway = featureStart > 0 && t > featureStart && t < slashAt + 0.6
@@ -1693,8 +1858,15 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
                 val e = (t - phaseStart).toFloat()
                 s.showcaseSym = showcaseSym; s.showcaseGrow = min(1f, e / 0.45f) * (if (e > 1.6f) 1 - (e - 1.6f) / 0.4f else 1f)
             } else s.showcaseSym = -1
-            s.flash = lightningLevel(t)
+            s.flash = if (wallet.reduceFlash) lightningLevel(t) * 0.35f else lightningLevel(t)
             s.souls = (soulRate / 80f).coerceIn(0f, 1f)
+            val dtp = (t - lastPub).coerceIn(0.0, 0.1).toFloat(); lastPub = t
+            val moodTarget = if (seance != null || phase == Phase.SEANCE_TRIGGER) 1f else 0f
+            moodNow += (moodTarget - moodNow) * min(1f, dtp * 1.6f)
+            s.mood = moodNow
+            s.anticipation = if (phase == Phase.SPINNING && antFrom >= 1 && t >= antStart) ((t - antStart) / (antEnd - antStart).coerceAtLeast(0.4)).toFloat().coerceIn(0f, 1f) else 0f
+            s.seanceOpen = if (phase == Phase.SEANCE_TRIGGER) ((t - phaseStart) / 3.0).toFloat().coerceIn(0f, 1f) else 0f
+            s.shake = if (t < shakeUntil && !wallet.reduceFlash) ((shakeUntil - t) / 0.5).toFloat().coerceIn(0f, 1f) else 0f
         }
     }
 
@@ -1803,6 +1975,210 @@ class ReaperView(context: Context, private val host: Host) : View(context) {
         c.drawText("ALL FIVE RELICS COLLECTED", cx, height * 0.25f, pText)
         pText.clearShadowLayer(); pText.alpha = 255
         if (e > 2.9f) { pFill.color = Color.argb(((e - 2.9f) / 0.3f * 255).toInt().coerceIn(0, 255), 255, 255, 255); c.drawRect(0f, 0f, width.toFloat(), height.toFloat(), pFill) }
+    }
+
+
+    // ================================================================== Séance, anticipation and retrigger drawing
+    private fun calm() = wallet.reduceFlash
+
+    /** While THE SÉANCE runs the relic bar becomes its scoreboard: free spin counter, the rising multiplier and the running total. */
+    private fun drawSeanceHud(c: Canvas, t: Double) {
+        val se = seance ?: return
+        val r = relicRect
+        tmp.set(r)
+        pFill.color = 0xE6060203.toInt(); c.drawRoundRect(tmp, 16 * u, 16 * u, pFill)
+        val pulse = if (calm()) 0.8f else (0.65f + 0.35f * sin(t * 3.0)).toFloat()
+        pStroke.color = Neon.RED; pStroke.alpha = (60 + 100 * pulse).toInt(); pStroke.strokeWidth = 6 * u; c.drawRoundRect(tmp, 16 * u, 16 * u, pStroke)
+        pStroke.alpha = 255; pStroke.strokeWidth = 2 * u; c.drawRoundRect(tmp, 16 * u, 16 * u, pStroke)
+        val cy = r.centerY(); val hgt = r.height()
+        val total = if (seanceIdx == 0) se.startSpins else seanceIdx + seanceLeft
+        pText.textAlign = Paint.Align.LEFT
+        pText.typeface = cond; pText.color = Neon.BONE; pText.textSize = hgt * 0.2f
+        c.drawText("FREE SPIN", r.left + 18 * u, cy - hgt * 0.1f, pText)
+        pText.typeface = serif; pText.color = Color.WHITE; pText.textSize = hgt * 0.46f
+        c.drawText("${seanceIdx.coerceAtLeast(1)} / $total", r.left + 18 * u, cy + hgt * 0.34f, pText)
+        // the multiplier: pips for x1..x10 under a big number that stamps in when it rises
+        val cx = r.centerX()
+        val since = (t - seanceMultAt).toFloat()
+        val stamp = if (since in 0f..0.45f) 1f + 0.55f * (1f - since / 0.45f) else 1f
+        pText.textAlign = Paint.Align.CENTER
+        c.save(); c.scale(stamp, stamp, cx, cy - hgt * 0.04f)
+        pText.typeface = serif; pText.textSize = hgt * 0.62f; pText.color = Neon.RED
+        pText.setShadowLayer(18 * u, 0f, 0f, Neon.RED)
+        c.drawText("×$seanceMult", cx, cy + hgt * 0.2f, pText)
+        pText.clearShadowLayer()
+        c.restore()
+        val pipR = hgt * 0.05f; val pipGap = pipR * 3.1f
+        for (i in 0 until ReaperConfig.FS_RAMP_CAP) {
+            val px0 = cx + (i - (ReaperConfig.FS_RAMP_CAP - 1) / 2f) * pipGap
+            pFill.color = if (i < seanceMult) Neon.RED else 0xFF2A1014.toInt()
+            c.drawCircle(px0, r.bottom - pipR * 1.8f, pipR, pFill)
+        }
+        pText.textAlign = Paint.Align.RIGHT
+        pText.typeface = cond; pText.color = Neon.BONE; pText.textSize = hgt * 0.2f
+        c.drawText("SÉANCE WIN", r.right - 18 * u, cy - hgt * 0.1f, pText)
+        val shown = if (phase == Phase.SPINNING || phase == Phase.MINI_ACTION) seanceBase else seanceBase + rollValue(t)
+        pText.typeface = serif; pText.color = Neon.GREEN; pText.textSize = hgt * 0.46f
+        fit(Money.fmt(shown), r.width() * 0.28f, hgt * 0.46f)
+        c.drawText(Money.fmt(shown), r.right - 18 * u, cy + hgt * 0.34f, pText)
+        pText.textAlign = Paint.Align.CENTER
+    }
+
+    private fun coffinPath(p: Path, cx: Float, cy: Float, w: Float, h: Float) {
+        p.reset()
+        p.moveTo(cx - 0.28f * w, cy - 0.5f * h); p.lineTo(cx + 0.28f * w, cy - 0.5f * h)
+        p.lineTo(cx + 0.5f * w, cy - 0.2f * h); p.lineTo(cx + 0.3f * w, cy + 0.5f * h)
+        p.lineTo(cx - 0.3f * w, cy + 0.5f * h); p.lineTo(cx - 0.5f * w, cy - 0.2f * h); p.close()
+    }
+
+    /** The coffins burst open: the cinematic that starts THE SÉANCE (about 3.6 s, tap to skip the middle). */
+    private fun drawSeanceTrigger(c: Canvas, t: Double) {
+        val se = seance ?: return
+        val e = (t - phaseStart).toFloat()
+        val w = width.toFloat(); val h = height.toFloat()
+        val q = (e / 0.7f).coerceIn(0f, 1f)
+        pFill.color = Color.argb((215 * q).toInt(), 6, 0, 2); c.drawRect(0f, 0f, w, h, pFill)
+        val breathe = if (calm()) 0.8f else 0.75f + 0.25f * sin(e * 5f)
+        pFill.shader = RadialGradient(w / 2, h * 0.5f, max(w, h) * 0.65f, intArrayOf(0x00000000, Color.argb((140 * breathe * q).toInt(), 150, 0, 16)), floatArrayOf(0.3f, 1f), Shader.TileMode.CLAMP)
+        c.drawRect(0f, 0f, w, h, pFill); pFill.shader = null
+        // coffins rise out of the floor, tremble, then the lids fly off and a sick green light pours out
+        val n = se.coffins.coerceIn(3, 5)
+        val ch = h * 0.30f; val cw = ch * 0.5f
+        val gap = cw * 0.55f
+        val rise = (e / 0.9f).coerceIn(0f, 1f); val riseE = 1f - (1f - rise) * (1f - rise)
+        val open = ((e - 1.35f) / 0.5f).coerceIn(0f, 1f)
+        for (i in 0 until n) {
+            val cx0 = w / 2 + (i - (n - 1) / 2f) * (cw + gap)
+            val cy0 = h * 0.56f + (1f - riseE) * h * 0.5f
+            val shake = if (e in 0.9f..1.35f && !calm()) (fx.nextFloat() - 0.5f) * 8f * u else 0f
+            val cx = cx0 + shake
+            if (open > 0f) {
+                pFill.shader = LinearGradient(0f, cy0 - h * 0.75f, 0f, cy0, intArrayOf(0x00B6FF7A, Color.argb((150 * open).toInt(), 150, 255, 120)), null, Shader.TileMode.CLAMP)
+                tmp.set(cx - cw * 0.34f, cy0 - h * 0.75f, cx + cw * 0.34f, cy0); c.drawRect(tmp, pFill); pFill.shader = null
+                pFill.shader = RadialGradient(cx, cy0 - ch * 0.4f, cw * 1.3f, intArrayOf(Color.argb((190 * open).toInt(), 190, 255, 150), 0x00000000), null, Shader.TileMode.CLAMP)
+                c.drawCircle(cx, cy0 - ch * 0.4f, cw * 1.3f, pFill); pFill.shader = null
+            }
+            coffinPath(path, cx, cy0, cw, ch)
+            pFill.shader = LinearGradient(cx - cw / 2, 0f, cx + cw / 2, 0f, intArrayOf(0xFF5B3523.toInt(), 0xFF2A170E.toInt(), 0xFF120805.toInt()), null, Shader.TileMode.CLAMP)
+            c.drawPath(path, pFill); pFill.shader = null
+            pStroke.color = Neon.BRASS; pStroke.strokeWidth = 3 * u; c.drawPath(path, pStroke)
+            // the lid flies off to alternating sides
+            val side = if (i % 2 == 0) -1f else 1f
+            c.save()
+            c.translate(side * open * cw * 1.6f, -open * ch * 0.55f)
+            c.rotate(side * open * 55f, cx, cy0)
+            coffinPath(path, cx, cy0, cw * 0.98f, ch * 0.98f)
+            pFill.color = Color.argb((255 * (1f - open * 0.35f)).toInt(), 54, 30, 18); c.drawPath(path, pFill)
+            pStroke.color = Neon.BRASS_DIM; pStroke.strokeWidth = 2 * u; c.drawPath(path, pStroke)
+            pStroke.color = Neon.BRASS; pStroke.strokeWidth = 3 * u
+            c.drawLine(cx, cy0 - ch * 0.34f, cx, cy0 + ch * 0.3f, pStroke); c.drawLine(cx - cw * 0.17f, cy0 - ch * 0.18f, cx + cw * 0.17f, cy0 - ch * 0.18f, pStroke)
+            c.restore()
+        }
+        // title
+        val a = ((e - 0.9f) / 0.4f).coerceIn(0f, 1f)
+        if (a > 0f) {
+            pText.typeface = serif; pText.textSize = h * 0.11f; pText.color = Neon.BONE; pText.alpha = (255 * a).toInt()
+            pText.setShadowLayer(30 * u, 0f, 0f, Neon.RED)
+            c.drawText("THE SÉANCE", w / 2, h * 0.2f, pText)
+            pText.clearShadowLayer()
+        }
+        val b = ((e - 1.6f) / 0.4f).coerceIn(0f, 1f)
+        if (b > 0f) {
+            pText.typeface = serif; pText.textSize = h * 0.05f; pText.color = Neon.RED; pText.alpha = (255 * b).toInt()
+            pText.setShadowLayer(14 * u, 0f, 0f, Neon.RED)
+            c.drawText("${se.coffins} COFFINS  •  ${se.startSpins} FREE SPINS", w / 2, h * 0.28f, pText)
+            pText.clearShadowLayer()
+        }
+        val d = ((e - 2.1f) / 0.5f).coerceIn(0f, 1f)
+        if (d > 0f) {
+            pText.typeface = cond; pText.textSize = h * 0.034f; pText.color = Neon.BONE; pText.alpha = (210 * d).toInt()
+            c.drawText("THE MULTIPLIER RISES WITH EVERY SPIN — UP TO ×${ReaperConfig.FS_RAMP_CAP}   •   MORE COFFINS ADD SPINS", w / 2, h * 0.88f, pText)
+        }
+        pText.alpha = 255
+        if (e > 3.2f) { pFill.color = Color.argb(((e - 3.2f) / 0.4f * 255).toInt().coerceIn(0, 255), 0, 0, 0); c.drawRect(0f, 0f, w, h, pFill) }
+    }
+
+    /** The Séance's closing tally. */
+    private fun drawSeanceEnd(c: Canvas, t: Double) {
+        val se = seance ?: return
+        val e = (t - phaseStart).toFloat()
+        val w = width.toFloat(); val h = height.toFloat()
+        val q = (e / 0.6f).coerceIn(0f, 1f)
+        pFill.color = Color.argb((200 * q).toInt(), 6, 0, 2); c.drawRect(0f, 0f, w, h, pFill)
+        val v = seanceEndValue(t)
+        pText.typeface = serif; pText.textSize = h * 0.08f; pText.color = Neon.BONE; pText.alpha = (255 * q).toInt()
+        pText.setShadowLayer(24 * u, 0f, 0f, Neon.RED)
+        c.drawText("THE SÉANCE ENDS", w / 2, h * 0.24f, pText)
+        pText.clearShadowLayer()
+        if (se.payTokens > 0) {
+            pText.typeface = cond; pText.textSize = h * 0.04f; pText.color = Neon.BONE; pText.alpha = 220
+            c.drawText("TOTAL WIN", w / 2, h * 0.38f, pText)
+            pText.typeface = serif; pText.color = Color.WHITE; pText.alpha = 255
+            fit(Money.fmt(v), w * 0.8f, h * 0.17f)
+            pText.setShadowLayer(26 * u, 0f, 0f, Neon.GREEN)
+            c.drawText(Money.fmt(v), w / 2, h * 0.56f, pText)
+            pText.clearShadowLayer()
+            val xs = Math.round(se.payTokens.toDouble() / se.bet * 10) / 10.0
+            pText.typeface = cond; pText.textSize = h * 0.04f; pText.color = 0xFFCCFF90.toInt()
+            c.drawText("TOKENS  •  ${se.totalSpins} FREE SPINS  •  ×$xs YOUR STAKE", w / 2, h * 0.64f, pText)
+            if (se.capped && v >= se.payTokens) { pText.color = Neon.RED; c.drawText("25-BOOK MAXIMUM WIN", w / 2, h * 0.7f, pText) }
+        } else {
+            pText.typeface = serif; pText.textSize = h * 0.06f; pText.color = Neon.RED; pText.alpha = 255
+            c.drawText("THE SPIRITS WERE SILENT", w / 2, h * 0.52f, pText)
+        }
+        pText.alpha = 255
+        if (e > 3.4f) { pFill.color = Color.argb(((e - 3.4f) / 0.4f * 255).toInt().coerceIn(0, 255), 0, 0, 0); c.drawRect(0f, 0f, w, h, pFill) }
+    }
+
+    /** Two coffins have landed and the remaining reels are slowing: a red vignette closes in, the reels still turning glow, a heartbeat pulses. */
+    private fun drawAnticipation(c: Canvas, t: Double) {
+        if (phase != Phase.SPINNING || antFrom < 1 || t < antStart - 0.05) return
+        val o = outcome ?: return
+        val span = (antEnd - antStart).coerceAtLeast(0.4)
+        val build = ((t - antStart) / span).toFloat().coerceIn(0f, 1f)
+        val beat = if (calm()) 0.6f else 0.5f + 0.5f * sin((t - antStart) * 2 * PI * 1.35).toFloat()
+        val w = width.toFloat(); val h = height.toFloat()
+        val va = ((35 + 75 * build) * (0.55f + 0.45f * beat)).toInt()
+        pFill.shader = RadialGradient(w / 2, reelRect.centerY(), max(w, h) * 0.72f, intArrayOf(0x00000000, Color.argb(va, 150, 0, 16)), floatArrayOf(0.4f, 1f), Shader.TileMode.CLAMP)
+        c.drawRect(0f, 0f, w, h, pFill); pFill.shader = null
+        val cw = cellW()
+        val top = rowY(0.0) - cw * 0.6f; val bot = rowY(2.0) + cw * 0.6f
+        for (r in antFrom until REELS) if (!landed[r] && !isWildReel[r]) {
+            val x = cellX(r)
+            tmp.set(x - cw * 0.52f, top, x + cw * 0.52f, bot)
+            pStroke.color = Neon.RED; pStroke.alpha = (50 + 90 * beat).toInt(); pStroke.strokeWidth = 9 * u; c.drawRoundRect(tmp, 12 * u, 12 * u, pStroke)
+            pStroke.alpha = (140 + 100 * beat).toInt(); pStroke.strokeWidth = 2.5f * u; c.drawRoundRect(tmp, 12 * u, 12 * u, pStroke)
+            pStroke.alpha = 255
+        }
+        for (cellIdx in o.scatterCells) {
+            val r = cellIdx / ROWS; val row = cellIdx % ROWS
+            if (!landed[r]) continue
+            val x = cellX(r); val y = rowY(row.toDouble())
+            val rad = cw * (0.5f + 0.06f * beat)
+            pStroke.color = Neon.GREEN; pStroke.alpha = (110 + 120 * beat).toInt(); pStroke.strokeWidth = 4 * u
+            c.drawCircle(x, y, rad, pStroke); pStroke.alpha = 255
+        }
+    }
+
+    /** "+4 SPINS" pop-up when a free spin's coffins add spins. */
+    private fun drawSeanceBanner(c: Canvas, t: Double) {
+        if (seanceBanner.isEmpty()) return
+        val e = (t - seanceBannerAt).toFloat()
+        if (e < 0f || e > 1.9f) return
+        val inQ = min(1f, e / 0.2f)
+        val outQ = if (e > 1.5f) 1f - (e - 1.5f) / 0.4f else 1f
+        val s = 0.55f + 0.45f * inQ + (if (e < 0.35f) 0.12f * sin(e * 18f) else 0f)
+        val cx = reelRect.centerX(); val cy = reelRect.top + reelRect.height() * 0.22f
+        c.save(); c.scale(s, s, cx, cy)
+        pText.typeface = serif; pText.textSize = reelRect.height() * 0.17f
+        pText.color = Neon.RED; pText.alpha = (255 * outQ).toInt().coerceIn(0, 255)
+        pText.setShadowLayer(26 * u, 0f, 0f, Neon.RED)
+        c.drawText(seanceBanner, cx, cy, pText)
+        pText.clearShadowLayer()
+        pText.style = Paint.Style.STROKE; pText.strokeWidth = 1.6f * u; pText.color = Neon.BONE; pText.alpha = (200 * outQ).toInt().coerceIn(0, 255)
+        c.drawText(seanceBanner, cx, cy, pText)
+        pText.style = Paint.Style.FILL; pText.alpha = 255
+        c.restore()
     }
 
     // ================================================================== particles

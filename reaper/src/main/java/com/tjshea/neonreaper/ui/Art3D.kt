@@ -286,6 +286,7 @@ class Characters(val w: Int, val h: Int, private val plates: Boolean = true) {
             ReaperConfig.RAVEN -> buildRaven(c)
             ReaperConfig.PUMPKIN -> buildPumpkin(c)
             ReaperConfig.GHOST -> buildGhost(c)
+            ReaperConfig.SCATTER -> Art.coffin(c, Math.min(W, H))
             else -> buildRoyal(c, sym)
         }
     }
