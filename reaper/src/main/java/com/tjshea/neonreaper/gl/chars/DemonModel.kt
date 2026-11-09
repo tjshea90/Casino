@@ -49,6 +49,9 @@ class DemonModel : CharacterModel {
     /** design-space head point -> final character space */
     private fun dp(x: Float, y: Float, z: Float) = floatArrayOf(hn[0] + (x - hc[0]) * HS, hn[1] + (y - hc[1]) * HS, hn[2] + (z - hc[2]) * HS)
     private val half = (PI / 2).toFloat()
+    // glow positions (head space), precomputed so the frame loop does not allocate
+    private val eyeGlow = arrayOf(dp(-0.040f, 0.923f, 0.175f), dp(0.040f, 0.923f, 0.175f))
+    private val mouthGlow = dp(0f, 0.832f, 0.15f)
 
     /** Glowing ember crack: a thin emissive tube along [pts]. */
     private fun vein(pb: PartBuilder, pts: List<FloatArray>, r: Float = 0.0042f) {
@@ -249,7 +252,7 @@ class DemonModel : CharacterModel {
             val mem = MeshData()
             addMembrane(mem, wrist, listOf(tip1, elbow, root, low, tip3, s1, tip2, s2))
             KitA.shade(mem) { x, _, _, _, _, _ -> 0.45f + 0.55f * sstep(0.08f, 0.55f, abs(x)) }
-            pb.add(mem, 0x2E0B0F, SKIN)
+            pb.add(mem, 0x401015, SKIN)
             for (end in listOf(s1, s2, low, tip3)) {
                 val mid = floatArrayOf((wrist[0] + end[0]) / 2f, (wrist[1] + end[1]) / 2f + 0.01f, (wrist[2] + end[2]) / 2f + 0.006f)
                 vein(pb, listOf(floatArrayOf(wrist[0], wrist[1], wrist[2] + 0.006f), mid, floatArrayOf(end[0], end[1], end[2] + 0.006f)), 0.0034f)
@@ -300,16 +303,16 @@ class DemonModel : CharacterModel {
         sc.pointLightAt(root, 0f, 0.10f, 0.40f, 1.3f, 0xFF3A18, (0.45f + 0.25f * fl + 0.40f * ex) * dim)
 
         // ---- draws
-        sc.drawV(wings, wm, emis = 0.8f + 0.4f * fl + 0.6f * ex, dim = dim, rim = 0x500C0C, spec = 0.4f, shine = 20f)
-        sc.drawV(body, root, emis = 0.8f + 0.4f * fl + 0.7f * ex, dim = dim, rim = 0x4A0C0C, spec = 0.5f, shine = 20f)
-        sc.drawV(head, hm, emis = eye, dim = dim, rim = 0x4A0C0C, spec = 0.5f, shine = 20f)
-        sc.drawV(jaw, jm, emis = 0.8f + 0.9f * ex, dim = dim, rim = 0x4A0C0C, spec = 0.5f, shine = 20f)
-        sc.drawV(armR, aR, emis = 0.8f + 0.4f * fl + 0.7f * ex, dim = dim, rim = 0x4A0C0C, spec = 0.5f, shine = 20f)
-        sc.drawV(armL, aL, emis = 0.8f + 0.4f * fl + 0.7f * ex, dim = dim, rim = 0x4A0C0C, spec = 0.5f, shine = 20f)
+        sc.drawV(wings, wm, emis = 0.8f + 0.4f * fl + 0.6f * ex, dim = dim, rim = 0x8A1818, spec = 0.4f, shine = 20f)
+        sc.drawV(body, root, emis = 0.8f + 0.4f * fl + 0.7f * ex, dim = dim, rim = 0x7A1414, spec = 0.5f, shine = 20f)
+        sc.drawV(head, hm, emis = eye, dim = dim, rim = 0x7A1414, spec = 0.5f, shine = 20f)
+        sc.drawV(jaw, jm, emis = 0.8f + 0.9f * ex, dim = dim, rim = 0x7A1414, spec = 0.5f, shine = 20f)
+        sc.drawV(armR, aR, emis = 0.8f + 0.4f * fl + 0.7f * ex, dim = dim, rim = 0x7A1414, spec = 0.5f, shine = 20f)
+        sc.drawV(armL, aL, emis = 0.8f + 0.4f * fl + 0.7f * ex, dim = dim, rim = 0x7A1414, spec = 0.5f, shine = 20f)
         // glow sprites: the eyes (hot core, red halo), the open mouth, the hellfire at the base
-        for (sx in SGN) { val g = dp(sx * 0.040f, hc[1] + 0.008f, hc[2] + 0.115f); sc.glowAt(hm, g[0], g[1], g[2], 0.085f * eye + 0.02f, 0xFF3A1E, 0.8f * dim, 0.8f) }
+        for (g in eyeGlow) sc.glowAt(hm, g[0], g[1], g[2], 0.085f * eye + 0.02f, 0xFF3A1E, 0.8f * dim, 0.8f)
         val mouth = sstep(6f, 24f, open)
-        if (mouth > 0.01f) { val g = dp(0f, 0.832f, 0.15f); sc.glowAt(hm, g[0], g[1], g[2], 0.16f + 0.14f * mouth, 0xFF3010, 0.65f * mouth * dim, 0.3f) }
+        if (mouth > 0.01f) sc.glowAt(hm, mouthGlow[0], mouthGlow[1], mouthGlow[2], 0.16f + 0.14f * mouth, 0xFF3010, 0.65f * mouth * dim, 0.3f)
         sc.glowAt(root, 0f, 0.07f, 0.10f, 0.95f + 0.2f * ex, 0xFF2A10, (0.22f + 0.10f * fl + 0.15f * ex) * dim, 0f)
     }
 
