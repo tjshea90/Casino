@@ -13,6 +13,8 @@ import com.tjshea.neonreaper.engine.SoulVault
 import com.tjshea.neonreaper.engine.VaultResult
 import com.tjshea.neonreaper.engine.VaultStep
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -215,13 +217,80 @@ class VaultShotsTest {
         assertTrue("per-frame allocation $per bytes", per < 16 * 1024)
     }
 
+    /**
+     * AUD-10 ("no loss disguised as a win"): a Vault that was BOUGHT (31x the stake) and pays less than its price is not
+     * celebrated: no win stinger, no ember rain, a quiet plaque with the plain "BOUGHT FOR ... NET ..." line. The same
+     * Vault bought below its payout keeps the normal celebration (and also shows the line).
+     */
+    @Test fun boughtBelowPriceIsQuiet() {
+        SystemClock.setCurrentTimeMillis(1_000_000)
+        val low = small()                                            // bet 10, pays 80 tokens
+        val price = 31L * low.bet                                    // 310 tokens
+        assertTrue("fixture pays below its price", low.payTokens < price)
+        val v = VaultView(ctx, audio, low, price) {}
+        size(v, 1280, 800); step(v, 1.0); tap(v)
+        until(8.0, v) { v.awaitingSpin }; step(v, 0.3)
+        repeat(3) { nextRespin(v) }
+        assertTrue(until(30.0, v) { v.summaryAge in 1.3..1.5 }); shot(v, "vs_land_17_summary_bought_below_price")
+        assertTrue("quiet summary", v.quietSummary)
+        assertNull("win stinger skipped", v.summaryStinger)
+        assertEquals("no embers", 0f, v.emberRainLevel, 0f)
+
+        // a big result that clears its price: celebrated as usual, bought line included
+        val big = VB(5).apply { start(0 to 25, 1 to 25, 2 to 15, 3 to 15, 4 to 10); step(); step(); step() }.build()
+        val cheap = 31L * big.bet                                    // 155 tokens, the Vault pays 450
+        assertTrue(big.payTokens >= cheap)
+        val w = VaultView(ctx, audio, big, cheap) {}
+        size(w, 1280, 800); step(w, 1.0); tap(w)
+        until(8.0, w) { w.awaitingSpin }; step(w, 0.3)
+        repeat(3) { nextRespin(w) }
+        assertTrue(until(30.0, w) { w.summaryAge in 1.3..1.5 }); shot(w, "vs_land_18_summary_bought_above_price")
+        assertTrue("celebrated", !w.quietSummary)
+        assertNotNull("win stinger plays", w.summaryStinger)
+        assertTrue("embers fall on a big win", w.emberRainLevel > 0f)
+    }
+
+    /**
+     * On a device the crypt is baked one stage per frame (behind the host's white flash). That path must give exactly
+     * the same picture as the synchronous bake, and the first frames must be the plain white placeholder.
+     */
+    @Test fun slicedBakeMatchesSyncBake() {
+        fun run(sliced: Boolean): IntArray {
+            SystemClock.setCurrentTimeMillis(1_000_000)
+            val v = VaultView(ctx, audio, showcase()) {}
+            v.forceSlicedBake = sliced
+            size(v, 1280, 800)
+            var frames = 0
+            if (sliced) {
+                assertTrue("not baked yet", !v.isReady)
+                val first = frame(v)
+                assertEquals("placeholder is the flash colour", 0xFFECE6D6.toInt(), first.getPixel(640, 400))
+                frames++
+                while (!v.isReady && frames < 40) { ShadowSystemClock.advanceBy(Duration.ofMillis(40)); frame(v); frames++ }
+                println("VaultView sliced bake finished after $frames frames")
+                assertTrue("baked within a dozen frames", v.isReady && frames <= 14)
+            } else assertTrue(v.isReady)
+            frame(v)                                                      // first real frame: starts the intro clock
+            step(v, 1.0)
+            val b = frame(v); val px = IntArray(b.width * b.height); b.getPixels(px, 0, b.width, 0, 0, b.width, b.height)
+            v.release(); return px
+        }
+        val a = run(false); val b = run(true)
+        var diff = 0
+        for (i in a.indices) if (a[i] != b[i]) diff++
+        assertEquals("sliced and synchronous bakes differ in $diff pixels", 0, diff)
+    }
+
     /** The crypt is baked once in onSizeChanged on the UI thread: report how long that takes (JIT-warm and cold). */
     @Test fun bakeIsQuick() {
         SystemClock.setCurrentTimeMillis(1_000_000)
         val ms = ArrayList<Long>()
         for ((w, h) in listOf(1280 to 800, 800 to 1280, 1280 to 800)) {
             val v = VaultView(ctx, audio, showcase()) {}
+            val parts = StringBuilder()
+            v.bakeTrace = { name, t -> parts.append(name).append('=').append(t).append("ms ") }
             val t0 = System.nanoTime(); size(v, w, h); val t1 = System.nanoTime()
+            println("VaultView bake stages: $parts")
             frame(v); val t2 = System.nanoTime()
             ms += (t1 - t0) / 1_000_000
             println("VaultView bake ${w}x$h: ${(t1 - t0) / 1_000_000} ms, first frame ${(t2 - t1) / 1_000_000} ms")
