@@ -643,6 +643,11 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
         val sh = Sheet()
         val mins = wallet.sessionMillis / 60000
         val net = wallet.sessionNet
+        val played = when {
+            mins < 1 -> "less than a minute"
+            mins < 60 -> "$mins minute${if (mins == 1L) "" else "s"}"
+            else -> "${mins / 60} h ${mins % 60} min"
+        }
         val netText = (if (net > 0) "+" else if (net < 0) "-" else "") + fmt(abs(net))
         val netColor = when { net > 0 -> Dread.GOOD; net < 0 -> Dread.ERROR; else -> Dread.BONE_HI }
         val hourglass = ui.icon(Art.relic(1, dp(52), true), 52, "Hourglass").apply {
@@ -651,7 +656,7 @@ class Dialogs(private val act: Activity, private val wallet: Wallet, private val
         sheet(sh, "REALITY CHECK", subtitle = "A moment to look at your play", widthDp = 560, cancelable = false,
             body = ui.vbox(
                 hourglass,
-                ui.text(ui.rich(if (mins < 1) "You have been playing for **less than a minute**." else "You have been playing for **$mins minute${if (mins == 1L) "" else "s"}**."), 16f, Dread.BONE, center = true),
+                ui.text(ui.rich("You have been playing for **$played**."), 16f, Dread.BONE, center = true),
                 ui.tiles(
                     ui.stat("Wagered", fmt(wallet.sessionWagered), maxSp = 22f),
                     ui.stat("Won", fmt(wallet.sessionWon), maxSp = 22f),
