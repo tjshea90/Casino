@@ -32,6 +32,7 @@ class GameGLView(context: Context) : GLSurfaceView(context), SceneSink {
         override fun onSurfaceCreated(unused: GL10?, config: EGLConfig?) {
             try {
                 val s = Scene3D(AndroidGl())
+                s.introFade = true
                 s.init()
                 // 192 px symbol cells are plenty for ~150 px faces (45 % cheaper to paint and upload); big screens get 256
                 val dm = context.resources.displayMetrics

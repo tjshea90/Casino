@@ -294,7 +294,9 @@ class Scene3D(private val gl: Gl) {
             val p = postParams; val k = S.mood
             val beat = if (S.anticipation > 0f) S.anticipation * (if (S.calm) 0.6f else 0.5f + 0.5f * sin(time * 8.5f)) else 0f
             p.flash = S.flash * 0.35f
-            p.tint[0] = 1f + 0.16f * k; p.tint[1] = 1f - 0.26f * k; p.tint[2] = 1f - 0.28f * k
+            if (firstFrameT < 0f) firstFrameT = time
+            val fade = if (introFade) ((time - firstFrameT) / 0.9f).coerceIn(0f, 1f) else 1f   // the world fades in from black when the app starts
+            p.tint[0] = (1f + 0.16f * k) * fade; p.tint[1] = (1f - 0.26f * k) * fade; p.tint[2] = (1f - 0.28f * k) * fade
             p.saturation = 0.86f + 0.06f * k
             p.vignette = 0.62f + 0.10f * k
             p.pulse = beat
@@ -307,6 +309,9 @@ class Scene3D(private val gl: Gl) {
     }
 
     private fun lerp(a: Float, b: Float, k: Float) = a + (b - a) * k
+    private var firstFrameT = -1f
+    /** Fade the world in from black over the first ~1 s (the game view enables it; tests leave it off). */
+    var introFade = false
 
     /** Test hook: when true, [statLog] receives a per-phase draw-call / triangle breakdown of the last frame. */
     internal var collectStats = false
